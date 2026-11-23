@@ -1,0 +1,187 @@
+{
+  "about": "Made by engine/scripts/vectors.js. Do not edit by hand. Salts here are fixed on purpose; real ones are random.",
+  "league": "0xacda73914c8f7c9d61f8901a4c982cccaf53c541dbeea43c72b24ea78f66bd9a",
+  "matchCount": 3,
+  "playerCount": 3,
+  "matches": [
+    {
+      "label": "football",
+      "id": "0x4e29d98034df64f3393796369952ecb1b7d1f32f6a72d8bbe904871d2e79eecd",
+      "sport": 1,
+      "bestOf5": false,
+      "kickoffAfter": 3600,
+      "resultByte": 18,
+      "count": 3,
+      "root": "0x883d82df345f8a7781cf68341826cc29170bceb452b99a8eea827e30315b1f84",
+      "lockRef": "0x31f69677fd8356ccbab0e4f38d5bb3131b40cd1a0a6ff09ca8e1811c29c75389",
+      "picks": [
+        {
+          "name": "ada",
+          "player": "0x737c06c5a0e789ce19f9560efdb4ae10ff96bfd5d435cc2a844a71097a2806c4",
+          "pickByte": 18,
+          "salt": "0x916ecaf47f08e6c5b218a7cb44deb6499579120de0d13dc3f0aef7f2576f7b06",
+          "fingerprint": "0x992c3364809d5ed9e2e61f98829315520acfc9abd741a56177cb2857ccc5d5e5",
+          "index": 1,
+          "path": [
+            "0x3289d2fa7186fcac8269ba3b5ddf78a06f52848a379b7bf94247a67746bcd797",
+            "0xc79f122627cfcf47037e17fafaf9bffcc6d6977ed27e0b4e8282a6041bbcde40"
+          ],
+          "points": 3
+        },
+        {
+          "name": "bola",
+          "player": "0x3f138646d804c5af4fb47ac46bd01d08eb64bb4ae45c67fd715c22dcb19ebea5",
+          "pickByte": 1,
+          "salt": "0xa6b67b420dc8b31bda993c6a2b3a112bb63b41056382f14763b38836bfaa390a",
+          "fingerprint": "0x7df72fac6017724169cfb16f73a7880aa1c04774bd0b4ba3b554add45eb53593",
+          "index": 0,
+          "path": [
+            "0xa12d2ce9963a4f4b49a75ebe59f049fa2b6ef2d1a2884b67d180b2d630bed3ed",
+            "0xc79f122627cfcf47037e17fafaf9bffcc6d6977ed27e0b4e8282a6041bbcde40"
+          ],
+          "points": 1
+        },
+        {
+          "name": "chidi",
+          "player": "0x932048f47c334256f75de92affa7fb421e3da5b21caa345550da36020988e3a3",
+          "pickByte": 0,
+          "salt": "0x95a7d872b9d024466979faa08a384aa082e2e15a4cc89d60eed74f1cde9e9514",
+          "fingerprint": "0x265ecabbfd6229ee1ca8a39f9bb79a05f43d1a04ab875ba3834d1c8e6a5ce1c2",
+          "index": 2,
+          "path": [
+            "0x02e7fe7fe4b19665038941999a4c174276b2b72a5bb7432a9203eab3b0618125"
+          ],
+          "points": 0
+        }
+      ]
+    },
+    {
+      "label": "basketball",
+      "id": "0x75a80ed0ae6dbea650edabc2f65ee135d074f7fa85edd9500c9002a29657c3bb",
+      "sport": 2,
+      "bestOf5": false,
+      "kickoffAfter": 7200,
+      "resultByte": 2,
+      "count": 3,
+      "root": "0x6b1711bba7f396156c68ff51e61f587ae988f8fa75857165bf6e37db03fc00b1",
+      "lockRef": "0x52e36a86e4170551a9f3c8c81f278c02a62adbbdcc93ebcb36dbce4cd453380e",
+      "picks": [
+        {
+          "name": "ada",
+          "player": "0x737c06c5a0e789ce19f9560efdb4ae10ff96bfd5d435cc2a844a71097a2806c4",
+          "pickByte": 0,
+          "salt": "0xc2ad881c186518a39f8523026e544fd3c9909d153b3840fa7eb541ee551620cd",
+          "fingerprint": "0xfe83b2aea9a94c24fa8f140e9ad86acff55647b462ca295a8f7b34c90d25e905",
+          "index": 1,
+          "path": [
+            "0x3f62aa81044be3172828b6d3ec21843e30d954a0f709af0cc2320fd5e1a376d2",
+            "0xe423ce11b7a53bd63d594a4f3ec12fe778aaa14c9796f9b48bdc7c2d647083f2"
+          ],
+          "points": 1
+        },
+        {
+          "name": "bola",
+          "player": "0x3f138646d804c5af4fb47ac46bd01d08eb64bb4ae45c67fd715c22dcb19ebea5",
+          "pickByte": 2,
+          "salt": "0x8685bb20c9b8c3af6687a5b6f5f67d87a64ef7e11edbddfcfb17fc19567c42d5",
+          "fingerprint": "0xded846f0b276db773f80827ec16b3019019306d5cb999de207905b89fc56b21d",
+          "index": 0,
+          "path": [
+            "0x4faa4e380d3adf9abf7f61680cf39f5219f9f33c495d519e7d2dc4f470f6b49a",
+            "0xe423ce11b7a53bd63d594a4f3ec12fe778aaa14c9796f9b48bdc7c2d647083f2"
+          ],
+          "points": 3
+        },
+        {
+          "name": "chidi",
+          "player": "0x932048f47c334256f75de92affa7fb421e3da5b21caa345550da36020988e3a3",
+          "pickByte": 3,
+          "salt": "0xebc84a7a074f164bc4fd6e22b9f666fcc2eaf6e977bc8e2d51a2b2f07b91dc22",
+          "fingerprint": "0x8e877347260bf2e9473e26d1e9b64b673f22256b64e62ba4c177dcdd3f31214c",
+          "index": 2,
+          "path": [
+            "0x6f466577c68a356c7a24e810603be78541b66917502a2b3b913b7aede07545f9"
+          ],
+          "points": 0
+        }
+      ]
+    },
+    {
+      "label": "tennis",
+      "id": "0xff9da4d7ce4e0b05788809865fc1bbabbeb70356aca5a94b904e1819d25f8395",
+      "sport": 3,
+      "bestOf5": true,
+      "kickoffAfter": 10800,
+      "resultByte": 4,
+      "count": 3,
+      "root": "0xb42dc1c75028db554d3f3a9683114c40e59bf8e4e3dc119b195f369257f70878",
+      "lockRef": "0x24df19733371216702a711a8fcd1c67251429b9ac5ffde920d512993a3a963bc",
+      "picks": [
+        {
+          "name": "ada",
+          "player": "0x737c06c5a0e789ce19f9560efdb4ae10ff96bfd5d435cc2a844a71097a2806c4",
+          "pickByte": 4,
+          "salt": "0xb0619481473d6117cabe0c7cef4bf5bb419a88a7fa949d9e29cf6a4608b37d4e",
+          "fingerprint": "0x89e9c3232f5672f497c32ce330480744fb1ecc0f2a1b12f10d171190da610238",
+          "index": 1,
+          "path": [
+            "0x5d39406a9d233e3841f114a71cefb5b797abb8f594556cc251699423209ad86f",
+            "0x4be006670f1292d15fd63bffffea6df72210ee38072c76e96b2a44b38aa04777"
+          ],
+          "points": 3
+        },
+        {
+          "name": "bola",
+          "player": "0x3f138646d804c5af4fb47ac46bd01d08eb64bb4ae45c67fd715c22dcb19ebea5",
+          "pickByte": 3,
+          "salt": "0x99d8306b9dd22f0110acf3006f40578cd5662a69f3fc38dc91b5aee90500145d",
+          "fingerprint": "0x8461f8200b44119a7b5f4e49bb7e326670ac091d7c80933b062b460449d7be46",
+          "index": 0,
+          "path": [
+            "0x9ac9a0302fa974c333d4a56fc1b9caf33c4d4ef8f2f1733d744f9d7db94ac411",
+            "0x4be006670f1292d15fd63bffffea6df72210ee38072c76e96b2a44b38aa04777"
+          ],
+          "points": 0
+        },
+        {
+          "name": "chidi",
+          "player": "0x932048f47c334256f75de92affa7fb421e3da5b21caa345550da36020988e3a3",
+          "pickByte": 6,
+          "salt": "0x5e55eeab09d3d08c88f07183acae646185e624ac645a491f9c59a3bb9764b09e",
+          "fingerprint": "0x8503aad5080abe5885f240dc67022085dc91a7aadc07062aa17687109a4b7376",
+          "index": 2,
+          "path": [
+            "0xc49c3275b64d03c0ea6ba8b180872062f7811ca9ebe54fdc0144994107decf31"
+          ],
+          "points": 1
+        }
+      ]
+    }
+  ],
+  "table": [
+    {
+      "name": "ada",
+      "player": "0x737c06c5a0e789ce19f9560efdb4ae10ff96bfd5d435cc2a844a71097a2806c4",
+      "position": 1,
+      "points": 7,
+      "threes": 2,
+      "ones": 1
+    },
+    {
+      "name": "bola",
+      "player": "0x3f138646d804c5af4fb47ac46bd01d08eb64bb4ae45c67fd715c22dcb19ebea5",
+      "position": 2,
+      "points": 4,
+      "threes": 1,
+      "ones": 1
+    },
+    {
+      "name": "chidi",
+      "player": "0x932048f47c334256f75de92affa7fb421e3da5b21caa345550da36020988e3a3",
+      "position": 3,
+      "points": 1,
+      "threes": 0,
+      "ones": 1
+    }
+  ]
+}

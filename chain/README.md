@@ -68,6 +68,29 @@ Kickoff keeps a verified copy of its website on chain, in the account of a circu
 5. Probes the name contract to find out what a site's on-chain name costs and how the name must be
    written. This one prints what it finds and cannot fail.
 
+### 4. A whole season
+
+`test/LeagueSeason.t.sol`. Written. Its result is recorded in
+[docs/REHEARSAL-RESULTS.md](../docs/REHEARSAL-RESULTS.md) once it has run.
+
+This joins the picks engine to the chain. The engine plays out a small fixed league, three players
+and one match in each sport, and writes down every value it works out in
+[`engine/vectors/league.json`](../engine/vectors/league.json). The rehearsal then does the chain's
+half with the real TapeOut contracts:
+
+1. Works out every fingerprint, every bundle root and every receipt again in Solidity and confirms
+   each is exactly what the engine got.
+2. Has the league lock each match's bundle through the real mailbox before kickoff.
+3. After the matches, posts each result, then opens every pick: checks the lock on chain is that
+   bundle and was stamped before kickoff, checks the pick against its fingerprint and its receipt,
+   and has the sport's real circuit score it.
+4. Confirms each score, and the final totals, are the engine's.
+5. Tries four ways of cheating: locking after kickoff, changing a pick, opening another player's
+   pick as your own, and using a pick from another match.
+
+The Solidity side of these checks is `src/KickoffCheck.sol`. It is real product code, not test
+code: it is what a contract paying out a sponsor's prize would use to check a pick.
+
 ### The fees report
 
 `test/Fees.t.sol`. **Passed on its first run, 23 November 2026.** The page written from its output
@@ -115,10 +138,12 @@ It reads X Layer through the public node at `https://rpc.xlayer.tech`. To use an
 | File | What it is |
 | --- | --- |
 | `src/ITapeOut.sol` | The parts of TapeOut that Kickoff talks to, and where each one was taken from |
+| `src/KickoffCheck.sol` | Kickoff's own checks, written for the chain: the same fingerprints, bundle proofs and circuit inputs as the picks engine |
 | `test/Rehearsal.sol` | What every rehearsal starts with: the private copy of X Layer and a Kickoff processor on it |
 | `test/PublishCircuits.t.sol` | Rehearsal 1: publish the three circuits and check every case |
 | `test/LeagueAccount.t.sol` | Rehearsal 2: a league's account, its mailbox, and one pick from start to finish |
 | `test/LeagueSite.t.sol` | Rehearsal 3: the on-chain site, who may change it, and what happens when it changes hands |
+| `test/LeagueSeason.t.sol` | Rehearsal 4: a whole season, with the engine's values checked on chain and every pick scored by the real circuits |
 | `test/Fees.t.sol` | The fees report: every fee read from the chain and the gas of every step |
 | `foundry.toml` | Settings for the test tool |
 | `lib/forge-std` | The standard Foundry test library, pinned to a release |

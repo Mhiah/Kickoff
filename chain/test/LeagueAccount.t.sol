@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 import {ITapeSendHub} from "../src/ITapeOut.sol";
+import {KickoffCheck} from "../src/KickoffCheck.sol";
 import {Rehearsal} from "./Rehearsal.sol";
 
 /// A rehearsal on a PRIVATE COPY of X Layer mainnet. Nothing here is sent to the real network.
@@ -44,9 +45,17 @@ contract LeagueAccountTest is Rehearsal {
         index = HUB.send(address(processor), fromId, endpoint, ref, payload);
     }
 
-    /// The fingerprint of a football pick. It hides the pick until the salt is given out.
+    /// The fingerprint of a football pick, worked out the way the picks engine does. It hides the
+    /// pick until the salt is given out.
     function _fingerprint(uint256 matchId, uint8 homeGoals, uint8 awayGoals, bytes32 salt) internal pure returns (bytes32) {
-        return keccak256(abi.encode("kickoff/football-pick/v0", matchId, homeGoals, awayGoals, salt));
+        return KickoffCheck.fingerprint(
+            keccak256("a league"),
+            bytes32(matchId),
+            KickoffCheck.FOOTBALL,
+            homeGoals | (awayGoals << 4),
+            keccak256("a player"),
+            salt
+        );
     }
 
     // ------------------------------------------------------------------ the league's account

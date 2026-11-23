@@ -9,7 +9,7 @@ the website and anyone checking a league use exactly the same code.
 
 > [!NOTE]
 > **What is here:** sealing, bundling, opening and checking, scoring with the circuits, and the
-> table and personal records, with 62 tests. **Not here yet:** reading a league's facts from the
+> table and personal records, with 64 tests. **Not here yet:** reading a league's facts from the
 > chain, and the rehearsal that runs a whole league on a copy of X Layer. At the moment the table
 > builder is handed the facts. It does not fetch them.
 
@@ -134,9 +134,22 @@ every tree from 1 to 17 leaves is checked to have a proof that works only for it
   by the league, so the league could deny having issued it. Signing receipts is still to do.
 - **This hides a pick behind a fingerprint. It does not encrypt it.** Encrypted messages between
   players who have their own TapeOut identity are a later step.
-- **The fingerprint format here replaces the stand-in used in the second chain rehearsal.** That
-  rehearsal proved the chain parts with a simpler fingerprint. The league rehearsal will use this
-  one.
+
+## The engine and the chain agree
+
+`scripts/vectors.js` plays out a small fixed league with the engine and writes every value it
+works out to `vectors/league.json`: each fingerprint, each bundle root, each receipt, the points
+and the final table. The chain rehearsal in
+[`chain/test/LeagueSeason.t.sol`](../chain/test/LeagueSeason.t.sol) reads that file and works every
+value out again in Solidity, with the real TapeOut circuits doing the scoring. A test here fails if
+the file is not what the engine produces today.
+
+To remake the file after changing the engine:
+
+```
+cd engine
+npm run vectors
+```
 
 ## Run the tests
 
@@ -160,4 +173,6 @@ npm test
 | `src/table.js` | The league table and every player's record |
 | `src/bytes.js` | Small helpers for raw bytes, and SHA-256 from the platform |
 | `src/index.js` | Everything, in one place to import from |
+| `scripts/vectors.js` | Plays out a small fixed league and writes down every value, for the chain rehearsal to check |
+| `vectors/league.json` | Those values. Made by the script, not by hand. |
 | `test/` | The tests |

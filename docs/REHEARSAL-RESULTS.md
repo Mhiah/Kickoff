@@ -119,6 +119,10 @@ What the probe found about a site's on-chain name:
 The number 443 belongs to the rehearsal. When Kickoff's processor is created on the real network
 it gets whatever number is next at that moment.
 
+## Rehearsal 4: a whole season
+
+Written, not yet recorded here. This section is filled in after its first run.
+
 ## The fees report
 
 | | |

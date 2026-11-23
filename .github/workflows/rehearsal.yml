@@ -8,6 +8,7 @@ on:
     paths:
       - "chain/**"
       - "circuits/out/**"
+      - "engine/vectors/**"
       - ".github/workflows/rehearsal.yml"
   workflow_dispatch:
 
