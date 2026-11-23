@@ -6,7 +6,7 @@ picks so they can be locked on X Layer together.
 > [!NOTE]
 > **What is here:** the server's rules as tested code, the way a device proves it is itself, the
 > addresses the website will talk to, the connection to a real database, the entry point a web
-> host uses, and a version that runs on your own computer. 51 tests.
+> host uses, and a version that runs on your own computer. 52 tests.
 > **Not here yet:** it has not been put on the internet, so no real database is connected, and the
 > website does not talk to it. Those are the next steps.
 
@@ -126,6 +126,9 @@ The host's settings decide everything. None of them is in the code:
 | `KV_REST_API_URL` and `KV_REST_API_TOKEN` | The database's address and token. Vercel adds these itself when a database is connected. |
 | `KICKOFF_ADMIN_KEY` | The robot's key. If it is not set, the robot's addresses are switched off. |
 | `KICKOFF_LEAGUE` | Kickoff's id on X Layer. Until Kickoff is live there, a stand-in is used. |
+
+Every record's name starts with `kickoff:`, so the database can be shared with another project
+without either overwriting the other.
 
 With no database set, every address answers "Kickoff's database is not connected yet." It never
 pretends to keep things it would forget.

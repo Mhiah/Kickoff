@@ -113,3 +113,20 @@ test("a player is told plainly when the database is down, and nothing leaks", as
   assert.equal(answer.body.error, "Something went wrong on Kickoff's side. Try again.");
   assert.ok(!JSON.stringify(answer.body).includes(FAKE_TOKEN));
 });
+
+test("Kickoff's records sit apart from anything else in the same database", async () => {
+  const fake = fakeRedis();
+  // Another project already keeps things here, under names Kickoff also uses.
+  fake.strings.set("group:SUNDAYB-4821", "theirs");
+  fake.hashes.set("fixtures", new Map([["x", "theirs"]]));
+  const s = await serverWithFixtures({ store: new RedisStore({ url: FAKE_URL, token: FAKE_TOKEN, fetch: fake.fetch }) });
+  const ada = await device();
+  const made = await s.post(ada, "/api/groups", { name: "Sunday Ballers", playerName: "Ada" });
+  assert.equal(made.body.code, "SUNDAYB-4821", "their record under the same name does not get in the way");
+  assert.equal((await s.get("/api/fixtures")).body.fixtures.length, 2, "and theirs is not read as one of Kickoff's");
+  // Theirs is untouched, and everything Kickoff wrote starts with its own name.
+  assert.equal(fake.strings.get("group:SUNDAYB-4821"), "theirs");
+  assert.deepEqual([...fake.hashes.get("fixtures")], [["x", "theirs"]]);
+  const mine = [...fake.strings.keys(), ...fake.hashes.keys()].filter((k) => k !== "group:SUNDAYB-4821" && k !== "fixtures");
+  assert.ok(mine.length > 3 && mine.every((k) => k.startsWith("kickoff:")));
+});
