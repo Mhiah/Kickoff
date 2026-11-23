@@ -2,7 +2,8 @@
 
 What happened when Kickoff's X Layer rehearsals were run. A rehearsal runs on a **private copy** of
 X Layer mainnet with the real TapeOut contracts. Nothing is sent to the real network and nothing is
-paid. What each rehearsal does is explained in [chain/README.md](../chain/README.md).
+paid. What rehearsals 1 to 4 and the fees report do is explained in
+[chain/README.md](../chain/README.md), and rehearsal 5 in [engine/README.md](../engine/README.md).
 
 Each entry links to the run on GitHub, where the full output can be read.
 
@@ -153,7 +154,60 @@ What was confirmed:
   opened under your own name; and a pick sealed for one match is not in another match's bundle.
 
 What this rehearsal does not cover: reading a league's facts back from the chain to build the
-table. Here the test knew where each lock was. Finding them is the next piece of the engine.
+table. Here the test knew where each lock was. Rehearsal 5 does that.
+
+## Rehearsal 5: a season played on chain and read back
+
+| | |
+| --- | --- |
+| Date | 23 November 2026 |
+| Run | <https://github.com/Mhiah/Kickoff/actions/runs/45230433681> |
+| Commit | `c52b822` |
+| Result | **11 of 11 checks passed on the first run** |
+
+This one is run by the picks engine itself, not by a Solidity test. GitHub starts a private copy of
+X Layer (it was copied at block 76,686,687), and
+[`engine/scripts/season-on-chain.js`](../engine/scripts/season-on-chain.js) plays a season on it
+through the real TapeOut contracts. Then it keeps only the league's id, fetches the league back
+from the node, and rebuilds the table.
+
+What happened on the copy:
+
+- A circuit was published on an existing TapeOut processor, paying in OKB only, and its account was
+  opened. That account became the league.
+- The league announced three matches, locked each bundle of sealed picks through the real mailbox
+  10 minutes before kickoff, gave each result two hours after, and published each match's opened
+  picks on its on-chain site through the real site store.
+- One minute after the football kickoff, the host locked a changed bundle, with chidi's pick set to
+  the real score.
+- An outsider with their own TapeOut account wrote a 0-0 result to the league's inbox.
+- A member disputed the football result.
+
+What was confirmed when it was read back:
+
+- **All 12 messages in the league's inbox were fetched**, each one checked against the fingerprint
+  the mailbox stores for it.
+- **The opened picks for all three matches were fetched from the league's site**, each file checked
+  against the SHA-256 the site store keeps with it.
+- **The table came out the same as in every other check:**
+
+| Position | Player | Points |
+| --- | --- | --- |
+| 1 | ada | 7 |
+| 2 | bola | 4 |
+| 3 | chidi | 1 |
+
+- **The changed bundle was refused.** The bundle locked before kickoff stayed in force. The changed
+  one is on the record, marked as locked too late.
+- **The outsider's result was ignored**, with the reason recorded: a result by someone other than
+  the league.
+- **The dispute is listed with its match**, from the member's account, inside the 24 hours.
+- **The one-line command printed the same table** for the same league:
+  `node engine/bin/table.js <league id>`.
+
+What this rehearsal does not cover: a real league. The league here lived only on the copy and was
+gone when the run ended. It also asks one node, the copy itself. Asking several independent nodes
+and requiring them to agree is still to do.
 
 ## The fees report
 

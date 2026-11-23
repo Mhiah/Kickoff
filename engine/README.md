@@ -11,8 +11,9 @@ the website and anyone checking a league use exactly the same code.
 > **What is here:** sealing, bundling, opening and checking, scoring with the circuits, the table
 > and personal records, reading a league back from its inbox, and fetching that inbox and the
 > opened picks from an X Layer node, with 112 tests. **Not live yet:** no league exists on X Layer
-> itself. The fetching has been run against a stand-in node in the tests and against a private copy
-> of X Layer on GitHub, not against a real league.
+> itself. The fetching has been run against a stand-in node in the tests, and against the real
+> TapeOut contracts on a private copy of X Layer, where it passed
+> ([rehearsal 5](../docs/REHEARSAL-RESULTS.md)). It has not been run against a real league.
 
 ## How a pick stays secret, then gets proven
 
@@ -244,7 +245,8 @@ Then it throws everything away except the league's id, fetches the league back f
 rebuilds the table from that alone. It has to come out as ada 7, bola 4, chidi 1, with both cheats
 refused and the dispute listed.
 
-GitHub runs it on every change to the engine. The script only works against a test node that lets
+It passed on its first run against the real contracts
+([rehearsal 5](../docs/REHEARSAL-RESULTS.md)). GitHub runs it on every change to the engine. The script only works against a test node that lets
 it act as any account, which no real node allows, so it cannot touch the real network. To run it
 yourself you need [Foundry](https://getfoundry.sh):
 
