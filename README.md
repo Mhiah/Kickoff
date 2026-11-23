@@ -110,7 +110,7 @@ through are an ordinary website.
 | --- | --- | --- |
 | 1 | Project setup: this README, the folders, the licence | Done |
 | 2 | The three scoring circuits and the checker that tests every possible case | Built and checked off chain. Not published on X Layer yet. |
-| 3 | Proving the TapeOut parts on a private copy of X Layer | In progress. Rehearsal 1, publishing the three circuits, passed: the real TapeOut evaluator agreed with the rules on every case. Rehearsal 2, a league's account and mailbox, is written. See [chain/README.md](chain/README.md). |
+| 3 | Proving the TapeOut parts on a private copy of X Layer | In progress. Rehearsal 1, publishing the three circuits, passed: the real TapeOut evaluator agreed with the rules on every case. Rehearsal 2 passed too: a league's own account, its mailbox, and one pick locked before kickoff, opened after and scored. Still to rehearse: the on-chain site. See [chain/README.md](chain/README.md). |
 | 4 | The picks engine and the table builder | Not started |
 | 5 | The website | Not started |
 | 6 | Going live on X Layer: processor, circuits, the first league | Not started |

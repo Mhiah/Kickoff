@@ -43,4 +43,43 @@ the processor.
 
 ## Rehearsal 2: a league's account and mailbox
 
-Written, not yet recorded here. This section is filled in after its first run.
+| | |
+| --- | --- |
+| Date | 23 November 2026 |
+| Run | <https://github.com/Mhiah/Kickoff/actions/runs/45216405278> |
+| Commit | `7125a14` |
+| Result | **5 of 5 tests passed** (and rehearsal 1 passed again in the same run, 11 of 11) |
+
+What was confirmed, all with the real TapeOut contracts:
+
+- **A league gets its own account.** Opening one worked, and TapeOut's opener and its mailbox agree
+  on which account belongs to the circuit.
+- **The account can hold prize money.** OKB sent to it by another wallet arrived and stayed there.
+- **Only an opened account can send, but any account can receive.** The mailbox refused a message
+  from a circuit whose account was not open, and accepted one addressed to a league whose account
+  was still closed.
+- **A message can be sent and read back.** The inbox recorded who sent it, the block and the time
+  it arrived, and a fingerprint of it, and the text read back from the chain was the text sent.
+- **One pick, start to finish.** Its fingerprint was sent before kickoff and stamped with a time
+  before kickoff. A pick sent after kickoff was stamped late. The first pick was then opened and
+  matched its fingerprint, a different score did not, the time on the original could not be
+  changed, and the football circuit gave it 3 points.
+
+Fee the rehearsal read from the chain:
+
+| Fee | Amount | Paid in |
+| --- | --- | --- |
+| Opening a circuit's account | 0.08 OKB | OKB |
+
+Sending a message has no fee of its own. It costs only the network's gas.
+
+**The first run of this rehearsal failed, and why.** In
+[the run before this one](https://github.com/Mhiah/Kickoff/actions/runs/45215959362), three of the
+five tests failed with TapeOut's `NotHolder` error. The cause was a mistake in the test, not in
+TapeOut or in Kickoff: the test looked up an address in between "act as the circuit's owner" and
+the send, so the send went out from the wrong sender and the mailbox rightly refused it. The fix
+was to do the lookup first. It is recorded here because it shows the mailbox really does check who
+is sending.
+
+What this rehearsal does not cover: encrypted messages. They are encrypted in the browser, so they
+are tested with the picks engine.

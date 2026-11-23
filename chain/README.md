@@ -37,8 +37,7 @@ Actions tab.
 
 ### 2. A league's account and mailbox
 
-`test/LeagueAccount.t.sol`. Written. Its result is recorded in
-[docs/REHEARSAL-RESULTS.md](../docs/REHEARSAL-RESULTS.md) once it has run.
+`test/LeagueAccount.t.sol`. **Passed, 23 November 2026.**
 
 A Kickoff league is one TapeOut circuit with its own account and mailbox. This rehearsal:
 
@@ -62,6 +61,8 @@ fingerprint instead, which is how guest picks work.
 - **The transistor fee is one flat charge for each circuit**, whatever its size. Kickoff's
   processor sets its own transistor price to zero, so only TapeOut's flat fee is paid.
 - **Publishing a circuit costs 0.0013 OKB.**
+- **Opening a circuit's own account costs 0.08 OKB.** Every league that wants its own identity pays
+  this once. Sending messages through the mailbox costs only gas.
 
 So a wallet that creates a Kickoff processor needs BEM as well as OKB. The other route is to publish
 the circuits on an existing processor, which needs OKB only. The numbers are in
