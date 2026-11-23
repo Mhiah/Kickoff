@@ -52,6 +52,9 @@ interface IProcessor {
     function netlist(uint256 id) external view returns (bytes memory);
     function eval(uint256 id, bytes calldata inputs) external view returns (bytes memory outputs);
     function ownerOf(uint256 id) external view returns (address);
+
+    // A circuit is an ordinary NFT, so it can change hands.
+    function transferFrom(address from, address to, uint256 id) external;
 }
 
 /// Opens a circuit's own account ("container"). The address is the same on Base and X Layer and is
@@ -89,6 +92,45 @@ interface ITapeSendHub {
     function outboxCount(address from) external view returns (uint256);
     function digestOf(bytes32 ref, bytes calldata payload) external view returns (bytes32);
     function MAX_PAYLOAD() external view returns (uint256);
+}
+
+/// The site store: where a circuit's website files live on chain (DeWEB). Specified in TAP-10
+/// section 7 and its appendix. Only the circuit's holder, or an operator they name, may write.
+interface ISiteRegistry {
+    /// Writes the first piece of a file (at most 24,000 bytes) and replaces any file already there.
+    /// `sha256Hash` is the fingerprint of the WHOLE file, so a reader can tell when it is complete.
+    function putFile(
+        address container,
+        string calldata path,
+        string calldata contentType,
+        bytes32 sha256Hash,
+        bytes calldata data
+    ) external;
+
+    /// Adds the next piece. `expectIndex` must be the number of pieces the file already has.
+    function appendChunk(address container, string calldata path, uint256 expectIndex, bytes calldata data) external;
+    function removeFile(address container, string calldata path) external;
+    function setFallback(address container, string calldata path) external;
+
+    function fileInfo(address container, string calldata path)
+        external
+        view
+        returns (uint32 size, string memory contentType, bytes32 sha256Hash, uint40 updatedAt, uint256 chunkCount);
+    function read(address container, string calldata path) external view returns (bytes memory);
+    function readRange(address container, string calldata path, uint256 offset, uint256 len)
+        external
+        view
+        returns (bytes memory);
+    function pathCount(address container) external view returns (uint256);
+    function pathsRange(address container, uint256 from, uint256 n) external view returns (string[] memory);
+    function fallbackPath(address container) external view returns (string memory);
+}
+
+/// Pays for a site's on-chain name (TAP-10 section 6 and its appendix).
+interface IDomainBinding {
+    function bind(string calldata name, address container, uint256 months) external payable;
+    function monthlyFee() external view returns (uint256);
+    function paidUntil(bytes32 nameHash, address container) external view returns (uint40);
 }
 
 interface IERC20 {

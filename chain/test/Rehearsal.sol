@@ -3,7 +3,14 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {
-    IProcessorFactory, ITransistors, IProcessor, IContainerOpener, ITapeSendHub, IERC20
+    IProcessorFactory,
+    ITransistors,
+    IProcessor,
+    IContainerOpener,
+    ITapeSendHub,
+    ISiteRegistry,
+    IDomainBinding,
+    IERC20
 } from "../src/ITapeOut.sol";
 
 /// What every rehearsal starts with: a PRIVATE COPY of X Layer mainnet and a Kickoff processor
@@ -13,6 +20,8 @@ abstract contract Rehearsal is Test {
     IProcessorFactory constant FACTORY = IProcessorFactory(0x1f09DAeFA827f02CBb40967cc91b259763760761);
     IContainerOpener constant OPENER = IContainerOpener(0x536adD8F30f03b69f6fbF29d425A816A0dC50106);
     ITapeSendHub constant HUB = ITapeSendHub(0xe61A9C7213a6Aa616C246a2B569e555B417b25ee);
+    ISiteRegistry constant SITES = ISiteRegistry(0xd6EFb7adCc9c83dC4924Ad56f6a8E4e969b9ADB6);
+    IDomainBinding constant NAMES = IDomainBinding(0x68809Fd2fb343aA57D0aeB7f33Defe477c9666f9);
 
     uint256 constant NAND = 0;
 
@@ -67,6 +76,17 @@ abstract contract Rehearsal is Test {
         assertEq(gotState, 0, "no memory, so eval() works");
         assertEq(gotGates, gates, "gate count");
         assertEq(keccak256(processor.netlist(id)), keccak256(netlist), "stored circuit is byte-identical");
+    }
+
+    /// The smallest possible circuit: one NAND gate that flips its one input. It stands in for the
+    /// circuit a league or a player would own.
+    bytes constant ONE_GATE = hex"00000002000002";
+
+    /// Opens a circuit's own account and returns its address.
+    function _open(uint256 id) internal returns (address account) {
+        uint256 fee = OPENER.FEE();
+        vm.prank(deployer);
+        account = OPENER.open{value: fee}(address(processor), id);
     }
 
     /// Publishes one of Kickoff's scoring circuits from circuits/out/.

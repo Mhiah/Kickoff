@@ -12,10 +12,6 @@ import {Rehearsal} from "./Rehearsal.sol";
 /// the mailbox and reading it back, and the whole life of one pick in miniature. The pick is
 /// locked before kickoff, opened after, and scored by the football circuit.
 contract LeagueAccountTest is Rehearsal {
-    /// The smallest possible circuit: one NAND gate that flips its one input. It stands in for the
-    /// circuit a league or a player would own.
-    bytes constant ONE_GATE = hex"00000002000002";
-
     /// The start of every TapeSend message (TAP-10 section 15.1): "TS", version 2, kind 0 (public).
     bytes constant PUBLIC_MESSAGE_HEADER = hex"54530200";
 
@@ -33,12 +29,6 @@ contract LeagueAccountTest is Rehearsal {
     }
 
     // ------------------------------------------------------------------ helpers
-
-    function _open(uint256 id) internal returns (address account) {
-        uint256 fee = OPENER.FEE();
-        vm.prank(deployer);
-        account = OPENER.open{value: fee}(address(processor), id);
-    }
 
     function _message(string memory subject, string memory body) internal pure returns (bytes memory) {
         return bytes.concat(

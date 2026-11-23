@@ -83,3 +83,7 @@ is sending.
 
 What this rehearsal does not cover: encrypted messages. They are encrypted in the browser, so they
 are tested with the picks engine.
+
+## Rehearsal 3: the on-chain site
+
+Written, not yet recorded here. This section is filled in after its first run.

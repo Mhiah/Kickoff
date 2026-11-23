@@ -53,6 +53,22 @@ What it does not cover: encrypted messages. TapeSend's sealed messages are encry
 browser, so they are tested with the picks engine, not here. This rehearsal hides the pick behind a
 fingerprint instead, which is how guest picks work.
 
+### 3. The on-chain site
+
+`test/LeagueSite.t.sol`. Written. Its result is recorded in
+[docs/REHEARSAL-RESULTS.md](../docs/REHEARSAL-RESULTS.md) once it has run.
+
+Kickoff keeps a verified copy of its website on chain, in the account of a circuit. This rehearsal:
+
+1. Uploads a one-page site and reads it back: same bytes, same fingerprint, listed by name.
+2. Uploads a file too big for one piece (60,000 bytes, in three pieces), confirms a half-uploaded
+   file can be told apart from a finished one, and reads the whole file back.
+3. Confirms a stranger cannot replace, add to or remove a page, and the owner can.
+4. Hands the circuit to a new owner and confirms the site goes with it: same account, same page,
+   the old owner locked out and the new owner in control.
+5. Probes the name contract to find out what a site's on-chain name costs and how the name must be
+   written. This one prints what it finds and cannot fail.
+
 ## What the rehearsals showed about going live
 
 - **Creating a processor is paid for in the BEM token, not in OKB.** So is the fee for buying
@@ -89,5 +105,6 @@ It reads X Layer through the public node at `https://rpc.xlayer.tech`. To use an
 | `test/Rehearsal.sol` | What every rehearsal starts with: the private copy of X Layer and a Kickoff processor on it |
 | `test/PublishCircuits.t.sol` | Rehearsal 1: publish the three circuits and check every case |
 | `test/LeagueAccount.t.sol` | Rehearsal 2: a league's account, its mailbox, and one pick from start to finish |
+| `test/LeagueSite.t.sol` | Rehearsal 3: the on-chain site, who may change it, and what happens when it changes hands |
 | `foundry.toml` | Settings for the test tool |
 | `lib/forge-std` | The standard Foundry test library, pinned to a release |
