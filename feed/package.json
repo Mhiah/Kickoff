@@ -1,0 +1,15 @@
+{
+  "name": "kickoff-feed",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kickoff's fixtures feed: real matches and results for the Premier League, Champions League, NBA and WNBA.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "fixtures": "node bin/fixtures.js"
+  }
+}

@@ -1,0 +1,73 @@
+# The fixtures feed.
+#
+# On every change: the feed's tests, which need no key and no network.
+# By hand, from the Actions page: a live run that fetches this week's real fixtures from the two
+# feeds, using the keys kept in this repository's secrets.
+name: Fixtures feed
+
+on:
+  push:
+    paths:
+      - "feed/**"
+      - "engine/src/**"
+      - ".github/workflows/feed.yml"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test the feed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run the tests
+        working-directory: feed
+        run: npm test
+
+  live:
+    name: Fetch this week's real fixtures
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+      BALLDONTLIE_KEY: ${{ secrets.BALLDONTLIE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Fetch the fixtures
+        run: |
+          set -o pipefail
+          node feed/bin/fixtures.js --save-raw raw | tee fixtures.txt
+
+      - name: Put the fixtures on the run's summary page
+        if: always()
+        run: |
+          {
+            echo '```'
+            cat fixtures.txt 2>/dev/null || echo 'nothing was fetched'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The feeds' answers exactly as they came, to turn into test examples. They hold fixtures and
+      # scores only. The keys are sent in headers and are not in these files.
+      - name: Keep the feeds' answers
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feed-answers
+          path: raw/
+          if-no-files-found: ignore
+          retention-days: 14
