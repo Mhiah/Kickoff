@@ -37,6 +37,9 @@ Every sport gives a maximum of 3 points per match.
 | Basketball | The winner and the winning margin | 1 for the right winner, plus 2 more for the right margin band: 1 to 5, 6 to 10, 11 to 15, or 16 and over. |
 | Tennis | The winner and the number of sets | 1 for the right winner, plus 2 more for the right number of sets. |
 
+The bonus points only count when the winner is right. The full rules, with examples for each
+sport, are in [docs/RULES.md](docs/RULES.md).
+
 ### What makes it different
 
 - **No trusted organiser.** Nobody, including the league host and us, can alter picks, scores or
