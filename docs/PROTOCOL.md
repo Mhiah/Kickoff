@@ -109,9 +109,31 @@ This file is not in the mailbox, and does not need to be. Nothing in it is taken
 - Each opened pick must produce a fingerprint that its `index` and `path` prove is in that root.
 - Then the pick must be one that can happen in that kind of match.
 
-So the file can be kept anywhere. Kickoff keeps it on the league's on-chain site. A player who
-holds their own pick, salt and receipt can also publish their own opening, and it proves itself in
-the same way.
+So the file can be kept anywhere. Kickoff keeps it on the league's on-chain site (TapeOut's site
+store, under the league's own account), at the path `openings/<match id>.json`, where the match id
+is 64 lowercase hex digits with no `0x`. The site store keeps a SHA-256 with every file, so a
+reader can tell a whole file from a half-uploaded one. A player who holds their own pick, salt and
+receipt can also publish their own opening, and it proves itself in the same way.
+
+## Fetching a league from a node
+
+A league's id says where it is: 4 zero bytes, the chain's number (8 bytes; X Layer is 196), then
+the address of the league's account (20 bytes). The account in the id is the one whose word counts.
+
+To read the inbox, follow TAP-10 section 13:
+
+1. Pick one block and read everything as it stood at that block.
+2. Ask the mailbox `inboxCount(id)`, then `inboxPage(id, start, 200)` until every entry is in hand.
+   Each entry is who sent the message, the block it is in, its time, and its fingerprint.
+3. For each entry, fetch the mailbox's `Sent` logs in that entry's block. Accept a log only if it
+   is from the mailbox, for this inbox, from the entry's sender, with the entry's place in the
+   inbox, and `keccak256(reference, then keccak256(text))` equals the entry's fingerprint. Take only
+   the reference and the text from the log.
+4. If any message cannot be found in a form that passes, stop. Do not build a table from part of an
+   inbox.
+
+Kickoff's code for this is [`engine/src/xlayer.js`](../engine/src/xlayer.js), and
+`node engine/bin/table.js <league id>` prints the result.
 
 ## Building the table
 
@@ -132,6 +154,9 @@ Anyone who does this gets the same table. The rules of the game are in [RULES.md
   waiting for the league.
 - **Results are entered by the league.** They are checked for being possible, not for being true.
   A wrong result is visible to everyone, and so is every challenge to it.
+- **Kickoff's fetcher asks one node.** Every message is checked against the mailbox's fingerprint,
+  but the node is believed about what the mailbox stores. TAP-10 says to ask several independent
+  nodes and require them to agree. That is still to do.
 - **Receipts are not signed by the league yet.** A player dropped from a bundle can show their
   receipt is for a different bundle from the one on chain, but the league could deny having issued
   it.

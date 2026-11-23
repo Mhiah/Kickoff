@@ -26,6 +26,11 @@ const id = (value, name) => {
   return fromHex(value);
 };
 
+/** Where a match's file is kept on the league's on-chain site. */
+export function openingsPath(match) {
+  return `openings/${toHex(id32(match, "match"))}.json`;
+}
+
 /** Write the file. `openings` are { pickByte, player, salt, receipt } as the engine makes them. */
 export function writeOpenings({ match, entries, openings }) {
   return JSON.stringify({

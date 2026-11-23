@@ -9,9 +9,10 @@ the website and anyone checking a league use exactly the same code.
 
 > [!NOTE]
 > **What is here:** sealing, bundling, opening and checking, scoring with the circuits, the table
-> and personal records, and reading a league back from its inbox, with 87 tests. **Not here yet:**
-> the part that fetches a league's inbox from a live X Layer node. At the moment the reader is
-> handed the inbox's messages. It applies every rule to them, but it does not go and get them.
+> and personal records, reading a league back from its inbox, and fetching that inbox and the
+> opened picks from an X Layer node, with 112 tests. **Not live yet:** no league exists on X Layer
+> itself. The fetching has been run against a stand-in node in the tests and against a private copy
+> of X Layer on GitHub, not against a real league.
 
 ## How a pick stays secret, then gets proven
 
@@ -118,6 +119,43 @@ The exact format of each message, and every rule for what counts, is written out
 - The last result is in force, so a mistake can be corrected, but every result stays on the record.
 - A member's challenge is never hidden.
 
+## Fetching a league from X Layer
+
+`src/xlayer.js` goes and gets a league from an X Layer node. Give it the league's id and it returns
+the table. It only reads: nothing is sent and no wallet is needed.
+
+```
+cd engine
+node bin/table.js <league id>
+node bin/table.js --circuit <processor address> <circuit number>
+```
+
+It asks `https://rpc.xlayer.tech` unless told otherwise with `--node <address>`. It prints each
+match with its result and when its bundle was locked, the table, every dispute, and every message
+it did not believe with the reason.
+
+How it reads an inbox is the way TapeOut's mailbox is meant to be read (TAP-10, section 13):
+
+1. It asks the mailbox for its list of the inbox. For each message the mailbox itself stores who
+   sent it, the block it is in, the time, and a fingerprint of the message.
+2. The text of a message is not stored. It is in the log of the block the message is in. So it
+   fetches that block's log and accepts a message only if it is the mailbox's own log, for this
+   inbox, from the sender the mailbox recorded, at that place in the inbox, and its text matches
+   the fingerprint. Only the text and its reference are taken from the log.
+3. Everything is read as it stood at one block, so the list and the messages cannot disagree.
+
+**If one message cannot be fetched, or does not match its fingerprint, no table is built.** A table
+from an inbox with a hole in it could be wrong, because the missing message might be the one that
+matters.
+
+The opened picks for each match are read from the league's on-chain site, at
+`openings/<match id>.json`, and checked against the SHA-256 the site store keeps with every file.
+A file that is half uploaded is not used, and the output says so.
+
+The mailbox's fingerprint is a Keccak-256, which neither Node nor a browser has built in. It is
+written out in `src/keccak.js` with nothing to install, and tested against published values. The
+function codes it works out for the mailbox are tested against the ones TAP-10 publishes.
+
 ## The cheating the tests try
 
 Each of these is a test in `test/open.test.js`, and each is refused:
@@ -150,6 +188,14 @@ And in `test/reader.test.js`, at the level of what is on chain:
 - A match announced after its own kickoff does not count.
 - A message carrying someone else's reference is not believed.
 
+And in `test/xlayer.test.js`, a node that lies about what is on chain:
+
+- A node that changes one message's text: caught, and no table is built.
+- A node that leaves a message out: caught, and no table is built.
+- A node that swaps a message's reference: caught.
+- The right text in a log from some other contract: not believed.
+- The right text under another sender's name: not believed.
+
 The tree itself is checked against the published reference values from RFC 6962, and every leaf of
 every tree from 1 to 17 leaves is checked to have a proof that works only for its own place.
 
@@ -164,6 +210,10 @@ every tree from 1 to 17 leaves is checked to have a proof that works only for it
   players who have their own TapeOut identity are a later step.
 - **A league decides when to publish the opened picks.** Until it does, the chain shows a bundle
   was locked but not who is in it. A player can publish their own opening without waiting.
+- **The fetcher asks one node.** It checks every message against the mailbox's fingerprint, but it
+  believes that node about what the mailbox stores. A node that lied could claim the inbox is
+  shorter than it is. TapeOut's own rule is to ask several independent nodes and require them to
+  agree. That is still to do. Until then, use a node you trust.
 
 ## The engine and the chain agree
 
@@ -179,6 +229,29 @@ To remake the file after changing the engine:
 ```
 cd engine
 npm run vectors
+```
+
+## The season rehearsal
+
+`scripts/season-on-chain.js` plays a whole season on a private copy of X Layer, through TapeOut's
+real contracts: it publishes a circuit to be the league, opens its account, announces three
+matches, locks each bundle before kickoff, gives each result, and publishes the opened picks on the
+league's site. It also does two things that should not work: the host locks a changed bundle one
+minute after kickoff, and an outsider writes a result to the league's inbox. A member disputes a
+result.
+
+Then it throws everything away except the league's id, fetches the league back from the node, and
+rebuilds the table from that alone. It has to come out as ada 7, bola 4, chidi 1, with both cheats
+refused and the dispute listed.
+
+GitHub runs it on every change to the engine. The script only works against a test node that lets
+it act as any account, which no real node allows, so it cannot touch the real network. To run it
+yourself you need [Foundry](https://getfoundry.sh):
+
+```
+anvil --fork-url https://rpc.xlayer.tech
+cd engine
+node scripts/season-on-chain.js --node http://127.0.0.1:8545
 ```
 
 ## Run the tests
@@ -206,8 +279,13 @@ npm test
 | `src/reader.js` | Reading a league back from its inbox, and deciding what to believe |
 | `src/openings.js` | The published file of opened picks |
 | `src/league.js` | From the chain to the table in one step |
+| `src/xlayer.js` | Fetching a league's inbox and its opened picks from an X Layer node |
+| `src/keccak.js` | Keccak-256, the fingerprint the mailbox uses, written out with nothing to install |
+| `src/abi.js` | How to ask a contract a question and read its answer |
 | `src/bytes.js` | Small helpers for raw bytes, and SHA-256 from the platform |
 | `src/index.js` | Everything, in one place to import from |
+| `bin/table.js` | The command that prints a league's table from X Layer |
+| `scripts/season-on-chain.js` | The season rehearsal on a private copy of X Layer |
 | `scripts/vectors.js` | Plays out a small fixed league and writes down every value, for the chain rehearsal to check |
 | `vectors/league.json` | Those values. Made by the script, not by hand. |
 | `test/` | The tests |

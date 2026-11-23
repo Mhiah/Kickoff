@@ -1,0 +1,70 @@
+# A rehearsal on a private copy of X Layer mainnet. A league plays a whole season through TapeOut's
+# real mailbox and site store. Then the league is fetched back from the node and the table is
+# rebuilt from that alone. Nothing is sent to the real network and nothing is paid.
+name: Season rehearsal
+
+on:
+  push:
+    paths:
+      - "engine/**"
+      - "circuits/out/**"
+      - ".github/workflows/season.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  season:
+    name: Play a season on a copy of X Layer and read it back
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      XLAYER_RPC_URL: https://rpc.xlayer.tech
+      COPY: http://127.0.0.1:8545
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Start a private copy of X Layer
+        run: |
+          anvil --fork-url "$XLAYER_RPC_URL" --port 8545 --retries 10 > anvil.log 2>&1 &
+          for i in $(seq 1 60); do
+            if cast chain-id --rpc-url "$COPY" > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          echo "The copy is of chain $(cast chain-id --rpc-url "$COPY"), at block $(cast block-number --rpc-url "$COPY")"
+
+      - name: Play the season, then fetch the league back and rebuild the table
+        working-directory: engine
+        run: node scripts/season-on-chain.js --node "$COPY" --save-league league.txt --summary season.md
+
+      - name: Print the same league's table with the one-line command
+        working-directory: engine
+        run: |
+          set -o pipefail
+          node bin/table.js "$(cat league.txt)" --node "$COPY" | tee table.txt
+
+      - name: Put the output on the run's summary page
+        if: always()
+        working-directory: engine
+        run: |
+          {
+            echo '## The season'
+            echo '```'
+            cat season.md 2>/dev/null || echo 'the rehearsal did not finish'
+            echo '```'
+            echo '## The one-line command'
+            echo '```'
+            cat table.txt 2>/dev/null || echo 'not run'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show the copy's log if something went wrong
+        if: failure()
+        run: tail -n 80 anvil.log || true

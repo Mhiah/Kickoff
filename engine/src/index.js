@@ -12,4 +12,6 @@ export * from "./messages.js";
 export * from "./reader.js";
 export * from "./openings.js";
 export * from "./league.js";
+export * from "./xlayer.js";
+export { keccak256 } from "./keccak.js";
 export { fromHex, toHex } from "./bytes.js";

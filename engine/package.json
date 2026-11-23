@@ -2,7 +2,7 @@
   "name": "kickoff-engine",
   "version": "0.1.0",
   "private": true,
-  "description": "Kickoff's picks engine: sealing picks, bundling them, and opening and checking them.",
+  "description": "Kickoff's picks engine: sealing picks, bundling them, opening and checking them, and reading a league back from X Layer.",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -10,6 +10,8 @@
   },
   "scripts": {
     "test": "node --test \"test/*.test.js\"",
-    "vectors": "node scripts/make-vectors.js"
+    "vectors": "node scripts/make-vectors.js",
+    "table": "node bin/table.js",
+    "season": "node scripts/season-on-chain.js"
   }
 }

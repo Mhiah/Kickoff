@@ -3,14 +3,16 @@
 import {
   BASKETBALL, FOOTBALL, TENNIS,
   basketballResult, buildBundle, encodePick, lockMessage, matchId, matchInfoOf, matchMessage, receiptFor,
-  resultMessage, sealPick, toHex, writeOpenings,
+  leagueId, resultMessage, sealPick, toHex, writeOpenings,
 } from "../src/index.js";
 import { id } from "./helpers.js";
 
 export const LEAGUE_ACCOUNT = "0x00000000000000000000000000000000000a11ce";
 export const STRANGER = "0x000000000000000000000000000000000000beef";
 export const MEMBER = "0x0000000000000000000000000000000000c0ffee";
-export const LEAGUE = id("league endpoint");
+// A league's id is its inbox's address in the mailbox: the chain's number (196 is X Layer) and the
+// league's account.
+export const LEAGUE = leagueId(196, LEAGUE_ACCOUNT);
 export const START = 1_800_000_000;
 
 export class Inbox {
