@@ -1,7 +1,11 @@
 // Kickoff's website. No build step and nothing to install: plain files a browser runs as they are.
 
+import { SERVER } from "./config.js";
 import { COMPETITIONS, SAMPLE_LEAGUE, sampleFixtures } from "./data/sample.js";
+import { createDevice } from "./lib/device.js";
+import { createGroups } from "./lib/groups.js";
 import { createStore, matchIdOf, seal } from "./lib/picks.js";
+import { createClient } from "./lib/server.js";
 import { checkScreen, frame, groupScreen, home, league, matchScreen, pick, recordScreen } from "./screens.js";
 
 const routes = { "": home, league, pick, match: matchScreen, record: recordScreen, check: checkScreen, group: groupScreen };
@@ -13,19 +17,22 @@ try {
   // Some browsers refuse storage altogether. Picks are then kept for this visit only.
 }
 const store = createStore(storage);
+const device = createDevice(store);
+const groups = createGroups({ store, device, client: createClient({ base: SERVER, device }) });
 
 document.body.insertAdjacentHTML("afterbegin", frame());
 const view = document.getElementById("view");
 let editing = null; // the fixture whose pick is being changed, if any
 let drawing = 0;
 
-/** What is true right now: the time, the matches, and the picks kept on this device. */
+/** What is true right now: the time, the matches, this player's groups, and the picks kept on this device. */
 async function context() {
   const now = Math.floor(Date.now() / 1000);
   const fixtures = sampleFixtures(now);
   const matchIds = {};
   for (const [id, fixture] of Object.entries(fixtures)) matchIds[id] = await matchIdOf(SAMPLE_LEAGUE, fixture, COMPETITIONS);
-  return { now, fixtures, matchIds, picks: store.all(), lasting: store.lasting, editing };
+  const mine = await groups.view();
+  return { now, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine };
 }
 
 async function draw({ keepPlace = false } = {}) {
@@ -42,9 +49,13 @@ async function draw({ keepPlace = false } = {}) {
     if (link.dataset.tab === screen.tab) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
+  // The frame's own words: which group this is, and who is playing.
   const where = document.querySelector("[data-where]");
-  where.textContent = screen.public ? "See a sample group" : where.dataset.name ?? where.textContent;
-  where.setAttribute("href", screen.public ? "#/league" : "#/group");
+  where.textContent = ctx.mine.group?.name ?? (screen.public ? "See a sample group" : "Start a group");
+  where.setAttribute("href", ctx.mine.group || !screen.public ? "#/group" : "#/league");
+  const me = document.querySelector("[data-me]");
+  me.hidden = !ctx.mine.group;
+  me.querySelector("[data-me-name]").textContent = ctx.mine.name;
   if (!keepPlace) window.scrollTo(0, 0);
 }
 
@@ -59,10 +70,6 @@ function pickOnScreen() {
   const band = picker.querySelector('[data-band][aria-pressed="true"]')?.dataset.band;
   return winner && band ? { winner, band } : null;
 }
-
-// Remember the group's name before the home screen swaps the link's words.
-const whereLink = document.querySelector("[data-where]");
-whereLink.dataset.name = whereLink.textContent;
 
 /** Say something short near whatever was pressed, where a screen reader will read it out. */
 function say(from, words) {
@@ -99,7 +106,7 @@ document.addEventListener("click", async (event) => {
     const ctx = await context();
     const fixture = ctx.fixtures[target.dataset.seal];
     try {
-      await seal({ store, league: SAMPLE_LEAGUE, fixture, competitions: COMPETITIONS, pick: chosen, now: ctx.now });
+      await seal({ store, league: SAMPLE_LEAGUE, fixture, competitions: COMPETITIONS, pick: chosen, now: ctx.now, player: ctx.mine.player });
       editing = null;
       await draw();
     } catch (error) {
@@ -132,9 +139,24 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
-  // The group screen: a competition's on and off switch.
-  if (target.matches(".switch")) {
-    target.setAttribute("aria-checked", String(target.getAttribute("aria-checked") !== "true"));
+  // The group screen: whoever started the group turns a competition on or off.
+  if (target.matches("[data-plays]")) {
+    const { mine } = await context();
+    const on = target.getAttribute("aria-checked") !== "true";
+    const plays = Object.keys(COMPETITIONS).filter((key) => (key === target.dataset.plays ? on : mine.group.plays.includes(key)));
+    target.setAttribute("aria-checked", String(on));
+    try {
+      await groups.setPlays({ code: mine.group.code, plays });
+      await draw({ keepPlace: true });
+    } catch (error) {
+      target.setAttribute("aria-checked", String(!on));
+      say(target, error.message);
+    }
+    return;
+  }
+  if (target.matches("[data-choose]")) {
+    groups.choose(target.dataset.choose);
+    await draw();
     return;
   }
 
@@ -156,8 +178,40 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+// The group screen's forms: start a group, or join one with a code.
+document.addEventListener("submit", async (event) => {
+  const form = event.target.closest("[data-form]");
+  if (!form) return;
+  event.preventDefault();
+  const out = form.querySelector("[data-form-out]");
+  const button = form.querySelector("button[type=submit]");
+  const typed = Object.fromEntries(new FormData(form));
+  out.textContent = "";
+  button.disabled = true;
+  try {
+    if (form.dataset.form === "start") await groups.start({ name: typed.name, playerName: typed.playerName, plays: new FormData(form).getAll("plays") });
+    else await groups.join({ code: typed.code, playerName: typed.playerName });
+    if (location.hash === "#/group") await draw();
+    else location.hash = "#/group";
+  } catch (error) {
+    out.textContent = error.message;
+    button.disabled = false;
+  }
+});
+
+/** Ask the server for this device's groups, and draw again if anything changed. */
+async function catchUp() {
+  try {
+    if (await groups.refresh()) await draw({ keepPlace: true });
+  } catch {
+    // The server answered but would not say. What is kept on the device stays as it is.
+  }
+}
+
 window.addEventListener("hashchange", () => {
   editing = null;
   draw();
+  if (location.hash.startsWith("#/group")) catchUp();
 });
-draw();
+window.addEventListener("online", catchUp);
+draw().then(catchUp);

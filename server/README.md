@@ -6,9 +6,13 @@ picks so they can be locked on X Layer together.
 > [!NOTE]
 > **What is here:** the server's rules as tested code, the way a device proves it is itself, the
 > addresses the website will talk to, the connection to a real database, the entry point a web
-> host uses, and a version that runs on your own computer. 52 tests.
-> **Not here yet:** it has not been put on the internet, so no real database is connected, and the
-> website does not talk to it. Those are the next steps.
+> host uses, and a version that runs on your own computer. 53 tests.
+> **Online** at <https://kickoff-two-xi.vercel.app> (every address under `/api/`), with a real
+> database. Starting a group, joining it, a changed request and a keyless robot request have all
+> been tried on the live server, and each behaved as the tests say.
+> The website uses it for groups.
+> **Not here yet:** the website does not send sealed picks to it, and no real matches are on its
+> list until the robot is built. Those are the next steps.
 
 ## Why there is a server at all
 
@@ -57,7 +61,7 @@ A device must sign these:
 
 | Address | What it does |
 | --- | --- |
-| `POST /api/groups` | Start a group, and get its code |
+| `POST /api/groups` | Start a group, choosing what it plays, and get its code |
 | `POST /api/groups/<code>/join` | Join a group with a name |
 | `POST /api/groups/<code>/plays` | Choose which competitions it plays. Only the person who started it can |
 | `POST /api/me/groups` | The groups this device is in |
@@ -94,6 +98,7 @@ match have closed."
 | Moving a match's start time under the same id | Refused: a moved match is a new match. |
 | Making a bundle while picks are still open | Refused. A bundle is made a few seconds after picks close. |
 | Two groups started at the same moment | They can never be given the same code. |
+| Starting a group that plays nothing, or switching off its last competition | Refused: a group plays at least one. |
 | The database failing, or its token being wrong | The player is told something went wrong. Nothing about the database is shown. |
 
 One test goes the whole way: three phones seal picks for a football match and a basketball match,
@@ -150,9 +155,11 @@ every `/api/...` address to `api/index.mjs`, which starts the server.
 
 ## Honest limits
 
-- **It is not on the internet yet.** The database connection is built and tested against a
-  stand-in, not against a real database. That happens when it is first put online.
-- **The website does not talk to it yet.** A sealed pick still stays on the device.
+- **Sealed picks have not been tried on the live server.** They need real matches on its list,
+  which the robot will put there. Groups have been tried.
+- **The database is shared** with another of the owner's projects, on a free plan. Kickoff's
+  records are kept apart by their names.
+- **The website only uses it for groups so far.** A sealed pick still stays on the device.
 - **A receipt is not signed.** Kickoff could deny having issued one. Signing receipts is still to do.
 - **The server could leave a pick out of a bundle.** A player can check for their receipt as soon as
   picks are locked, but by then it is too late to add the pick. This is the one thing a player has

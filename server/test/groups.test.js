@@ -116,6 +116,24 @@ test("a group stops taking players when it is full", async () => {
   assert.equal((await s.post(ada, `/api/groups/${group.code}/join`, { playerName: "Ada B" })).status, 200);
 });
 
+test("a group can be started playing only some competitions, but never none", async () => {
+  const s = server();
+  const ada = await device();
+  const some = await s.post(ada, "/api/groups", { name: "Hoops only", playerName: "Ada", plays: ["wnba", "nba"] });
+  assert.deepEqual(some.body.plays, ["nba", "wnba"], "kept in Kickoff's own order");
+  const none = await s.post(ada, "/api/groups", { name: "Nothing", playerName: "Ada", plays: [] });
+  assert.equal(none.status, 400);
+  assert.match(none.body.error, /at least one competition/);
+  assert.equal((await s.post(ada, "/api/groups", { name: "Tennis", playerName: "Ada", plays: ["tennis"] })).status, 400);
+  assert.equal((await s.post(ada, "/api/groups", { name: "Odd", playerName: "Ada", plays: "pl" })).status, 400);
+  // A refused group is not left half made.
+  assert.deepEqual((await s.post(ada, "/api/me/groups")).body.groups.map((g) => g.name), ["Hoops only"]);
+  // The last competition cannot be switched off afterwards either.
+  const off = await s.post(ada, `/api/groups/${some.body.code}/plays`, { plays: [] });
+  assert.equal(off.status, 400);
+  assert.match(off.body.error, /at least one competition/);
+});
+
 test("only the person who started a group can change what it plays", async () => {
   const s = server();
   const [ada, bola] = [await device(), await device()];

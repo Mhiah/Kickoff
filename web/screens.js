@@ -9,6 +9,8 @@
 //   picks      the picks kept on this device, by match id
 //   lasting    false if this browser will not keep picks after it is closed
 //   editing    the id of a fixture whose pick is being changed, if any
+//   mine       this player and their groups, as lib/groups.js gives them:
+//              { player, groups, group (the one being looked at, or null), name, offline }
 
 import { COMPETITIONS, check, group, match, record, scores, voided, week } from "./data/sample.js";
 import { MARK, SAMPLE_NOTE, TOGGLE, comp, esc, stamp, titlebar } from "./lib/html.js";
@@ -45,8 +47,8 @@ export function home() {
   </div>
   <div class="do">
     <div class="cta">
-      <a class="btn go" href="#/group">Start a group</a>
-      <a class="btn quiet" href="#/league">Join with a code</a>
+      <a class="btn go" href="#/group/start">Start a group</a>
+      <a class="btn quiet" href="#/group/join">Join with a code</a>
     </div>
     <p class="tagline">Free to play. Predict with your friends.</p>
   </div>
@@ -375,31 +377,102 @@ ${SAMPLE_NOTE}`;
 
 // ------------------------------------------------------------------------------------ group
 
-export function groupScreen() {
-  const plays = group.plays
-    .map(
-      (p) => `<div class="row"><div class="grow">${comp(p.comp, "big")}<div class="sub">${esc(p.note)}</div></div>
-      <button type="button" class="switch" role="switch" aria-checked="${p.on}" aria-label="${esc(COMPETITIONS[p.comp].name)}"><i></i></button></div>`,
-    )
-    .join("");
-  const players = group.players
-    .map((name) => `<div class="row"><div class="grow"><div class="title" style="margin:0">${esc(name)}${name === group.you ? '<span class="tag">you</span>' : ""}</div></div>${name === group.you ? "" : `<button type="button" class="small muted" data-preview-note="Removing a player is not switched on in this preview.">Remove</button>`}</div>`)
-    .join("");
-  const html = `
-${titlebar({ heading: "Your group" })}
-<p class="sub">You started ${esc(group.name)}. ${group.players.length} players.</p>
+const SPORT_WORDS = { football: "Football", basketball: "Basketball" };
 
-<div class="glass invite"><div><small class="muted">Invite code</small><b>${esc(group.code)}</b></div><button type="button" class="btn small go" data-copy="${esc(group.code)}">Copy</button></div>
+/** A box to type in, with its label. */
+function field({ label, name, value = "", max, hint = "", extra = "" }) {
+  return `<label>${label}<input name="${name}" value="${esc(value)}" maxlength="${max}" autocomplete="off" autocapitalize="words" spellcheck="false" ${extra}>${hint ? `<span class="hint">${hint}</span>` : ""}</label>`;
+}
+
+function startForm(mine) {
+  return `<form class="glass form" data-form="start" novalidate>
+  <h2>Start a group</h2>
+  <p class="sub">You get a code to share. Anyone with the code can join.</p>
+  ${field({ label: "Group name", name: "name", max: 40 })}
+  ${field({ label: "Your name", name: "playerName", value: mine.name, max: 24, hint: "What your friends will see on the table." })}
+  <fieldset class="plays">
+    <legend>What this group plays</legend>
+    ${Object.keys(COMPETITIONS).map((key) => `<label class="tick"><input type="checkbox" name="plays" value="${key}" checked>${comp(key)}<span class="muted">${SPORT_WORDS[COMPETITIONS[key].sport]}</span></label>`).join("")}
+    <span class="hint">You can change this later.</span>
+  </fieldset>
+  <button class="btn go" type="submit">Start group</button>
+  <p class="say-so" data-form-out role="status"></p>
+</form>`;
+}
+
+function joinForm(mine) {
+  return `<form class="glass form" data-form="join" novalidate>
+  <h2>Join with a code</h2>
+  <p class="sub">Ask whoever started the group for its code.</p>
+  ${field({ label: "Invite code", name: "code", max: 12, hint: "It looks like BALLERS-4821.", extra: 'autocapitalize="characters"' })}
+  ${field({ label: "Your name", name: "playerName", value: mine.name, max: 24 })}
+  <button class="btn go" type="submit">Join group</button>
+  <p class="say-so" data-form-out role="status"></p>
+</form>`;
+}
+
+const OFFLINE_NOTE = `<div class="note warn" style="margin-top:14px"><b>Kickoff could not be reached.</b> This is what this phone last saw. It will catch up when you are back online.</div>`;
+const DEVICE_NOTE = `<div class="note" style="margin-top:16px"><b>No sign-up and no wallet.</b> This phone and browser become your player. Use the same ones each time, and do not clear the browser's saved data, or Kickoff will not know it is you.</div>`;
+
+/**
+ * The group screen. `arg` is "start" or "join" to show just that form.
+ * With no group yet, both forms are shown.
+ */
+export function groupScreen(arg, ctx) {
+  const mine = ctx.mine;
+  const g = mine.group;
+
+  if (!g || arg === "start" || arg === "join") {
+    const forms = arg === "start" ? startForm(mine) : arg === "join" ? joinForm(mine) : `<div class="pair">${startForm(mine)}${joinForm(mine)}</div>`;
+    const heading = arg === "start" ? "Start a group" : arg === "join" ? "Join a group" : "Your group";
+    const html = `
+${titlebar({ heading })}
+<p class="sub">${g ? `<a href="#/group">Back to ${esc(g.name)}</a>` : arg === "start" ? 'Have a code already? <a href="#/group/join">Join with a code</a>.' : arg === "join" ? 'No code yet? <a href="#/group/start">Start a group</a>.' : "Play with your friends. Start a group and share its code, or join one with a code."}</p>
+${mine.offline ? OFFLINE_NOTE : ""}
+${forms}
+${DEVICE_NOTE}`;
+    return { html, title: `${heading} on Kickoff`, tab: "group", real: true };
+  }
+
+  const isStarter = g.startedBy === mine.player;
+  const starter = g.members.find((m) => m.player === g.startedBy);
+  const count = `${g.members.length} ${g.members.length === 1 ? "player" : "players"}`;
+  const plays = Object.keys(COMPETITIONS)
+    .map((key) => {
+      const on = g.plays.includes(key);
+      const control = isStarter
+        ? `<button type="button" class="switch" role="switch" aria-checked="${on}" aria-label="${esc(COMPETITIONS[key].name)}" data-plays="${key}"><i></i></button>`
+        : `<span class="muted small">${on ? "On" : "Off"}</span>`;
+      return `<div class="row"><div class="grow">${comp(key, "big")}<div class="sub">${SPORT_WORDS[COMPETITIONS[key].sport]}</div></div>${control}</div>`;
+    })
+    .join("");
+  const players = g.members
+    .map((m) => `<div class="row"><div class="grow"><div class="title" style="margin:0">${esc(m.name)}${m.player === mine.player ? '<span class="tag">you</span>' : ""}</div>${m.player === g.startedBy ? '<div class="sub">Started the group</div>' : ""}</div></div>`)
+    .join("");
+  const others = mine.groups.filter((other) => other.code !== g.code);
+  const switcher = others.length
+    ? `<h2>Your other groups</h2>
+<div class="glass">${others.map((o) => `<div class="row"><div class="grow"><div class="title" style="margin:0">${esc(o.name)}</div><div class="sub">${o.members.length} ${o.members.length === 1 ? "player" : "players"}</div></div><button type="button" class="btn small quiet" data-choose="${esc(o.code)}">Open</button></div>`).join("")}</div>`
+    : "";
+  const html = `
+${titlebar({ heading: esc(g.name) })}
+<p class="sub">${isStarter ? "You started this group" : starter ? `${esc(starter.name)} started this group` : "Your group"}. ${count}.</p>
+${mine.offline ? OFFLINE_NOTE : ""}
+
+<div class="glass invite"><div><small class="muted">Invite code</small><b>${esc(g.code)}</b></div><button type="button" class="btn small go" data-copy="${esc(g.code)}">Copy</button></div>
+<p class="sub">Send this code to your friends. They choose "Join with a code" on Kickoff.</p>
 
 <h2>What this group plays</h2>
 <div class="glass">${plays}</div>
+<p class="say-so muted" data-note-out role="status">${isStarter ? "" : `Only ${starter ? esc(starter.name) : "whoever started the group"} can change this.`}</p>
 <div class="note" style="margin-top:12px">Fixtures and results come in by themselves from live sports data. Nobody in the group adds a match or enters a score, so nobody can get one wrong on purpose.</div>
 
 <h2>Players</h2>
 <div class="glass">${players}</div>
-<p class="say-so muted" data-note-out role="status"></p>
-${SAMPLE_NOTE}`;
-  return { html, title: `${group.name} on Kickoff`, tab: "group" };
+${switcher}
+
+<div class="more"><a href="#/group/start">Start another group</a><a href="#/group/join">Join another group</a></div>`;
+  return { html, title: `${g.name} on Kickoff`, tab: "group", real: true };
 }
 
 /** The frame around every screen: the side menu, the top bar, and the bottom menu. */
@@ -410,11 +483,11 @@ export function frame() {
 <aside class="side">
   <a class="mark" href="#/">${MARK}Kickoff</a>
   <nav aria-label="Kickoff">${links}</nav>
-  <div class="me glass"><small class="muted">Signed in as</small><br><b>${esc(group.you)}</b></div>
+  <div class="me glass" data-me hidden><small class="muted">Playing as</small><br><b data-me-name></b></div>
 </aside>
 <header class="top">
   <a class="mark" href="#/">${MARK}Kickoff</a>
-  <div class="right"><a class="where" href="#/group" data-where>${esc(group.name)}</a>${TOGGLE}</div>
+  <div class="right"><a class="where" href="#/group" data-where>Your group</a>${TOGGLE}</div>
 </header>
 <main id="view" tabindex="-1"></main>
 <nav class="tabs" aria-label="Kickoff">${links}</nav>`;

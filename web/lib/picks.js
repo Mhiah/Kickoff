@@ -3,8 +3,10 @@
 // Nothing here talks to a server. A pick is sealed with the picks engine (the copy in web/engine),
 // and the pick and its secret are kept in this browser. Only the fingerprint is ever meant to
 // leave the device before kickoff.
+//
+// A pick is sealed for one player: the id that belongs to this device's own key (lib/device.js).
 
-import { fromHex, randomBytes, toHex } from "../engine/bytes.js";
+import { fromHex, toHex } from "../engine/bytes.js";
 import { matchId } from "../engine/match.js";
 import { BASKETBALL, FOOTBALL } from "../engine/picks.js";
 import { sealPick } from "../engine/seal.js";
@@ -12,7 +14,6 @@ import { hasClosed } from "./time.js";
 
 const SPORT = { football: FOOTBALL, basketball: BASKETBALL };
 const PICKS_KEY = "kickoff-picks";
-const PLAYER_KEY = "kickoff-player";
 
 /**
  * The facts about a match that go into its id. The competition is part of the label, so two
@@ -66,17 +67,18 @@ export function createStore(storage) {
     get lasting() {
       return lasting;
     },
-    /** This device's player id: 32 random bytes, made the first time it is asked for. */
-    playerId() {
-      let id = read(PLAYER_KEY);
-      if (typeof id !== "string" || !/^[0-9a-f]{64}$/.test(id)) {
-        id = toHex(randomBytes(32));
-        write(PLAYER_KEY, id);
-      }
-      return id;
+    /** Anything else this device keeps (its key, its groups), as text under a name. */
+    read,
+    write,
+    /**
+     * The picks kept on this device, by match id. Given a player id, only that player's: a pick
+     * sealed for any other id could never be opened by this device's key, so it is not shown.
+     */
+    all(player) {
+      const all = picks();
+      if (player === undefined) return all;
+      return Object.fromEntries(Object.entries(all).filter(([, entry]) => entry?.player === player));
     },
-    /** Every pick kept on this device, by match id. */
-    all: picks,
     /** The pick kept for a match, or null. */
     get(match) {
       return picks()[match] ?? null;
@@ -91,15 +93,18 @@ export function createStore(storage) {
  * Seal a pick for a match and keep it on this device. Sealing again for the same match replaces
  * the earlier pick with a new secret.
  *
- * @returns the entry that was kept: { match, sport, pick, pickByte, salt, fingerprint, sealedAt }
+ * @param player  this device's player id, as hex
+ * @returns the entry that was kept: { match, player, sport, pick, pickByte, salt, fingerprint, sealedAt }
  */
-export async function seal({ store, league, fixture, competitions, pick, now }) {
+export async function seal({ store, league, fixture, competitions, pick, now, player }) {
   if (hasClosed(now, fixture.kickoff)) throw new Error("Picks for this match have closed.");
+  if (typeof player !== "string" || !/^[0-9a-f]{64}$/.test(player)) throw new Error("This device has no player id yet.");
   const facts = fixtureFacts(fixture, competitions);
   const match = await matchId(league, facts);
-  const sealed = await sealPick({ league, match, sport: facts.sport, pick, player: fromHex(store.playerId()) });
+  const sealed = await sealPick({ league, match, sport: facts.sport, pick, player: fromHex(player) });
   const entry = {
     match: toHex(match),
+    player,
     sport: facts.sport,
     pick,
     pickByte: sealed.pickByte,

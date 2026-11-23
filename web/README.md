@@ -5,9 +5,10 @@ The Kickoff website.
 > [!NOTE]
 > **What is here:** every screen, in light and dark, for a phone and for a computer. Making a pick
 > is real: pressing "Seal my pick" seals it on your own device with the picks engine, and keeps the
-> pick and its secret there. **Not here yet:** anywhere to send it. A sealed pick stays on the
-> device and is not in a group, because the part of Kickoff that collects sealed picks is not built.
-> The matches, names, table and results are still invented, and each screen says so at its foot.
+> pick and its secret there. **Groups are real too:** the group screen talks to Kickoff's server, so
+> starting a group gives a real code and a friend can join with it from their own phone.
+> **Not here yet:** a sealed pick is not sent anywhere, and the matches, table and results on the
+> other screens are still invented. Each of those screens says so at its foot.
 
 ## The screens
 
@@ -19,7 +20,7 @@ The Kickoff website.
 | Match | `#/match/<match>` | What everyone said, the result, and any dispute |
 | My record | `#/record` | One player's picks and points |
 | Check it yourself | `#/check` | When each set of picks was sealed, what was refused, and how to rebuild the table |
-| Group | `#/group` | The invite code, the competitions the group plays, the players |
+| Group | `#/group` | Start a group or join one with a code. Then: the invite code, the competitions the group plays, the players |
 
 ## The look
 
@@ -79,10 +80,14 @@ hand. A test fails if it differs from the engine by a single byte.
 | `app.js` | Which screen to show, and what the buttons do |
 | `screens.js` | The screens |
 | `lib/picks.js` | Sealing a pick on the device and keeping it there |
+| `lib/device.js` | This device's own key, and the player id made from it |
+| `lib/server.js` | Talking to Kickoff's server, with everything signed by the device's key |
+| `lib/groups.js` | The groups this device plays in, kept on the device so they show at once and offline |
+| `config.js` | Where Kickoff's server is |
 | `lib/time.js` | Times as the screens show them, and when picks close |
 | `lib/html.js` | Small pieces every screen uses: the mark, the switch, the time stamp |
 | `lib/standings.js` | Turning picks into a table, with shared places |
-| `engine/` | The copy of the picks engine's sealing code |
+| `engine/` | The copy of the picks engine's sealing code, and of its code for a device's key |
 | `scripts/sync-engine.js` | Makes that copy |
 | `data/sample.js` | The made-up data |
 | `fonts/` | Gelasio and its licence |
@@ -90,14 +95,23 @@ hand. A test fails if it differs from the engine by a single byte.
 
 ## See it on your own computer
 
-You need Python or Node, only to serve the files.
+You need Node 22 or newer. This runs the website together with Kickoff's server, kept in memory, so
+groups work:
 
 ```
-cd web
-python3 -m http.server 8000
+node server/bin/dev.js
 ```
 
-Then open `http://localhost:8000` in a browser.
+Then open `http://localhost:8787` in a browser.
+
+## No sign-up and no wallet
+
+The first time someone plays, their phone makes its own key and keeps the private half in the
+browser. That key is the player. Everything the phone sends to Kickoff is signed with it.
+
+This means the same phone and browser have to be used each time. If the browser's saved data is
+cleared, the key is gone and Kickoff no longer knows who the player is. A way to back the key up
+is still to do.
 
 ## Run the checks
 
@@ -110,6 +124,12 @@ node --test "web/test/*.test.js"
 They confirm every screen draws with nothing missing, the made-up data agrees with itself, names are
 made safe before they go on a page, the table's shared places are right, the styles contain no
 gradient, and every screen carries the light and dark switch.
+
+For groups, they run the website's code against the real server's code, in memory: a group is
+started on one phone and joined from another, a refused join shows the server's own words, only
+whoever started a group can change what it plays, a group plays at least one competition, the
+private half of the key is never sent, and a phone that is offline shows what it last saw and
+says so.
 
 For picks, they confirm the fingerprint is exactly the one the engine works out from the same
 facts, a pick that cannot happen is refused, picks close ten minutes before the start to the

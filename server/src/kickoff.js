@@ -55,6 +55,14 @@ export function tidyName(value, max, what) {
   return name;
 }
 
+/** The competitions a group plays, checked and put in Kickoff's own order. A group plays at least one. */
+function tidyPlays(plays) {
+  if (!Array.isArray(plays) || plays.some((c) => !COMPETITIONS.includes(c))) refuse(400, "That is not a list of competitions.");
+  const chosen = COMPETITIONS.filter((c) => plays.includes(c));
+  if (chosen.length === 0) refuse(400, "A group has to play at least one competition.");
+  return chosen;
+}
+
 /** A code for a group: letters from its name, a dash, four digits. "Sunday Ballers" gives SUNDAYB-4821. */
 function codeFor(name, digits) {
   const letters = name.toUpperCase().normalize("NFD").replace(/[^A-Z]/g, "").slice(0, 7) || "GROUP";
@@ -77,16 +85,20 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
   return {
     // ---------------------------------------------------------------- groups
 
-    /** Start a group. The player who starts it is its first member. */
-    async createGroup({ player, now, name, playerName }) {
+    /**
+     * Start a group. The player who starts it is its first member.
+     * `plays` is which competitions it plays; left out, it plays all of them.
+     */
+    async createGroup({ player, now, name, playerName, plays }) {
       const groupName = tidyName(name, MAX_GROUP_NAME, "The group's name");
       const who = tidyName(playerName, MAX_PLAYER_NAME, "Your name");
+      const chosen = plays === undefined ? [...COMPETITIONS] : tidyPlays(plays);
       // The code is claimed and the group written in one step, so two groups started at the same
       // moment can never be given the same code.
       let code = null;
       for (let tries = 0; tries < 30 && code === null; tries++) {
         const candidate = codeFor(groupName, String(random(10000)).padStart(4, "0"));
-        const claimed = await store.setIfAbsent(`group:${candidate}`, { code: candidate, name: groupName, startedBy: player, startedAt: now, plays: [...COMPETITIONS] });
+        const claimed = await store.setIfAbsent(`group:${candidate}`, { code: candidate, name: groupName, startedBy: player, startedAt: now, plays: chosen });
         if (claimed) code = candidate;
       }
       if (code === null) refuse(503, "Could not make a code for the group. Try again.");
@@ -134,9 +146,9 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     async setPlays({ player, code, plays }) {
       const group = await this.group({ code });
       if (group.startedBy !== player) refuse(403, "Only the person who started the group can change what it plays.");
-      if (!Array.isArray(plays) || plays.some((c) => !COMPETITIONS.includes(c))) refuse(400, "That is not a list of competitions.");
+      const chosen = tidyPlays(plays);
       const { members, ...kept } = group;
-      await store.set(`group:${group.code}`, { ...kept, plays: COMPETITIONS.filter((c) => plays.includes(c)) });
+      await store.set(`group:${group.code}`, { ...kept, plays: chosen });
       return this.group({ code: group.code });
     },
 

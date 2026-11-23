@@ -1,5 +1,6 @@
 # Runs the website's checks on every change to it, and on every change to the picks engine, because
-# the site carries a copy of the engine's sealing code that has to match it exactly.
+# the site carries a copy of the engine's sealing code that has to match it exactly, and on every
+# change to the server, because the site's group checks run against the server's own code.
 name: Website checks
 
 on:
@@ -7,6 +8,7 @@ on:
     paths:
       - "web/**"
       - "engine/src/**"
+      - "server/src/**"
       - ".github/workflows/web.yml"
   pull_request:
   workflow_dispatch:

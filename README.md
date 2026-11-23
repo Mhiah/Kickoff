@@ -175,7 +175,8 @@ by the right key. The server is only ever sent fingerprints before kickoff, neve
 **State: the engine does all of this, and it has been rehearsed against the real TapeOut contracts
 on a private copy of X Layer.** It is not running on X Layer itself. **The server's rules are built
 and tested,** including a test that goes from three phones, through the server, to the final table.
-It can keep its records in a real database, but it has not been put on the internet yet.
+**It is online** at <https://kickoff-two-xi.vercel.app>, with a real database. The website uses it
+for groups: start one, share the code, and friends join from their own phones.
 
 ### 4. Results come in and picks are scored by a fixed rule
 
@@ -246,9 +247,9 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | The three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
 | The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
 | The picks engine | 120 tests. Twenty-three try to cheat, and five have the X Layer node lie about what is on chain | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
-| The website | 27 checks, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
+| The website | 43 checks, some of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 22 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
-| The server | 52 tests. They send picks in someone else's name, play old requests back, open a different pick from the one sealed, and use the robot's addresses without its key | All pass; every one is refused ([details](server/README.md)) |
+| The server | 53 tests. They send picks in someone else's name, play old requests back, open a different pick from the one sealed, and use the robot's addresses without its key | All pass; every one is refused ([details](server/README.md)) |
 | What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
 
 GitHub repeats the tests on every change, and the badges at the top of this page show the latest
@@ -257,12 +258,14 @@ results.
 ## Honest limits
 
 - **Nothing is live on X Layer yet.** Everything on chain so far happened on a private copy.
-- **The pieces are not joined up yet.** The website shows made-up matches, and a sealed pick stays
-  on the device.
+- **The pieces are only partly joined up.** Groups on the website are real. The matches, table and
+  results are still made up, and a sealed pick stays on the device.
+- **A player is one phone and browser.** The key that makes someone a player is kept in the
+  browser. If its saved data is cleared, that player is gone. A backup is still to do.
 - **A result is the feed's word.** Kickoff checks that it is a result that can happen, not that it
   is true. That is why any player can dispute a result, and why a dispute can never be hidden.
-- **The server is not on the internet yet.** Its rules and its database connection are built and
-  tested, but against a stand-in database, not a real one.
+- **The server has no real matches yet.** Groups work on the live site. Sealed picks have not been
+  sent to the live server, because no real matches are on its list until the robot is built.
 - **Sealed picks will pass through Kickoff's server.** A player needs no wallet, so the server
   gathers the fingerprints and Kickoff locks them. The server never sees a pick before kickoff and
   cannot change one or add one afterwards, but it could leave one out. Each player's receipt is the
@@ -298,7 +301,7 @@ results.
 | 5 | The website's screens | Done, with made-up data. |
 | 6 | Sealing a pick for real, on the player's own device | Done. |
 | 7 | The fixtures feed | Done, and run live against the real feeds. |
-| 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Partly done. The rules, signed requests, addresses and database connection are built, with 52 tests. Still to do: putting it online, and connecting the website. |
+| 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Partly done. The rules, signed requests, addresses and database connection are built, with 53 tests, and it is online with a real database. The website uses it for groups. Still to do: sending sealed picks from the website, receipts, and opening picks. |
 | 9 | The robot: announces fixtures, locks picks before kickoff and posts results on X Layer | Not started |
 | 10 | Joining it up: real fixtures and real tables on the website | Not started |
 | 11 | Going live on X Layer: the circuits and Kickoff's account | Not started |
@@ -327,10 +330,9 @@ You need Node 22 or newer. The circuit check also needs Python 3. Nothing has to
 | Check the scoring circuits on every possible case | `python3 circuits/check.py` |
 | Run the picks engine's tests | `cd engine && npm test` |
 | Run the website's checks | `node --test "web/test/*.test.js"` |
-| See the website on your own computer | `cd web && python3 -m http.server 8000`, then open `http://localhost:8000` |
+| See the website on your own computer, with groups working | `node server/bin/dev.js`, then open `http://localhost:8787` |
 | Run the feed's tests (no key needed) | `cd feed && npm test` |
 | Run the server's tests | `cd server && npm test` |
-| Run the server and the website together on your own computer | `node server/bin/dev.js`, then open `http://localhost:8787` |
 | Fetch this week's real fixtures (needs your own two keys) | `FOOTBALL_DATA_KEY=... BALLDONTLIE_KEY=... node feed/bin/fixtures.js` |
 
 The rehearsals on a private copy of X Layer need [Foundry](https://getfoundry.sh), and are

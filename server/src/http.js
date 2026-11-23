@@ -8,7 +8,7 @@
 //     GET  /api/matches/<match>/openings         the file of opened picks, as the picks engine reads it
 //
 //   A device must sign these (engine/src/identity.js)
-//     POST /api/groups                { name, playerName }      start a group
+//     POST /api/groups                { name, playerName, plays } start a group
 //     POST /api/groups/<code>/join    { playerName }            join one
 //     POST /api/groups/<code>/plays   { plays }                 choose its competitions (its starter only)
 //     POST /api/me/groups             {}                        the groups this device is in
@@ -65,7 +65,7 @@ export function createHandler({ kickoff, now, adminKey = null }) {
 
     ["POST", /^\/api\/groups$/, async (r) => {
       const s = await signed(r);
-      return kickoff.createGroup({ player: s.player, now: now(), name: s.name, playerName: s.playerName });
+      return kickoff.createGroup({ player: s.player, now: now(), name: s.name, playerName: s.playerName, plays: s.plays });
     }],
     ["POST", /^\/api\/groups\/([^/]+)\/join$/, async (r, code) => {
       const s = await signed(r);

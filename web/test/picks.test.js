@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { COMPETITIONS, SAMPLE_LEAGUE } from "../data/sample.js";
+import { createDevice } from "../lib/device.js";
 import { createStore, fixtureFacts, matchIdOf, pickWords, seal } from "../lib/picks.js";
 import { CLOSES_BEFORE, clock, closesAt, dayLabel, hasClosed, howLong, todayLabel } from "../lib/time.js";
 import { ENGINE_FILES } from "../scripts/sync-engine.js";
@@ -28,7 +29,7 @@ test("the site's copy of the engine is the engine, byte for byte", () => {
 test("a sealed pick's fingerprint is the one the engine works out from the same facts", async () => {
   const ctx = await contextAt(NOW);
   const fixture = ctx.fixtures["ars-che"];
-  const entry = await seal({ store: ctx.store, league: SAMPLE_LEAGUE, fixture, competitions: COMPETITIONS, pick: { home: 2, away: 1 }, now: NOW });
+  const entry = await seal({ store: ctx.store, league: SAMPLE_LEAGUE, fixture, competitions: COMPETITIONS, pick: { home: 2, away: 1 }, now: NOW, player: ctx.mine.player });
 
   const facts = fixtureFacts(fixture, COMPETITIONS);
   assert.deepEqual(facts, { sport: 1, kickoff: fixture.kickoff, bestOf: 0, label: "Premier League: Arsenal v Chelsea" });
@@ -37,7 +38,7 @@ test("a sealed pick's fingerprint is the one the engine works out from the same 
   assert.equal(entry.match, await matchIdOf(SAMPLE_LEAGUE, fixture, COMPETITIONS));
   assert.equal(entry.pickByte, 18, "2 – 1 is written as the byte 18, as the football circuit expects");
 
-  const expected = await fingerprintOf({ league: SAMPLE_LEAGUE, match, sport: 1, pickByte: 18, player: bytes(ctx.store.playerId()), salt: bytes(entry.salt) });
+  const expected = await fingerprintOf({ league: SAMPLE_LEAGUE, match, sport: 1, pickByte: 18, player: bytes(ctx.mine.player), salt: bytes(entry.salt) });
   assert.equal(entry.fingerprint, hex(expected));
   assert.equal(entry.salt.length, 64, "the secret is 32 bytes");
   assert.equal(entry.sealedAt, NOW);
@@ -46,7 +47,7 @@ test("a sealed pick's fingerprint is the one the engine works out from the same 
 test("a basketball pick seals as a winner and a margin", async () => {
   const ctx = await contextAt(NOW);
   const fixture = ctx.fixtures["nyk-mil"];
-  const entry = await seal({ store: ctx.store, league: SAMPLE_LEAGUE, fixture, competitions: COMPETITIONS, pick: { winner: "away", band: "C" }, now: NOW });
+  const entry = await seal({ store: ctx.store, league: SAMPLE_LEAGUE, fixture, competitions: COMPETITIONS, pick: { winner: "away", band: "C" }, now: NOW, player: ctx.mine.player });
   assert.equal(entry.sport, 2);
   assert.equal(entry.pickByte, 1 | (2 << 1));
   assert.equal(pickWords(entry, fixture), "Bucks by 11 to 15");
@@ -55,7 +56,7 @@ test("a basketball pick seals as a winner and a margin", async () => {
 
 test("a pick that cannot happen is refused, and nothing is kept", async () => {
   const ctx = await contextAt(NOW);
-  const football = { store: ctx.store, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["ars-che"], competitions: COMPETITIONS, now: NOW };
+  const football = { store: ctx.store, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["ars-che"], competitions: COMPETITIONS, now: NOW, player: ctx.mine.player };
   await assert.rejects(seal({ ...football, pick: { home: 16, away: 0 } }), /0 to 15/);
   await assert.rejects(seal({ ...football, pick: { home: 1.5, away: 0 } }), /whole number/);
   await assert.rejects(seal({ ...football, fixture: ctx.fixtures["nyk-mil"], pick: { winner: "home", band: "E" } }), /margin band/);
@@ -66,7 +67,7 @@ test("picks close ten minutes before the start, to the second", async () => {
   assert.equal(CLOSES_BEFORE, 600);
   const ctx = await contextAt(NOW);
   const fixture = ctx.fixtures["rma-bay"];
-  const sealAt = (now) => seal({ store: ctx.store, league: SAMPLE_LEAGUE, fixture, competitions: COMPETITIONS, pick: { home: 1, away: 0 }, now });
+  const sealAt = (now) => seal({ store: ctx.store, league: SAMPLE_LEAGUE, fixture, competitions: COMPETITIONS, pick: { home: 1, away: 0 }, now, player: ctx.mine.player });
   await sealAt(closesAt(fixture.kickoff) - 1); // one second before closing: fine
   await assert.rejects(sealAt(closesAt(fixture.kickoff)), /have closed/);
   await assert.rejects(sealAt(fixture.kickoff + 60), /have closed/);
@@ -76,7 +77,7 @@ test("picks close ten minutes before the start, to the second", async () => {
 
 test("changing a pick replaces it, with a new secret and a new fingerprint", async () => {
   const ctx = await contextAt(NOW);
-  const args = { store: ctx.store, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["ars-che"], competitions: COMPETITIONS, now: NOW };
+  const args = { store: ctx.store, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["ars-che"], competitions: COMPETITIONS, now: NOW, player: ctx.mine.player };
   const first = await seal({ ...args, pick: { home: 2, away: 1 } });
   const second = await seal({ ...args, pick: { home: 2, away: 1 }, now: NOW + 60 });
   assert.equal(second.match, first.match);
@@ -86,19 +87,33 @@ test("changing a pick replaces it, with a new secret and a new fingerprint", asy
   assert.equal(ctx.store.get(first.match).sealedAt, NOW + 60);
 });
 
-test("picks and the player's id are still there when the browser is opened again", async () => {
+test("picks and the device's key are still there when the browser is opened again", async () => {
   const storage = new FakeStorage();
   const before = createStore(storage);
   const ctx = await contextAt(NOW, before);
-  const entry = await seal({ store: before, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["int-bar"], competitions: COMPETITIONS, pick: { home: 0, away: 0 }, now: NOW });
+  const entry = await seal({ store: before, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["int-bar"], competitions: COMPETITIONS, pick: { home: 0, away: 0 }, now: NOW, player: ctx.mine.player });
+  assert.equal(entry.player, ctx.mine.player);
 
   const after = createStore(storage); // the page loaded again
-  assert.equal(after.playerId(), before.playerId());
-  assert.match(after.playerId(), /^[0-9a-f]{64}$/);
+  const again = await createDevice(after).player();
+  assert.equal(again, ctx.mine.player, "the same key, so the same player");
+  assert.match(again, /^[0-9a-f]{64}$/);
   assert.deepEqual(after.get(entry.match), entry);
+  assert.deepEqual(after.all(again), { [entry.match]: entry });
   assert.equal(after.lasting, true);
   // Two devices do not share an id.
-  assert.notEqual(createStore(new FakeStorage()).playerId(), before.playerId());
+  assert.notEqual(await createDevice(createStore(new FakeStorage())).player(), again);
+});
+
+test("a pick sealed for another player id is not shown as yours", async () => {
+  const ctx = await contextAt(NOW);
+  const entry = await seal({ store: ctx.store, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["ars-che"], competitions: COMPETITIONS, pick: { home: 1, away: 1 }, now: NOW, player: ctx.mine.player });
+  // A pick left over from before this device had its own key: no player, or someone else's.
+  ctx.store.save({ ...entry, match: "ab".repeat(32), player: undefined });
+  ctx.store.save({ ...entry, match: "cd".repeat(32), player: "ee".repeat(32) });
+  assert.deepEqual(Object.keys(ctx.store.all(ctx.mine.player)), [entry.match]);
+  assert.equal(Object.keys(ctx.store.all()).length, 3, "nothing is thrown away");
+  await assert.rejects(seal({ store: ctx.store, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["ars-che"], competitions: COMPETITIONS, pick: { home: 1, away: 1 }, now: NOW }), /no player id yet/);
 });
 
 test("a browser that refuses to store anything still works for the visit, and says so", async () => {
@@ -106,7 +121,7 @@ test("a browser that refuses to store anything still works for the visit, and sa
   for (const storage of [refusing, null]) {
     const store = createStore(storage);
     const ctx = await contextAt(NOW, store);
-    const entry = await seal({ store, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["ars-che"], competitions: COMPETITIONS, pick: { home: 3, away: 3 }, now: NOW });
+    const entry = await seal({ store, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["ars-che"], competitions: COMPETITIONS, pick: { home: 3, away: 3 }, now: NOW, player: ctx.mine.player });
     assert.deepEqual(store.get(entry.match), entry);
     assert.equal(store.lasting, false);
     const screen = pick("ars-che", await contextAt(NOW, store));
@@ -118,10 +133,10 @@ test("damaged storage is treated as empty, not as a crash", async () => {
   for (const junk of ["not json", "[1,2]", "null", '"text"']) {
     const storage = new FakeStorage();
     storage.setItem("kickoff-picks", junk);
-    storage.setItem("kickoff-player", "not an id");
+    storage.setItem("kickoff-device", junk);
     const store = createStore(storage);
     assert.deepEqual(store.all(), {});
-    assert.match(store.playerId(), /^[0-9a-f]{64}$/);
+    assert.match(await createDevice(store).player(), /^[0-9a-f]{64}$/, "a new key is made in place of the damaged one");
   }
 });
 
