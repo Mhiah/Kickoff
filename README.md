@@ -108,7 +108,7 @@ through are an ordinary website.
 | --- | --- | --- |
 | 1 | Project setup: this README, the folders, the licence | Done |
 | 2 | The three scoring circuits and the checker that tests every possible case | Built and checked off chain. Not published on X Layer yet. |
-| 3 | Proving the TapeOut parts on a private copy of X Layer | Not started |
+| 3 | Proving the TapeOut parts on a private copy of X Layer | Started. The first rehearsal, publishing the three circuits, is written. See [chain/README.md](chain/README.md). |
 | 4 | The picks engine and the table builder | Not started |
 | 5 | The website | Not started |
 | 6 | Going live on X Layer: processor, circuits, the first league | Not started |
@@ -138,6 +138,7 @@ will be listed here as soon as they exist.
 | Folder | What goes in it |
 | --- | --- |
 | `circuits/` | The three scoring circuits in TapeOut's format, and the checker. Start with [circuits/README.md](circuits/README.md) |
+| `chain/` | Rehearsals of the parts that touch X Layer, run on a private copy of it |
 | `engine/` | The picks engine and the table builder |
 | `web/` | The website |
 | `docs/` | The rules in plain words, design notes, test results and evidence |

@@ -1,0 +1,12 @@
+[profile.default]
+src = "src"
+test = "test"
+libs = ["lib"]
+solc = "0.8.28"
+optimizer = true
+optimizer_runs = 200
+# The tests read the finished circuits from circuits/out/.
+fs_permissions = [{ access = "read", path = "../circuits/out" }]
+# Checking every possible football case asks the evaluator thousands of times in one test.
+gas_limit = "18446744073709551615"
+memory_limit = 1073741824

@@ -1,0 +1,45 @@
+# A rehearsal on a private copy of X Layer mainnet. It creates a Kickoff processor through the real
+# TapeOut factory, publishes the three scoring circuits, and asks the real TapeOut evaluator for
+# the points on every possible input. Nothing is sent to the real network and nothing is paid.
+name: X Layer rehearsal
+
+on:
+  push:
+    paths:
+      - "chain/**"
+      - "circuits/out/**"
+      - ".github/workflows/rehearsal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rehearsal:
+    name: Publish and check the circuits on a copy of X Layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      XLAYER_RPC_URL: https://rpc.xlayer.tech
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run the rehearsal
+        working-directory: chain
+        run: |
+          set -o pipefail
+          forge test -vv 2>&1 | tee rehearsal.txt
+
+      - name: Put the output on the run's summary page
+        if: always()
+        working-directory: chain
+        run: |
+          {
+            echo '```'
+            cat rehearsal.txt 2>/dev/null || echo 'no output was produced'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
