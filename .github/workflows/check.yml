@@ -1,0 +1,30 @@
+# Runs on every push. It re-checks the three scoring circuits on every possible case and makes
+# sure the circuits saved in circuits/out/ are exactly what the builder produces.
+name: Circuit check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check the scoring circuits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check every possible case
+        run: python3 circuits/check.py
+
+      - name: Rebuild the circuits
+        run: python3 circuits/build.py
+
+      - name: Nothing saved in the repository may differ from what was just produced
+        run: git diff --exit-code -- circuits/out docs/CHECK-RESULTS.md

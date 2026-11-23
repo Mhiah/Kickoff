@@ -4,6 +4,8 @@
 
 X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during this event by Mhiah.
 
+[![Circuit check](https://github.com/Mhiah/Kickoff/actions/workflows/check.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/check.yml)
+
 > [!NOTE]
 > **Where this is today:** the rules are written and the three scoring circuits are built and
 > checked on every possible case, off chain. Nothing is live on X Layer yet. This README describes
@@ -125,7 +127,8 @@ through are an ordinary website.
 
 Each case was evaluated twice, with Kickoff's own evaluator and with TapeOut's official reference
 evaluator. The full results are in [docs/CHECK-RESULTS.md](docs/CHECK-RESULTS.md), and anyone can
-repeat the check with `python3 circuits/check.py`.
+repeat the check with `python3 circuits/check.py`. GitHub also repeats it on every push, and the
+badge at the top of this page shows whether it passed.
 
 Nothing is deployed, so there are no contract addresses, no circuit IDs and no live link yet. They
 will be listed here as soon as they exist.
