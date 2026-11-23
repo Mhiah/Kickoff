@@ -8,8 +8,6 @@ export const COMPETITIONS = {
   wnba: { name: "WNBA", sport: "basketball" },
 };
 
-export const today = "Monday, 23 November";
-
 export const group = {
   name: "Sunday Ballers",
   code: "BALLERS-4821",
@@ -35,22 +33,28 @@ export const scores = [
   { name: "Dayo", threes: 0, ones: 2 },
 ];
 
-/** Matches still to be played. `state` is "open" (no pick yet) or "sealed" (you have picked). */
-export const fixtures = {
-  "rma-bay": { comp: "cl", home: "Real Madrid", away: "Bayern", day: "Tuesday 24 Nov", time: "21:00", closes: "20:50", closesIn: "in 1 day 1 hour", state: "open" },
-  "int-bar": { comp: "cl", home: "Inter", away: "Barcelona", day: "Tuesday 24 Nov", time: "21:00", closes: "20:50", closesIn: "in 1 day 1 hour", state: "sealed" },
-  "nyk-mil": { comp: "nba", home: "Knicks", away: "Bucks", day: "Wednesday 25 Nov", time: "01:30", closes: "01:20", closesIn: "in 1 day", state: "sealed" },
-  "gsw-den": { comp: "nba", home: "Warriors", away: "Nuggets", day: "Wednesday 25 Nov", time: "04:00", closes: "03:50", closesIn: "in 1 day", state: "open" },
-  "ars-che": { comp: "pl", home: "Arsenal", away: "Chelsea", day: "Saturday 28 Nov", time: "18:30", closes: "18:20", closesIn: "in 4 days", state: "open" },
-};
+/**
+ * Matches still to be played. They are always a few days ahead of whenever the page is opened, so
+ * there is always something to pick. `kickoff` is the start time in seconds.
+ */
+export function sampleFixtures(now) {
+  const today = new Date(now * 1000);
+  const at = (days, hours, minutes) =>
+    Math.floor(new Date(today.getFullYear(), today.getMonth(), today.getDate() + days, hours, minutes).getTime() / 1000);
+  return {
+    "rma-bay": { comp: "cl", home: "Real Madrid", away: "Bayern", kickoff: at(1, 21, 0) },
+    "int-bar": { comp: "cl", home: "Inter", away: "Barcelona", kickoff: at(1, 21, 0) },
+    "nyk-mil": { comp: "nba", home: "Knicks", away: "Bucks", kickoff: at(2, 1, 30) },
+    "gsw-den": { comp: "nba", home: "Warriors", away: "Nuggets", kickoff: at(2, 4, 0) },
+    "ars-che": { comp: "pl", home: "Arsenal", away: "Chelsea", kickoff: at(5, 18, 30) },
+  };
+}
 
-export const week = {
-  total: 80,
-  nextUp: "rma-bay",
-  nextUpWhen: "Tomorrow, 21:00.",
-  nextUpCloses: "1 day 1 hour",
-  days: ["Tuesday 24 Nov", "Wednesday 25 Nov", "Saturday 28 Nov"],
-};
+/** How many matches the week holds in all. Only five are made up here. */
+export const week = { total: 80 };
+
+/** A stand-in for Kickoff's id on X Layer, until there is a real one. */
+export const SAMPLE_LEAGUE = "0x0000000000000000000000c424ad6fe8a46a34fa9b0610959beaba8a2c6b6982";
 
 /** Your own record: every match you picked that has finished. */
 export const record = [
@@ -100,5 +104,5 @@ export const check = {
     { title: "A result from an account that is not Kickoff's.", text: "On 22 Nov at 17:32 somebody else wrote \"0 – 0\" for Man City v Liverpool. Only Kickoff's own account can give a result, so it was ignored." },
   ],
   disputes: [{ title: "Man City 2 – 1 Liverpool.", text: "Chidi says it finished 0 – 0. Sent 22 Nov at 19:41, inside the 24 hours. Not answered yet." }],
-  id: "0x0000000000000000000000c424ad6fe8a46a34fa9b0610959beaba8a2c6b6982",
+  id: SAMPLE_LEAGUE,
 };

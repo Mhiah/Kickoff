@@ -4,7 +4,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, statSync } from "node:fs";
 
-import { COMPETITIONS, fixtures, group, match, record, scores, week } from "../data/sample.js";
+import { COMPETITIONS, group, match, record, scores, week } from "../data/sample.js";
+import { NOW, contextAt, sealOn } from "./helpers.js";
 import { ordinal, placeName, standings } from "../lib/standings.js";
 import { checkScreen, frame, groupScreen, home, league, matchScreen, pick, recordScreen } from "../screens.js";
 
@@ -13,10 +14,12 @@ const file = (name) => new URL(`../${name}`, import.meta.url);
 const css = readFileSync(file("styles.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 const table = standings(scores);
 const you = table.find((row) => row.name === group.you);
+const ctx = await contextAt(NOW);
+const fixtures = ctx.fixtures;
 
 test("every screen draws, with nothing missing in it", () => {
-  const screens = { home: home(), league: league(), record: recordScreen(), check: checkScreen(), group: groupScreen(), match: matchScreen(), frame: { html: frame(), title: "frame" } };
-  for (const id of Object.keys(fixtures)) screens[`pick ${id}`] = pick(id);
+  const screens = { home: home(), league: league(null, ctx), record: recordScreen(), check: checkScreen(), group: groupScreen(), match: matchScreen(), frame: { html: frame(), title: "frame" } };
+  for (const id of Object.keys(fixtures)) screens[`pick ${id}`] = pick(id, ctx);
   for (const [name, screen] of Object.entries(screens)) {
     assert.ok(screen.html.length > 200, `${name} is empty`);
     assert.ok(screen.title, `${name} has no title`);
@@ -25,13 +28,13 @@ test("every screen draws, with nothing missing in it", () => {
 });
 
 test("a pick for a match that does not exist falls back to the league", () => {
-  assert.equal(pick("no-such-match").tab, "league");
-  assert.match(pick("no-such-match").html, /This week/);
+  assert.equal(pick("no-such-match", ctx).tab, "league");
+  assert.match(pick("no-such-match", ctx).html, /This week/);
 });
 
 test("football matches get a score to set, basketball games get a winner and a margin", () => {
   for (const [id, f] of Object.entries(fixtures)) {
-    const html = pick(id).html;
+    const html = pick(id, ctx).html;
     if (COMPETITIONS[f.comp].sport === "football") {
       assert.match(html, /What will the score be\?/);
       assert.match(html, /90 minutes/);
@@ -69,25 +72,25 @@ test("the made-up data agrees with itself", () => {
   // Everyone in the group is accounted for in that match.
   assert.equal(match.opened.length + match.notOpened.length, match.sealedCount);
   assert.deepEqual([...match.opened.map((o) => o.name), ...match.notOpened].sort(), [...group.players].sort());
-  // Every fixture belongs to a competition and a day that is listed.
+  // Every fixture belongs to a competition and is still ahead.
   for (const f of Object.values(fixtures)) {
     assert.ok(COMPETITIONS[f.comp]);
-    assert.ok(week.days.includes(f.day));
+    assert.ok(f.kickoff > NOW);
   }
-  assert.ok(fixtures[week.nextUp]);
   assert.equal(scores.length, group.players.length);
 });
 
-test("the league screen counts the picks you have sealed", () => {
-  const sealed = Object.values(fixtures).filter((f) => f.state === "sealed").length;
-  assert.match(league().html, new RegExp(`You have picked ${sealed} of ${week.total} matches`));
+test("the league screen counts the picks sealed on this device", async () => {
+  assert.match(league(null, ctx).html, new RegExp(`You have picked 0 of ${week.total} matches`));
+  const after = await sealOn(ctx, "ars-che", { home: 2, away: 1 });
+  assert.match(league(null, after).html, new RegExp(`You have picked 1 of ${week.total} matches`));
 });
 
 test("names are made safe before they go on the page", () => {
   const before = group.name;
   group.name = `<img src=x onerror=alert(1)>`;
   try {
-    for (const screen of [league(), recordScreen(), groupScreen()]) assert.ok(!screen.html.includes("<img src=x"));
+    for (const screen of [league(null, ctx), recordScreen(), groupScreen()]) assert.ok(!screen.html.includes("<img src=x"));
     assert.ok(!frame().includes("<img src=x"));
   } finally {
     group.name = before;
@@ -103,7 +106,7 @@ test("the look keeps to what was asked for: no gradients, Georgia first, a colou
 
 test("every screen carries the light and dark switch", () => {
   assert.match(frame(), /data-theme-toggle/); // the top bar, on a phone
-  for (const screen of [league(), recordScreen(), checkScreen(), groupScreen(), matchScreen(), pick("ars-che")]) {
+  for (const screen of [league(null, ctx), recordScreen(), checkScreen(), groupScreen(), matchScreen(), pick("ars-che", ctx)]) {
     assert.match(screen.html, /data-theme-toggle/); // the end of the title row, on a computer
   }
 });
@@ -115,7 +118,7 @@ test("each typeface file is small enough to go on chain in one piece", () => {
 });
 
 test("until Kickoff is live, every screen says the data is made up", () => {
-  for (const screen of [home(), league(), recordScreen(), checkScreen(), groupScreen(), matchScreen(), pick("ars-che")]) {
+  for (const screen of [home(), league(null, ctx), recordScreen(), checkScreen(), groupScreen(), matchScreen(), pick("ars-che", ctx)]) {
     assert.match(screen.html, /Nothing here is live yet/);
   }
 });

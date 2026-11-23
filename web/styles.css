@@ -214,6 +214,13 @@ body.public .tabs { display: none; }
 .rules { margin: 16px 0 20px; font-size: 15px; }
 .rules li { margin-left: 18px; padding: 2px 0; }
 .after { margin-top: 14px; font-size: 14.5px; color: var(--muted); }
+.sealed { padding: 18px; }
+.sealed .yours { font-size: 44px; font-weight: 700; line-height: 1.1; margin: 6px 0 8px; }
+.sealed .yours.words { font-size: 30px; }
+.sealed .finger { margin-top: 14px; padding-top: 12px; border-top: 1.5px dashed var(--line); }
+.sealed .finger small { display: block; font-size: 13.5px; }
+.sealed code { font: 14px/1.6 ui-monospace, Menlo, Consolas, monospace; }
+button.link { text-decoration: underline; font-weight: 700; }
 
 /* ---- match */
 .final { margin: 14px 0 16px; }

@@ -1,10 +1,12 @@
-# Runs the website's checks on every change to it.
+# Runs the website's checks on every change to it, and on every change to the picks engine, because
+# the site carries a copy of the engine's sealing code that has to match it exactly.
 name: Website checks
 
 on:
   push:
     paths:
       - "web/**"
+      - "engine/src/**"
       - ".github/workflows/web.yml"
   pull_request:
   workflow_dispatch:

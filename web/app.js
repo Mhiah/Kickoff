@@ -1,15 +1,39 @@
 // Kickoff's website. No build step and nothing to install: plain files a browser runs as they are.
 
+import { COMPETITIONS, SAMPLE_LEAGUE, sampleFixtures } from "./data/sample.js";
+import { createStore, matchIdOf, seal } from "./lib/picks.js";
 import { checkScreen, frame, groupScreen, home, league, matchScreen, pick, recordScreen } from "./screens.js";
 
 const routes = { "": home, league, pick, match: matchScreen, record: recordScreen, check: checkScreen, group: groupScreen };
 
+let storage = null;
+try {
+  storage = window.localStorage;
+} catch {
+  // Some browsers refuse storage altogether. Picks are then kept for this visit only.
+}
+const store = createStore(storage);
+
 document.body.insertAdjacentHTML("afterbegin", frame());
 const view = document.getElementById("view");
+let editing = null; // the fixture whose pick is being changed, if any
+let drawing = 0;
 
-function draw() {
+/** What is true right now: the time, the matches, and the picks kept on this device. */
+async function context() {
+  const now = Math.floor(Date.now() / 1000);
+  const fixtures = sampleFixtures(now);
+  const matchIds = {};
+  for (const [id, fixture] of Object.entries(fixtures)) matchIds[id] = await matchIdOf(SAMPLE_LEAGUE, fixture, COMPETITIONS);
+  return { now, fixtures, matchIds, picks: store.all(), lasting: store.lasting, editing };
+}
+
+async function draw({ keepPlace = false } = {}) {
+  const mine = ++drawing;
   const [name = "", arg] = location.hash.replace(/^#\/?/, "").split("/");
-  const screen = (routes[name] ?? home)(arg);
+  const ctx = await context();
+  if (mine !== drawing) return; // a newer draw has started
+  const screen = (routes[name] ?? home)(arg, ctx);
   document.body.classList.toggle("public", Boolean(screen.public));
   view.className = screen.wide ? "wide" : "";
   view.innerHTML = screen.html;
@@ -21,16 +45,29 @@ function draw() {
   const where = document.querySelector("[data-where]");
   where.textContent = screen.public ? "See a sample group" : where.dataset.name ?? where.textContent;
   where.setAttribute("href", screen.public ? "#/league" : "#/group");
-  window.scrollTo(0, 0);
+  if (!keepPlace) window.scrollTo(0, 0);
+}
+
+/** The pick as the controls on the screen now show it, or null if it is not finished. */
+function pickOnScreen() {
+  const picker = view.querySelector("[data-picker]");
+  if (picker.dataset.picker === "football") {
+    const [home, away] = [...picker.querySelectorAll("output")].map((o) => Number(o.textContent));
+    return { home, away };
+  }
+  const winner = picker.querySelector('[data-winner][aria-pressed="true"]')?.dataset.winner;
+  const band = picker.querySelector('[data-band][aria-pressed="true"]')?.dataset.band;
+  return winner && band ? { winner, band } : null;
 }
 
 // Remember the group's name before the home screen swaps the link's words.
 const whereLink = document.querySelector("[data-where]");
 whereLink.dataset.name = whereLink.textContent;
 
-/** Say something short next to whatever was pressed, where a screen reader will read it out. */
+/** Say something short near whatever was pressed, where a screen reader will read it out. */
 function say(from, words) {
-  const out = from.closest("main").querySelector("[data-note-out], [data-seal-note]") ?? from.parentElement;
+  const outs = [...view.querySelectorAll("[data-note-out]")];
+  const out = outs.find((o) => from.compareDocumentPosition(o) & Node.DOCUMENT_POSITION_FOLLOWING) ?? outs.at(-1) ?? from.parentElement;
   out.textContent = words;
 }
 
@@ -54,7 +91,25 @@ document.addEventListener("click", async (event) => {
     return;
   }
   if (target.matches("[data-seal]")) {
-    say(target, "This is a preview, so nothing was sealed. Sealing a pick for real is the next thing being built.");
+    const chosen = pickOnScreen();
+    if (!chosen) {
+      say(target, "Choose who wins and by how many points first.");
+      return;
+    }
+    const ctx = await context();
+    const fixture = ctx.fixtures[target.dataset.seal];
+    try {
+      await seal({ store, league: SAMPLE_LEAGUE, fixture, competitions: COMPETITIONS, pick: chosen, now: ctx.now });
+      editing = null;
+      await draw();
+    } catch (error) {
+      say(target, error.message);
+    }
+    return;
+  }
+  if (target.matches("[data-change]")) {
+    editing = target.dataset.change;
+    await draw({ keepPlace: true });
     return;
   }
 
@@ -101,5 +156,8 @@ document.addEventListener("click", async (event) => {
   }
 });
 
-window.addEventListener("hashchange", draw);
+window.addEventListener("hashchange", () => {
+  editing = null;
+  draw();
+});
 draw();
