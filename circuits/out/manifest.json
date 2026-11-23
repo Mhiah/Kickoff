@@ -1,0 +1,23 @@
+{
+  "football": {
+    "inputs": 16,
+    "outputs": 2,
+    "gates": 148,
+    "bytes": 1036,
+    "sha256": "7a663a0ed0040e6ce9952091fb796458f21dcb5e80ac4c8369ef2f147cb9e87b"
+  },
+  "basketball": {
+    "inputs": 6,
+    "outputs": 2,
+    "gates": 20,
+    "bytes": 140,
+    "sha256": "1c94a4cc1a6428c9e4ad27055fc3421245d74cadd625fb327a7628d6d4d1f480"
+  },
+  "tennis": {
+    "inputs": 7,
+    "outputs": 2,
+    "gates": 37,
+    "bytes": 259,
+    "sha256": "28d758b254c1193a1d80d7f4695545a20563bb86d6258379de6dc8fa077c11be"
+  }
+}

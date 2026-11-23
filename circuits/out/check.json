@@ -1,0 +1,47 @@
+{
+  "football": {
+    "inputs": 16,
+    "gates": 148,
+    "bytes": 1036,
+    "sha256": "7a663a0ed0040e6ce9952091fb796458f21dcb5e80ac4c8369ef2f147cb9e87b",
+    "cases_checked": 65536,
+    "cases_wrong_kickoff_evaluator": 0,
+    "cases_wrong_tapeout_reference_evaluator": 0,
+    "cases_scoring_0": 36480,
+    "cases_scoring_1": 28800,
+    "cases_scoring_3": 256,
+    "damaged_copies_made": 148,
+    "damaged_copies_caught": 148,
+    "problems": []
+  },
+  "basketball": {
+    "inputs": 6,
+    "gates": 20,
+    "bytes": 140,
+    "sha256": "1c94a4cc1a6428c9e4ad27055fc3421245d74cadd625fb327a7628d6d4d1f480",
+    "cases_checked": 64,
+    "cases_wrong_kickoff_evaluator": 0,
+    "cases_wrong_tapeout_reference_evaluator": 0,
+    "cases_scoring_0": 32,
+    "cases_scoring_1": 24,
+    "cases_scoring_3": 8,
+    "damaged_copies_made": 20,
+    "damaged_copies_caught": 20,
+    "problems": []
+  },
+  "tennis": {
+    "inputs": 7,
+    "gates": 37,
+    "bytes": 259,
+    "sha256": "28d758b254c1193a1d80d7f4695545a20563bb86d6258379de6dc8fa077c11be",
+    "cases_checked": 128,
+    "cases_wrong_kickoff_evaluator": 0,
+    "cases_wrong_tapeout_reference_evaluator": 0,
+    "cases_scoring_0": 102,
+    "cases_scoring_1": 16,
+    "cases_scoring_3": 10,
+    "damaged_copies_made": 37,
+    "damaged_copies_caught": 37,
+    "problems": []
+  }
+}

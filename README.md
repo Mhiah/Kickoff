@@ -5,8 +5,9 @@
 X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during this event by Mhiah.
 
 > [!NOTE]
-> **Where this is today:** the project has just been set up. Nothing is live yet. This README
-> describes what Kickoff is and how it will work. The section
+> **Where this is today:** the rules are written and the three scoring circuits are built and
+> checked on every possible case, off chain. Nothing is live on X Layer yet. This README describes
+> what Kickoff is and how it will work. The section
 > [Where the build is](#where-the-build-is) says exactly what exists, and it is updated as each
 > part is finished.
 
@@ -104,7 +105,7 @@ through are an ordinary website.
 | Stage | What it is | State |
 | --- | --- | --- |
 | 1 | Project setup: this README, the folders, the licence | Done |
-| 2 | The three scoring circuits and the checker that tests every possible case | Not started |
+| 2 | The three scoring circuits and the checker that tests every possible case | Built and checked off chain. Not published on X Layer yet. |
 | 3 | Proving the TapeOut parts on a private copy of X Layer | Not started |
 | 4 | The picks engine and the table builder | Not started |
 | 5 | The website | Not started |
@@ -114,6 +115,18 @@ through are an ordinary website.
 | 9 | Players with their own TapeOut identity, and sponsor prizes | Not started |
 | 10 | Demo video and submission | Not started |
 
+**The scoring circuits so far**
+
+| Circuit | Gates | Cases checked | Cases wrong |
+| --- | --- | --- | --- |
+| Football | 148 | 65,536 (every possible case) | 0 |
+| Basketball | 20 | 64 (every possible case) | 0 |
+| Tennis | 37 | 128 (every possible case) | 0 |
+
+Each case was evaluated twice, with Kickoff's own evaluator and with TapeOut's official reference
+evaluator. The full results are in [docs/CHECK-RESULTS.md](docs/CHECK-RESULTS.md), and anyone can
+repeat the check with `python3 circuits/check.py`.
+
 Nothing is deployed, so there are no contract addresses, no circuit IDs and no live link yet. They
 will be listed here as soon as they exist.
 
@@ -121,7 +134,7 @@ will be listed here as soon as they exist.
 
 | Folder | What goes in it |
 | --- | --- |
-| `circuits/` | The scoring rules in TapeOut's circuit format, and the checker |
+| `circuits/` | The three scoring circuits in TapeOut's format, and the checker. Start with [circuits/README.md](circuits/README.md) |
 | `engine/` | The picks engine and the table builder |
 | `web/` | The website |
 | `docs/` | The rules in plain words, design notes, test results and evidence |

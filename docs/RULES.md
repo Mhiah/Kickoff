@@ -1,7 +1,7 @@
 # The rules of Kickoff, in plain words
 
 These are the rules every league plays by. The scoring parts of this page are what the three
-scoring circuits are built from, so if a rule here changes, the circuit for it has to be rebuilt
+scoring circuits in [circuits/](../circuits/) are built from, so if a rule here changes, the circuit for it has to be rebuilt
 and published again as a new circuit. A circuit that is already published can never be changed.
 
 ## Rules that are the same for every sport
@@ -108,6 +108,9 @@ winner.
 | --- | --- |
 | Best of 3 | 2 or 3 |
 | Best of 5 | 3, 4 or 5 |
+
+A number of sets that cannot happen in that kind of match, such as 2 sets in a best of 5, scores
+0. The scoring rule itself refuses it, so it does not depend on the website stopping you.
 
 **Points**
 
