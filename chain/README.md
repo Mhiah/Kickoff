@@ -18,9 +18,11 @@ It runs on GitHub's machines (see `.github/workflows/rehearsal.yml`) every time 
 circuits change. The output of each run is on that run's summary page under the repository's
 Actions tab.
 
-## What the first rehearsal does
+## The rehearsals
 
-`test/PublishCircuits.t.sol`:
+### 1. Publishing the scoring circuits
+
+`test/PublishCircuits.t.sol`. **Passed on its first run, 23 November 2026.**
 
 1. Creates a processor called Kickoff through the real TapeOut factory.
 2. Buys exactly the NAND transistors each circuit needs, one for each gate.
@@ -33,16 +35,37 @@ Actions tab.
    plain Solidity.
 6. Asks it the worked examples printed in [docs/RULES.md](../docs/RULES.md).
 
-## Something to know about going live
+### 2. A league's account and mailbox
 
-The public tests of another TapeOut Accelerate entry report that creating a processor is paid for
-in the **BEM token**, not in OKB, and so is the fee for buying transistors on a new processor,
-while publishing a circuit is paid for in OKB. This rehearsal is written to pay that way and gives
-itself test BEM. Its first run will confirm whether that is right, and this section will be
-updated with what it found.
+`test/LeagueAccount.t.sol`. Written. Its result is recorded in
+[docs/REHEARSAL-RESULTS.md](../docs/REHEARSAL-RESULTS.md) once it has run.
 
-If it is right, the real wallet will need BEM as well as OKB to create a Kickoff processor. The
-other route is to publish the circuits on an existing processor, which needs OKB only.
+A Kickoff league is one TapeOut circuit with its own account and mailbox. This rehearsal:
+
+1. Opens a league's account and confirms TapeOut's opener and mailbox agree on which account it is.
+2. Sends OKB to the account, to confirm it can hold a sponsor's prize money.
+3. Confirms only an opened account can send, while any account can receive.
+4. Sends a message through the mailbox and reads it back: who sent it, when, and the exact text.
+5. Walks one pick through its whole life: its fingerprint is sent before kickoff and stamped with
+   the time, a pick sent after kickoff is stamped late, the pick is opened and checked against its
+   fingerprint, and the football circuit scores it.
+
+What it does not cover: encrypted messages. TapeSend's sealed messages are encrypted in the
+browser, so they are tested with the picks engine, not here. This rehearsal hides the pick behind a
+fingerprint instead, which is how guest picks work.
+
+## What the rehearsals showed about going live
+
+- **Creating a processor is paid for in the BEM token, not in OKB.** So is the fee for buying
+  transistors on a new processor. The first rehearsal paid both in BEM and the real factory
+  accepted it.
+- **The transistor fee is one flat charge for each circuit**, whatever its size. Kickoff's
+  processor sets its own transistor price to zero, so only TapeOut's flat fee is paid.
+- **Publishing a circuit costs 0.0013 OKB.**
+
+So a wallet that creates a Kickoff processor needs BEM as well as OKB. The other route is to publish
+the circuits on an existing processor, which needs OKB only. The numbers are in
+[docs/REHEARSAL-RESULTS.md](../docs/REHEARSAL-RESULTS.md).
 
 ## Run it yourself
 
@@ -62,6 +85,8 @@ It reads X Layer through the public node at `https://rpc.xlayer.tech`. To use an
 | File | What it is |
 | --- | --- |
 | `src/ITapeOut.sol` | The parts of TapeOut that Kickoff talks to, and where each one was taken from |
-| `test/PublishCircuits.t.sol` | The first rehearsal: publish the three circuits and check every case |
+| `test/Rehearsal.sol` | What every rehearsal starts with: the private copy of X Layer and a Kickoff processor on it |
+| `test/PublishCircuits.t.sol` | Rehearsal 1: publish the three circuits and check every case |
+| `test/LeagueAccount.t.sol` | Rehearsal 2: a league's account, its mailbox, and one pick from start to finish |
 | `foundry.toml` | Settings for the test tool |
 | `lib/forge-std` | The standard Foundry test library, pinned to a release |

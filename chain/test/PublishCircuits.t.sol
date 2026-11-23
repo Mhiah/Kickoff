@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {IProcessorFactory, ITransistors, IProcessor, IERC20} from "../src/ITapeOut.sol";
+import {Rehearsal} from "./Rehearsal.sol";
 
 /// A rehearsal on a PRIVATE COPY of X Layer mainnet. Nothing here is sent to the real network.
 ///
@@ -10,93 +9,22 @@ import {IProcessorFactory, ITransistors, IProcessor, IERC20} from "../src/ITapeO
 /// publishes ("tapes out") the three scoring circuits from circuits/out/, then asks the real
 /// TapeOut evaluator for the points on every possible input and compares each answer with the
 /// rules written out again below in plain Solidity.
-contract PublishCircuitsTest is Test {
-    IProcessorFactory constant FACTORY = IProcessorFactory(0x1f09DAeFA827f02CBb40967cc91b259763760761);
-    uint256 constant NAND = 0;
-    uint32 constant N_OUT = 2;
-
-    address deployer = makeAddr("kickoff-deployer");
-
-    IProcessor processor;
-    ITransistors transistors;
-    IERC20 bem;
-
+contract PublishCircuitsTest is Rehearsal {
     uint256 footballId;
     uint256 basketballId;
     uint256 tennisId;
 
-    // ------------------------------------------------------------------ setting up
-
     function setUp() public {
-        vm.createSelectFork(vm.envOr("XLAYER_RPC_URL", string("https://rpc.xlayer.tech")));
-        vm.deal(deployer, 10 ether);
+        _startCopyOfXLayer();
+        footballId = _publishScoringCircuit("football", 16);
+        basketballId = _publishScoringCircuit("basketball", 6);
+        tennisId = _publishScoringCircuit("tennis", 7);
 
-        // Create the Kickoff processor. The factory charges its fee in the BEM token, so the
-        // rehearsal gives the deployer test BEM. On the real network the wallet must hold real BEM.
-        bem = IERC20(FACTORY.bem());
-        uint256 deployFee = FACTORY.deployFee();
-        deal(address(bem), deployer, deployFee);
-        vm.startPrank(deployer);
-        bem.approve(address(FACTORY), deployFee);
-        (address transistorToken, address circuits) = FACTORY.createCPU(
-            "Kickoff", "KICKOFF", "Scoring rules for Kickoff, the prediction game", 1_000_000, 0
-        );
-        vm.stopPrank();
-        processor = IProcessor(circuits);
-        transistors = ITransistors(transistorToken);
-        assertEq(processor.transistors(), transistorToken, "processor and transistor token are paired");
-
-        footballId = _publish("football", 16);
-        basketballId = _publish("basketball", 6);
-        tennisId = _publish("tennis", 7);
-    }
-
-    /// Reads one circuit from circuits/out/, buys exactly the NAND transistors it needs, publishes
-    /// it, and confirms the processor stored it byte for byte.
-    function _publish(string memory name, uint32 nIn) internal returns (uint256 id) {
-        string memory root = string.concat(vm.projectRoot(), "/../circuits/out/");
-        bytes memory netlist = vm.parseBytes(string.concat("0x", vm.readLine(string.concat(root, name, ".hex"))));
-        string memory manifest = vm.readFile(string.concat(root, "manifest.json"));
-        uint256 gates = vm.parseJsonUint(manifest, string.concat(".", name, ".gates"));
-        assertEq(vm.parseJsonUint(manifest, string.concat(".", name, ".inputs")), nIn, "inputs match the manifest");
-        assertEq(netlist.length, gates * 7, "seven bytes for each NAND gate");
-
-        uint256 mintFee = gates * transistors.mintPrice() + transistors.protocolFee();
-        uint256 tapeoutFee = processor.TAPEOUT_FEE();
-        deal(address(bem), deployer, mintFee);
-
-        vm.startPrank(deployer);
-        bem.approve(address(transistors), mintFee);
-        transistors.mint(NAND, gates);
-        assertEq(transistors.balanceOf(deployer, NAND), gates, "bought one NAND for each gate");
-        id = processor.tapeout{value: tapeoutFee}(netlist, nIn, N_OUT);
-        vm.stopPrank();
-
-        assertEq(transistors.balanceOf(deployer, NAND), 0, "publishing burns one NAND for each gate");
-        assertEq(processor.ownerOf(id), deployer, "the deployer owns the circuit");
-        (uint32 gotIn, uint32 gotOut, uint32 gotState, uint32 gotGates) = processor.circuitInfo(id);
-        assertEq(gotIn, nIn, "inputs");
-        assertEq(gotOut, N_OUT, "outputs");
-        assertEq(gotState, 0, "no memory, so eval() works");
-        assertEq(gotGates, gates, "gate count");
-        assertEq(keccak256(processor.netlist(id)), keccak256(netlist), "stored circuit is byte-identical");
-
-        emit log_named_string("published", name);
-        emit log_named_uint("  circuit id", id);
-        emit log_named_uint("  gates", gates);
-        emit log_named_uint("  transistor fee (BEM, smallest unit)", mintFee);
-        emit log_named_uint("  tape-out fee (OKB wei)", tapeoutFee);
-    }
-
-    // ------------------------------------------------------------------ asking the real evaluator
-
-    /// Points from a circuit's two outputs: output 0 + 2 x output 1.
-    function _points(uint256 id, bytes memory inputs) internal view returns (uint256) {
-        bytes memory out = processor.eval(id, inputs);
-        require(out.length == 1, "two outputs pack into one byte");
-        uint8 o = uint8(out[0]);
-        require(o < 4, "unused output bits must be zero");
-        return (o & 1) + 2 * ((o >> 1) & 1);
+        emit log_named_uint("football circuit id", footballId);
+        emit log_named_uint("basketball circuit id", basketballId);
+        emit log_named_uint("tennis circuit id", tennisId);
+        emit log_named_uint("transistor fee for one circuit (BEM, smallest unit)", transistors.protocolFee());
+        emit log_named_uint("tape-out fee for one circuit (OKB wei)", processor.TAPEOUT_FEE());
     }
 
     // ------------------------------------------------------------------ the rules, written again

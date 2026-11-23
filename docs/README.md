@@ -7,4 +7,7 @@ Written notes for the project.
 - [CHECK-RESULTS.md](CHECK-RESULTS.md): the results of checking the three scoring circuits against
   those rules on every possible case. Written by `python3 circuits/check.py`.
 
-Still to come: design notes and the evidence of what ran on X Layer.
+- [REHEARSAL-RESULTS.md](REHEARSAL-RESULTS.md): what happened when the X Layer rehearsals were run
+  on a private copy of the network, with a link to each run.
+
+Still to come: design notes and the evidence of what is published on X Layer itself.

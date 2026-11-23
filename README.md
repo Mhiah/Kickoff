@@ -7,8 +7,10 @@ X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during thi
 [![Circuit check](https://github.com/Mhiah/Kickoff/actions/workflows/check.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/check.yml)
 
 > [!NOTE]
-> **Where this is today:** the rules are written and the three scoring circuits are built and
-> checked on every possible case, off chain. Nothing is live on X Layer yet. This README describes
+> **Where this is today:** the rules are written, the three scoring circuits are built and checked
+> on every possible case, and a rehearsal on a private copy of X Layer has published them through
+> the real TapeOut factory and got the right points from the real TapeOut evaluator on every case.
+> Nothing is live on X Layer itself yet. This README describes
 > what Kickoff is and how it will work. The section
 > [Where the build is](#where-the-build-is) says exactly what exists, and it is updated as each
 > part is finished.
@@ -108,7 +110,7 @@ through are an ordinary website.
 | --- | --- | --- |
 | 1 | Project setup: this README, the folders, the licence | Done |
 | 2 | The three scoring circuits and the checker that tests every possible case | Built and checked off chain. Not published on X Layer yet. |
-| 3 | Proving the TapeOut parts on a private copy of X Layer | Started. The first rehearsal, publishing the three circuits, is written. See [chain/README.md](chain/README.md). |
+| 3 | Proving the TapeOut parts on a private copy of X Layer | In progress. Rehearsal 1, publishing the three circuits, passed: the real TapeOut evaluator agreed with the rules on every case. Rehearsal 2, a league's account and mailbox, is written. See [chain/README.md](chain/README.md). |
 | 4 | The picks engine and the table builder | Not started |
 | 5 | The website | Not started |
 | 6 | Going live on X Layer: processor, circuits, the first league | Not started |
@@ -125,8 +127,9 @@ through are an ordinary website.
 | Basketball | 20 | 64 (every possible case) | 0 |
 | Tennis | 37 | 128 (every possible case) | 0 |
 
-Each case was evaluated twice, with Kickoff's own evaluator and with TapeOut's official reference
-evaluator. The full results are in [docs/CHECK-RESULTS.md](docs/CHECK-RESULTS.md), and anyone can
+Each case was evaluated three ways: with Kickoff's own evaluator, with TapeOut's official reference
+evaluator, and by the real TapeOut contracts on a private copy of X Layer
+([docs/REHEARSAL-RESULTS.md](docs/REHEARSAL-RESULTS.md)). The full results are in [docs/CHECK-RESULTS.md](docs/CHECK-RESULTS.md), and anyone can
 repeat the check with `python3 circuits/check.py`. GitHub also repeats it on every push, and the
 badge at the top of this page shows whether it passed.
 
