@@ -89,16 +89,20 @@ abstract contract Rehearsal is Test {
         account = OPENER.open{value: fee}(address(processor), id);
     }
 
-    /// Publishes one of Kickoff's scoring circuits from circuits/out/.
-    function _publishScoringCircuit(string memory name, uint32 nIn) internal returns (uint256 id) {
+    /// Reads one of Kickoff's scoring circuits from circuits/out/.
+    function _readScoringCircuit(string memory name, uint32 nIn) internal view returns (bytes memory netlist) {
         string memory root = string.concat(vm.projectRoot(), "/../circuits/out/");
-        bytes memory netlist = vm.parseBytes(string.concat("0x", vm.readLine(string.concat(root, name, ".hex"))));
+        netlist = vm.parseBytes(string.concat("0x", vm.readLine(string.concat(root, name, ".hex"))));
         string memory manifest = vm.readFile(string.concat(root, "manifest.json"));
         assertEq(vm.parseJsonUint(manifest, string.concat(".", name, ".inputs")), nIn, "inputs match the manifest");
         assertEq(
             vm.parseJsonUint(manifest, string.concat(".", name, ".gates")), netlist.length / 7, "gates match the manifest"
         );
-        id = _tapeout(netlist, nIn, 2);
+    }
+
+    /// Publishes one of Kickoff's scoring circuits from circuits/out/.
+    function _publishScoringCircuit(string memory name, uint32 nIn) internal returns (uint256 id) {
+        id = _tapeout(_readScoringCircuit(name, nIn), nIn, 2);
     }
 
     /// Points from a scoring circuit's two outputs: output 0 + 2 x output 1.

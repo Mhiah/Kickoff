@@ -68,6 +68,16 @@ Kickoff keeps a verified copy of its website on chain, in the account of a circu
 5. Probes the name contract to find out what a site's on-chain name costs and how the name must be
    written. This one prints what it finds and cannot fail.
 
+### The fees report
+
+`test/Fees.t.sol`. Written. It does everything going live will do, reads each fee from the chain,
+measures the gas of each step, and prints it all. The page written from its output is
+`docs/FEES.md`, which is added once it has run.
+
+It covers two routes. Route A creates Kickoff's own processor and must work, so it is a real test.
+Route B publishes on a processor somebody else created. That depends on a contract Kickoff does not
+control, so it is a probe that prints what it finds and cannot fail.
+
 ## What the rehearsals showed about going live
 
 - **Creating a processor is paid for in the BEM token, not in OKB.** So is the fee for buying
@@ -108,5 +118,6 @@ It reads X Layer through the public node at `https://rpc.xlayer.tech`. To use an
 | `test/PublishCircuits.t.sol` | Rehearsal 1: publish the three circuits and check every case |
 | `test/LeagueAccount.t.sol` | Rehearsal 2: a league's account, its mailbox, and one pick from start to finish |
 | `test/LeagueSite.t.sol` | Rehearsal 3: the on-chain site, who may change it, and what happens when it changes hands |
+| `test/Fees.t.sol` | The fees report: every fee read from the chain and the gas of every step |
 | `foundry.toml` | Settings for the test tool |
 | `lib/forge-std` | The standard Foundry test library, pinned to a release |

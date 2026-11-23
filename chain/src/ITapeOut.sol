@@ -34,6 +34,8 @@ interface ITransistors {
     function mint(uint256 id, uint256 amount) external payable;
     function mintPrice() external view returns (uint256);
     function protocolFee() external view returns (uint256);
+    function supplyCap() external view returns (uint256);
+    function minted() external view returns (uint256);
     function balanceOf(address account, uint256 id) external view returns (uint256);
 }
 
@@ -137,4 +139,11 @@ interface IERC20 {
     function approve(address spender, uint256 amount) external returns (bool);
     function balanceOf(address account) external view returns (uint256);
     function decimals() external view returns (uint8);
+    function symbol() external view returns (string memory);
+}
+
+/// On networks built the way X Layer is, a transaction also pays for the data it posts to
+/// Ethereum. This standard contract quotes that extra fee. Only used by the fees report.
+interface IL1FeeOracle {
+    function getL1Fee(bytes calldata data) external view returns (uint256);
 }
