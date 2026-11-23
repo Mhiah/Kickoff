@@ -118,3 +118,23 @@ What the probe found about a site's on-chain name:
 
 The number 443 belongs to the rehearsal. When Kickoff's processor is created on the real network
 it gets whatever number is next at that moment.
+
+## The fees report
+
+| | |
+| --- | --- |
+| Date | 23 November 2026 |
+| Run | <https://github.com/Mhiah/Kickoff/actions/runs/45219514524> |
+| Commit | `85baf34` |
+| Result | **2 of 2 passed on the first run** (23 of 23 across everything in the same run) |
+
+What it found is written up in full in [FEES.md](FEES.md). In short:
+
+- Creating Kickoff's own processor, publishing the three scoring circuits and a league circuit,
+  opening the league's account and switching on its site's name costs **0.14 BEM and about 0.0853
+  OKB**, in 16 transactions.
+- Doing the same on an existing processor costs **about 0.0879 OKB and no BEM**. The probe published
+  all four circuits there paying in OKB only.
+- Either way, 0.08 OKB of it is the one fee for opening the league's account.
+- BEM has 8 decimal places, which settles the amounts left in the token's smallest unit under
+  rehearsal 1: the transistor fee is 0.01 BEM for each circuit, and creating a processor is 0.1 BEM.

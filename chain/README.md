@@ -70,13 +70,13 @@ Kickoff keeps a verified copy of its website on chain, in the account of a circu
 
 ### The fees report
 
-`test/Fees.t.sol`. Written. It does everything going live will do, reads each fee from the chain,
-measures the gas of each step, and prints it all. The page written from its output is
-`docs/FEES.md`, which is added once it has run.
+`test/Fees.t.sol`. **Passed on its first run, 23 November 2026.** The page written from its output
+is [docs/FEES.md](../docs/FEES.md).
 
-It covers two routes. Route A creates Kickoff's own processor and must work, so it is a real test.
-Route B publishes on a processor somebody else created. That depends on a contract Kickoff does not
-control, so it is a probe that prints what it finds and cannot fail.
+It does everything going live will do, reads each fee from the chain, measures the gas of each
+step, and prints it all. It covers two routes. Route A creates Kickoff's own processor and must
+work, so it is a real test. Route B publishes on a processor somebody else created. That depends on
+a contract Kickoff does not control, so it is a probe that prints what it finds and cannot fail.
 
 ## What the rehearsals showed about going live
 
@@ -92,9 +92,10 @@ control, so it is a probe that prints what it finds and cannot fail.
   name is written `<circuit id>.2.<processor number>.tape`.
 - **Uploading the site costs only gas.**
 
-So a wallet that creates a Kickoff processor needs BEM as well as OKB. The other route is to publish
-the circuits on an existing processor, which needs OKB only. The numbers are in
-[docs/REHEARSAL-RESULTS.md](../docs/REHEARSAL-RESULTS.md).
+So a wallet that creates a Kickoff processor needs BEM as well as OKB: 0.14 BEM and about 0.0853
+OKB in all. The other route is to publish the circuits on an existing processor, which needs about
+0.0879 OKB and no BEM. Either way almost all of it is the 0.08 OKB for the league's account. Every
+figure, step by step, is in [docs/FEES.md](../docs/FEES.md).
 
 ## Run it yourself
 

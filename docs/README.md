@@ -9,5 +9,6 @@ Written notes for the project.
 
 - [REHEARSAL-RESULTS.md](REHEARSAL-RESULTS.md): what happened when the X Layer rehearsals were run
   on a private copy of the network, with a link to each run.
+- [FEES.md](FEES.md): what going live costs, step by step, in OKB and BEM, read from the chain.
 
 Still to come: design notes and the evidence of what is published on X Layer itself.

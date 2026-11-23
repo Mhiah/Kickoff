@@ -111,7 +111,7 @@ through are an ordinary website.
 | --- | --- | --- |
 | 1 | Project setup: this README, the folders, the licence | Done |
 | 2 | The three scoring circuits and the checker that tests every possible case | Built and checked off chain. Not published on X Layer yet. |
-| 3 | Proving the TapeOut parts on a private copy of X Layer | Three rehearsals passed, 21 tests in all, against the real TapeOut contracts: publishing the three circuits and getting the right points on every case; a league's own account and mailbox, with one pick locked before kickoff, opened after and scored; and the on-chain site, which only its owner can change and which moves with the league. Results in [docs/REHEARSAL-RESULTS.md](docs/REHEARSAL-RESULTS.md). Still to do: the fees report. |
+| 3 | Proving the TapeOut parts on a private copy of X Layer | Done. Three rehearsals and a fees report passed, 23 tests in all, against the real TapeOut contracts: publishing the three circuits and getting the right points on every case; a league's own account and mailbox, with one pick locked before kickoff, opened after and scored; and the on-chain site, which only its owner can change and which moves with the league. Results in [docs/REHEARSAL-RESULTS.md](docs/REHEARSAL-RESULTS.md). What going live costs, read from the chain, is in [docs/FEES.md](docs/FEES.md). |
 | 4 | The picks engine and the table builder | Not started |
 | 5 | The website | Not started |
 | 6 | Going live on X Layer: processor, circuits, the first league | Not started |
