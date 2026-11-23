@@ -4,4 +4,7 @@ export * from "./picks.js";
 export * from "./seal.js";
 export * from "./bundle.js";
 export * from "./open.js";
+export * from "./circuit.js";
+export * from "./score.js";
+export * from "./table.js";
 export { fromHex, toHex } from "./bytes.js";

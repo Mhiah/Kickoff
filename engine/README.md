@@ -1,15 +1,17 @@
 # engine
 
 Kickoff's picks engine: the code that seals a pick, bundles everyone's sealed picks into one
-fingerprint, and decides whether an opened pick counts.
+fingerprint, decides whether an opened pick counts, scores it with the scoring circuits, and builds
+the league table.
 
 It is plain JavaScript with nothing to install, and it runs the same in Node and in a browser, so
 the website and anyone checking a league use exactly the same code.
 
 > [!NOTE]
-> **What is here so far:** sealing, bundling, and opening and checking, with tests. **Not here yet:**
-> the table builder, which scores opened picks with the scoring circuits and rebuilds the league
-> table from chain data, and the rehearsal that runs a whole league on a copy of X Layer.
+> **What is here:** sealing, bundling, opening and checking, scoring with the circuits, and the
+> table and personal records, with 62 tests. **Not here yet:** reading a league's facts from the
+> chain, and the rehearsal that runs a whole league on a copy of X Layer. At the moment the table
+> builder is handed the facts. It does not fetch them.
 
 ## How a pick stays secret, then gets proven
 
@@ -64,6 +66,39 @@ Every one of these must hold. The first that fails is the reason given.
 | `does-not-match` | The pick and salt given do not produce the sealed fingerprint. |
 | `impossible-pick` | The pick cannot happen in this kind of match, such as 2 sets in a best of 5. |
 
+## Scoring: the same circuits that go on chain
+
+The engine does not have its own copy of the scoring rules. It reads the three circuit files in
+[`circuits/out/`](../circuits/out/), the ones that get published on chain, and runs them. So the
+points the website shows are worked out by the same gates a TapeOut processor uses.
+
+The tests run all 65,536 football cases, all 64 basketball cases and all 128 tennis cases through
+the JavaScript reader and compare each with the rules written out plainly. They also confirm the
+split of 0, 1 and 3-point cases is the one the Python checker recorded for the same files. That
+makes four separate things that agree on every case: Kickoff's Python evaluator, TapeOut's
+reference evaluator, the real TapeOut contracts in the rehearsal, and this JavaScript reader.
+
+## The table and the personal record
+
+Nothing is stored. Hand the table builder the matches, with what is on chain for each and the picks
+that were opened, and it works the table out. Anyone who does the same gets the same table, in
+whatever order the facts arrive.
+
+What happens to a player in a match is one of:
+
+| | What it means | Points |
+| --- | --- | --- |
+| `scored` | The pick was opened, checked and scored by the circuit | 0, 1 or 3 |
+| `refused` | The pick was opened but failed a check. The reason is recorded. | 0 |
+| `not-opened` | The player has a sealed pick in the bundle but never opened it | 0 |
+| `no-pick` | The player made no pick | 0 |
+| `void` | The match was postponed, abandoned, or ended in a walkover or retirement | nobody scores |
+| `pending` | The match has no result yet | none yet |
+
+The table is ordered as [docs/RULES.md](../docs/RULES.md) says: most points, then most 3-point
+picks, then most 1-point picks. Players level on all three share a position, and the next position
+is skipped.
+
 ## The cheating the tests try
 
 Each of these is a test in `test/open.test.js`, and each is refused:
@@ -78,6 +113,14 @@ Each of these is a test in `test/open.test.js`, and each is refused:
 - A receipt that claims a different bundle size from the one on chain.
 - Reusing a pick from another match.
 - A forged receipt.
+
+And in `test/table.test.js`, at the level of a whole league:
+
+- A pick changed after kickoff scores 0 and the record says why.
+- A bundle locked after kickoff: every pick in that match is refused.
+- Nothing put on chain before kickoff: opened picks are refused.
+- Opening the same pick twice does not score twice.
+- A published list of sealed picks that does not match the chain is not taken on trust.
 
 The tree itself is checked against the published reference values from RFC 6962, and every leaf of
 every tree from 1 to 17 leaves is checked to have a proof that works only for its own place.
@@ -112,6 +155,9 @@ npm test
 | `src/seal.js` | Sealing a pick: the fingerprint and the salt |
 | `src/bundle.js` | The bundle, its root, receipts, and the value that goes on chain |
 | `src/open.js` | Opening a pick and deciding whether it counts |
+| `src/circuit.js` | Reading a TapeOut circuit and working out its answer, in JavaScript |
+| `src/score.js` | Scoring an opened pick with the circuits, and turning a real score into a result |
+| `src/table.js` | The league table and every player's record |
 | `src/bytes.js` | Small helpers for raw bytes, and SHA-256 from the platform |
 | `src/index.js` | Everything, in one place to import from |
 | `test/` | The tests |
