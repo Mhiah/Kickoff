@@ -10,7 +10,7 @@ the website and anyone checking a league use exactly the same code.
 > [!NOTE]
 > **What is here:** sealing, bundling, opening and checking, scoring with the circuits, the table
 > and personal records, reading a league back from its inbox, and fetching that inbox and the
-> opened picks from an X Layer node, with 112 tests. **Not live yet:** no league exists on X Layer
+> opened picks from an X Layer node, with 120 tests. **Not live yet:** no league exists on X Layer
 > itself. The fetching has been run against a stand-in node in the tests, and against the real
 > TapeOut contracts on a private copy of X Layer, where it passed
 > ([rehearsal 5](../docs/REHEARSAL-RESULTS.md)). It has not been run against a real league.
@@ -157,6 +157,22 @@ The mailbox's fingerprint is a Keccak-256, which neither Node nor a browser has 
 written out in `src/keccak.js` with nothing to install, and tested against published values. The
 function codes it works out for the mailbox are tested against the ones TAP-10 publishes.
 
+## A device proving it is itself
+
+A player has no wallet and no account, so their device makes its own key the first time they play.
+The private half never leaves the device. The **player id** is a SHA-256 of a fixed label and the
+public half, so nobody can claim an id without holding its key.
+
+`src/identity.js` makes the key, signs what a device sends, and checks it on the other side. The
+signature covers the address the request is for, the time, and everything being sent. Kickoff's
+server uses the checking half, and the website will use the signing half, so both run exactly the
+same code. In `test/identity.test.js`:
+
+- Changing anything in a signed request breaks it.
+- Signing with your own key does not let you speak as someone else.
+- An old request cannot be sent again later.
+- A second, separate signature checker (Node's own) agrees with the engine's.
+
 ## The cheating the tests try
 
 Each of these is a test in `test/open.test.js`, and each is refused:
@@ -282,6 +298,7 @@ npm test
 | `src/openings.js` | The published file of opened picks |
 | `src/league.js` | From the chain to the table in one step |
 | `src/xlayer.js` | Fetching a league's inbox and its opened picks from an X Layer node |
+| `src/identity.js` | A device's own key, the player id made from it, and signing and checking what a device sends |
 | `src/keccak.js` | Keccak-256, the fingerprint the mailbox uses, written out with nothing to install |
 | `src/abi.js` | How to ask a contract a question and read its answer |
 | `src/bytes.js` | Small helpers for raw bytes, and SHA-256 from the platform |

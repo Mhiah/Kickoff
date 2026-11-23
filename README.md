@@ -10,6 +10,7 @@ X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during thi
 [![Season rehearsal](https://github.com/Mhiah/Kickoff/actions/workflows/season.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/season.yml)
 [![Website checks](https://github.com/Mhiah/Kickoff/actions/workflows/web.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/web.yml)
 [![Fixtures feed](https://github.com/Mhiah/Kickoff/actions/workflows/feed.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/feed.yml)
+[![Server tests](https://github.com/Mhiah/Kickoff/actions/workflows/server.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/server.yml)
 
 > [!NOTE]
 > **Where this is today (23 November 2026).** The scoring rules, the picks engine, the website's
@@ -154,8 +155,8 @@ never leaves the device. Nobody can work the pick out from the fingerprint.
 The pick and its secret stay in that browser. Only the fingerprint is ever meant to leave it
 before kickoff.
 
-**State: built and working on the website.** The fingerprint is not sent anywhere yet, because the
-part that collects them is not built.
+**State: built and working on the website.** The fingerprint is not sent anywhere yet. The server
+that collects them is partly built (see below), and the website is not connected to it.
 
 ### 3. Picks are locked on X Layer before kickoff
 
@@ -166,8 +167,15 @@ the time. Each player gets a **receipt** proving their sealed pick is in the bun
 From then on nothing can be changed: a different pick would not match its fingerprint, and a
 bundle written after kickoff is stamped late and never counts.
 
+Gathering the sealed picks is the job of **Kickoff's server**. A player has no wallet, so each
+device makes its own key and signs everything it sends, and the server refuses anything not signed
+by the right key. The server is only ever sent fingerprints before kickoff, never picks. More in
+[server/README.md](server/README.md).
+
 **State: the engine does all of this, and it has been rehearsed against the real TapeOut contracts
-on a private copy of X Layer.** It is not running on X Layer itself.
+on a private copy of X Layer.** It is not running on X Layer itself. **The server's rules are built
+and tested,** including a test that goes from three phones, through the server, to the final table.
+It has no database and is not on the internet yet.
 
 ### 4. Results come in and picks are scored by a fixed rule
 
@@ -237,9 +245,10 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | --- | --- | --- |
 | The three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
 | The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
-| The picks engine | 112 tests. Twenty try to cheat, and five have the X Layer node lie about what is on chain | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
+| The picks engine | 120 tests. Twenty-three try to cheat, and five have the X Layer node lie about what is on chain | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
 | The website | 27 checks, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 22 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
+| The server | 32 tests. They send picks in someone else's name, play old requests back, open a different pick from the one sealed, and use the robot's addresses without its key | All pass; every one is refused ([details](server/README.md)) |
 | What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
 
 GitHub repeats the tests on every change, and the badges at the top of this page show the latest
@@ -252,6 +261,8 @@ results.
   on the device.
 - **A result is the feed's word.** Kickoff checks that it is a result that can happen, not that it
   is true. That is why any player can dispute a result, and why a dispute can never be hidden.
+- **The server keeps nothing yet.** Its rules are built and tested, but it has no database and no
+  home on the internet.
 - **Sealed picks will pass through Kickoff's server.** A player needs no wallet, so the server
   gathers the fingerprints and Kickoff locks them. The server never sees a pick before kickoff and
   cannot change one or add one afterwards, but it could leave one out. Each player's receipt is the
@@ -283,11 +294,11 @@ results.
 | 1 | Project setup: this README, the folders, the licence | Done |
 | 2 | The scoring circuits, and the checker that tests every possible case | Done. Not published on X Layer yet. |
 | 3 | Proving the TapeOut parts on a private copy of X Layer | Done. Rehearsals 1 to 4 and the fees report, 29 tests against the real contracts. |
-| 4 | The picks engine and the table builder | Done, 112 tests, with a fifth rehearsal that plays a season on chain and reads it back. Still to do: asking several nodes instead of one. |
+| 4 | The picks engine and the table builder | Done, 120 tests, with a fifth rehearsal that plays a season on chain and reads it back. Still to do: asking several nodes instead of one. |
 | 5 | The website's screens | Done, with made-up data. |
 | 6 | Sealing a pick for real, on the player's own device | Done. |
 | 7 | The fixtures feed | Done, and run live against the real feeds. |
-| 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Not started |
+| 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Partly done. The rules, signed requests and addresses are built, with 32 tests. Still to do: a database, putting it online, and connecting the website. |
 | 9 | The robot: announces fixtures, locks picks before kickoff and posts results on X Layer | Not started |
 | 10 | Joining it up: real fixtures and real tables on the website | Not started |
 | 11 | Going live on X Layer: the circuits and Kickoff's account | Not started |
@@ -318,6 +329,8 @@ You need Node 22 or newer. The circuit check also needs Python 3. Nothing has to
 | Run the website's checks | `node --test "web/test/*.test.js"` |
 | See the website on your own computer | `cd web && python3 -m http.server 8000`, then open `http://localhost:8000` |
 | Run the feed's tests (no key needed) | `cd feed && npm test` |
+| Run the server's tests | `cd server && npm test` |
+| Run the server and the website together on your own computer | `node server/bin/dev.js`, then open `http://localhost:8787` |
 | Fetch this week's real fixtures (needs your own two keys) | `FOOTBALL_DATA_KEY=... BALLDONTLIE_KEY=... node feed/bin/fixtures.js` |
 
 The rehearsals on a private copy of X Layer need [Foundry](https://getfoundry.sh), and are
@@ -331,6 +344,7 @@ explained in [chain/README.md](chain/README.md) and [engine/README.md](engine/RE
 | `chain/` | Rehearsals of the parts that touch X Layer, run on a private copy of it. Start with [chain/README.md](chain/README.md) |
 | `engine/` | The picks engine: sealing, bundling, opening, scoring with the circuits, the table, and reading it all back from X Layer. Start with [engine/README.md](engine/README.md) |
 | `feed/` | The fixtures feed: real matches and results from live sports data. Start with [feed/README.md](feed/README.md) |
+| `server/` | Kickoff's server: groups, and sealed picks until they are locked. Start with [server/README.md](server/README.md) |
 | `web/` | The website. Start with [web/README.md](web/README.md) |
 | `docs/` | The rules in plain words, what goes on chain, test results, rehearsal results and fees. Start with [docs/README.md](docs/README.md) |
 

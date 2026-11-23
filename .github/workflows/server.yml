@@ -1,0 +1,29 @@
+# Runs the server's tests on every change to it, and on every change to the picks engine, because
+# the server uses the engine for bundles, receipts and checking who a request is from.
+name: Server tests
+
+on:
+  push:
+    paths:
+      - "server/**"
+      - "engine/src/**"
+      - ".github/workflows/server.yml"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test the server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run the tests
+        run: node --test "server/test/*.test.js"

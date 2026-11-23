@@ -1,0 +1,15 @@
+{
+  "name": "kickoff-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kickoff's server: groups, names, and sealed picks until they are locked.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "dev": "node bin/dev.js"
+  }
+}
