@@ -5,13 +5,15 @@
 X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during this event by Mhiah.
 
 [![Circuit check](https://github.com/Mhiah/Kickoff/actions/workflows/check.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/check.yml)
+[![Engine tests](https://github.com/Mhiah/Kickoff/actions/workflows/engine.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/engine.yml)
+[![X Layer rehearsal](https://github.com/Mhiah/Kickoff/actions/workflows/rehearsal.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/rehearsal.yml)
 
 > [!NOTE]
 > **Where this is today:** the rules are written, the three scoring circuits are built and checked
 > on every possible case, and rehearsals on a private copy of X Layer have run every TapeOut part
 > Kickoff depends on against the real contracts: publishing the circuits and scoring with them, a
-> league's own account and mailbox, and the on-chain site. Nothing is live on X Layer itself yet,
-> and the picks engine and the website are not built yet. This README describes
+> league's own account and mailbox, and the on-chain site. The first half of the picks engine is
+> built. Nothing is live on X Layer itself yet, and the website is not built yet. This README describes
 > what Kickoff is and how it will work. The section
 > [Where the build is](#where-the-build-is) says exactly what exists, and it is updated as each
 > part is finished.
@@ -112,7 +114,7 @@ through are an ordinary website.
 | 1 | Project setup: this README, the folders, the licence | Done |
 | 2 | The three scoring circuits and the checker that tests every possible case | Built and checked off chain. Not published on X Layer yet. |
 | 3 | Proving the TapeOut parts on a private copy of X Layer | Done. Three rehearsals and a fees report passed, 23 tests in all, against the real TapeOut contracts: publishing the three circuits and getting the right points on every case; a league's own account and mailbox, with one pick locked before kickoff, opened after and scored; and the on-chain site, which only its owner can change and which moves with the league. Results in [docs/REHEARSAL-RESULTS.md](docs/REHEARSAL-RESULTS.md). What going live costs, read from the chain, is in [docs/FEES.md](docs/FEES.md). |
-| 4 | The picks engine and the table builder | Not started |
+| 4 | The picks engine and the table builder | In progress. Sealing a pick, bundling everyone's sealed picks, and opening and checking them are built and tested, including ten ways of cheating. The table builder is next. See [engine/README.md](engine/README.md). |
 | 5 | The website | Not started |
 | 6 | Going live on X Layer: processor, circuits, the first league | Not started |
 | 7 | Publishing the site, with the verified copy on DeWEB | Not started |
@@ -143,7 +145,7 @@ will be listed here as soon as they exist.
 | --- | --- |
 | `circuits/` | The three scoring circuits in TapeOut's format, and the checker. Start with [circuits/README.md](circuits/README.md) |
 | `chain/` | Rehearsals of the parts that touch X Layer, run on a private copy of it |
-| `engine/` | The picks engine and the table builder |
+| `engine/` | The picks engine: sealing, bundling, and opening and checking picks. The table builder comes next. |
 | `web/` | The website |
 | `docs/` | The rules in plain words, design notes, test results and evidence |
 

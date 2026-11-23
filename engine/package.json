@@ -1,0 +1,14 @@
+{
+  "name": "kickoff-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kickoff's picks engine: sealing picks, bundling them, and opening and checking them.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  }
+}

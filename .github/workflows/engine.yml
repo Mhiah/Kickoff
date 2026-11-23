@@ -1,0 +1,24 @@
+# Runs the picks engine's tests on every push.
+name: Engine tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test the picks engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run the tests
+        working-directory: engine
+        run: npm test
