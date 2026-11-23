@@ -70,8 +70,7 @@ Kickoff keeps a verified copy of its website on chain, in the account of a circu
 
 ### 4. A whole season
 
-`test/LeagueSeason.t.sol`. Written. Its result is recorded in
-[docs/REHEARSAL-RESULTS.md](../docs/REHEARSAL-RESULTS.md) once it has run.
+`test/LeagueSeason.t.sol`. **Passed on its first run, 23 November 2026.**
 
 This joins the picks engine to the chain. The engine plays out a small fixed league, three players
 and one match in each sport, and writes down every value it works out in

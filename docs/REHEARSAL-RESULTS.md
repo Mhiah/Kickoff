@@ -121,7 +121,39 @@ it gets whatever number is next at that moment.
 
 ## Rehearsal 4: a whole season
 
-Written, not yet recorded here. This section is filled in after its first run.
+| | |
+| --- | --- |
+| Date | 23 November 2026 |
+| Run | <https://github.com/Mhiah/Kickoff/actions/runs/45224267112> |
+| Commit | `f151257` |
+| Result | **6 of 6 tests passed on the first run** (29 of 29 across every rehearsal in the same run) |
+
+A league of three players played three matches, one in each sport. The picks were sealed and
+bundled by the picks engine, and the chain did the rest with the real TapeOut contracts.
+
+What was confirmed:
+
+- **The engine and the chain agree.** Every fingerprint, every bundle root, every receipt and every
+  value a league locks on chain, nine picks across three matches, was worked out again in Solidity
+  and was exactly what the engine got.
+- **The league locked each bundle through the real mailbox before kickoff**, writing to its own
+  inbox, and the chain's time stamp on each lock was before that match's kickoff.
+- **Every pick was opened, checked and scored on chain.** Each was checked against its fingerprint
+  and its receipt, then scored by the sport's real circuit. Every score was the one the engine gave.
+- **The totals are the engine's table:**
+
+| Position | Player | Points, scored by the real circuits |
+| --- | --- | --- |
+| 1 | ada | 7 |
+| 2 | bola | 4 |
+| 3 | chidi | 1 |
+
+- **Four ways of cheating were refused:** a bundle locked after kickoff is stamped late by the
+  chain; a changed pick does not match what was sealed; another player's sealed pick cannot be
+  opened under your own name; and a pick sealed for one match is not in another match's bundle.
+
+What this rehearsal does not cover: reading a league's facts back from the chain to build the
+table. Here the test knew where each lock was. Finding them is the next piece of the engine.
 
 ## The fees report
 
