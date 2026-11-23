@@ -185,7 +185,7 @@ body.public .tabs { display: none; }
 .demo { margin: 26px 0 24px; transform: rotate(-1.4deg); }
 .demo .pick { font-size: 46px; font-weight: 700; line-height: 1; margin-top: 12px; }
 .demo .stamp { position: absolute; right: 10px; top: 10px; }
-.nobet { text-align: center; margin-top: 16px; font-style: italic; color: var(--muted); }
+.tagline { text-align: center; margin-top: 16px; font-style: italic; color: var(--muted); }
 .comps { display: flex; gap: 4px 14px; margin: 6px 0; flex-wrap: wrap; }
 .steps { list-style: none; counter-reset: s; }
 .steps li { counter-increment: s; position: relative; padding: 0 0 16px 42px; }
@@ -311,7 +311,7 @@ h1.under { margin-top: 6px; }
   .hero h1 { font-size: 60px; margin-top: 0; }
   .hero .cta { grid-template-columns: auto auto; justify-content: start; margin-top: 26px; }
   .hero .cta .btn { width: auto; padding: 14px 26px; }
-  .hero .nobet { text-align: left; }
+  .hero .tagline { text-align: left; }
   .trio { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 34px; align-items: start; margin-top: 20px; }
   .trio h2 { margin-top: 0; }
 }

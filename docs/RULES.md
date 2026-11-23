@@ -159,7 +159,7 @@ play in.
 This is the one place where Kickoff still relies on a person. A live results feed is meant to
 replace host-entered results later, without changing anything else in these rules.
 
-## What Kickoff is not
+## Free to play
 
-There is no betting. Players never stake money on a pick. Prizes, where a league has them, are
-paid for by the brand or community running the league.
+Kickoff is a prediction game. Players predict, and it costs nothing to make a pick. Prizes, where a
+league has them, are paid for by the brand or community running the league.

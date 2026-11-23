@@ -48,7 +48,7 @@ export function home() {
       <a class="btn go" href="#/group">Start a group</a>
       <a class="btn quiet" href="#/league">Join with a code</a>
     </div>
-    <p class="nobet">No betting. No money. Just who got it right.</p>
+    <p class="tagline">Free to play. Predict with your friends.</p>
   </div>
 </div>
 

@@ -1,6 +1,6 @@
 # Kickoff
 
-**A multi-sport prediction game where every pick is sealed before the match starts, scored by a rule nobody can change, and kept on a record nobody can edit.**
+**A prediction game on real matches, where every pick is sealed before kickoff, scored by a rule nobody can change, and kept on a record nobody can edit.**
 
 X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during this event by Mhiah.
 
@@ -12,28 +12,28 @@ X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during thi
 [![Fixtures feed](https://github.com/Mhiah/Kickoff/actions/workflows/feed.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/feed.yml)
 
 > [!NOTE]
-> **Where this is today:** the rules are written, the three scoring circuits are built and checked
-> on every possible case, and rehearsals on a private copy of X Layer have run every TapeOut part
-> Kickoff depends on against the real contracts: publishing the circuits and scoring with them, a
-> league's own account and mailbox, and the on-chain site. The picks engine and the table builder
-> are built and tested. The website's screens are built and a pick can be sealed on a player's own
-> device, but the matches shown are made up and nothing is sent anywhere. Nothing is live on
-> X Layer itself yet. This README describes what Kickoff is and how it will work. The section
-> [Where the build is](#where-the-build-is) says exactly what exists, and it is updated as each
-> part is finished.
-
-> [!IMPORTANT]
-> **The plan changed on 23 November 2026, and parts of this page are still catching up.** Kickoff
-> will carry real competitions, with fixtures and results arriving by themselves from live sports
-> data: the Premier League and the Champions League for football, the NBA and the WNBA for
-> basketball. Tennis comes later. A person will no longer type in matches or results, and a
-> "league" among friends becomes a group that plays those competitions. The sections below still
-> describe the earlier design in places, with tennis and a host who enters results. They will be
-> rewritten when the feed and the server that go with the new plan are built.
+> **Where this is today (23 November 2026).** The scoring rules, the picks engine, the website's
+> screens and the fixtures feed are built and tested. The feed has been run against the real sports
+> data and brought back this week's real matches. A pick can be sealed for real on a player's own
+> device. Every TapeOut part Kickoff depends on has been rehearsed against the real contracts on a
+> private copy of X Layer.
+>
+> **Not done yet:** nothing is live on X Layer itself, and the pieces are not joined up. The
+> website still shows made-up matches, and a sealed pick is not sent anywhere. The section
+> [Where the build is](#where-the-build-is) says exactly what exists.
 
 ## What Kickoff is
 
-### The problem
+Kickoff is a prediction game for football and basketball fans. You and your friends predict the
+results of real matches, such as Premier League games and NBA games, and a table shows who gets the
+most right.
+
+What makes it different from a spreadsheet or a group chat is that nobody can cheat. Your pick is
+sealed before the match starts, so nobody can see it, copy it, or change it once the result is
+known. The points are worked out by a published rule that nobody can alter. And the whole record is
+kept on X Layer, where anyone can check it.
+
+### The problem it solves
 
 Every prediction league among friends or fans runs on trust. One person keeps the spreadsheet.
 They can add a late pick, fix a score, or change the points rule halfway through the season, and
@@ -42,35 +42,40 @@ they got wrong quietly disappear.
 
 ### How it works
 
-1. You join a league, either private with friends or public and run by a brand or community.
-2. Before each match you make your pick. It goes in sealed, so nobody can see it or copy it.
-3. At kickoff, picks lock. Nothing can be changed or added.
-4. After the match, picks open, the result goes in, and everyone is scored by the same fixed rule.
-5. The table updates, and every pick, right or wrong, stays on your personal record for good.
+1. **You start a group or join one with a code.** No wallet and no sign-up.
+2. **Each week's real fixtures appear by themselves.** Nobody types them in.
+3. **Before a match, you make your pick.** It is sealed on your own phone, so nobody can see it or
+   copy it, not even Kickoff.
+4. **Ten minutes before kickoff, picks close.** One fingerprint covering every sealed pick is
+   written to X Layer, which stamps the time. A pick that turns up later does not count.
+5. **After the match, the result comes in by itself** and every pick opens. Everyone is scored by
+   the same fixed rule.
+6. **Your group's table updates,** and every pick, right or wrong, stays on your record for good.
 
-### The sports and the points
+### The competitions and the points
 
-Every sport gives a maximum of 3 points per match.
+| Sport | Competitions | What you predict | Points |
+| --- | --- | --- | --- |
+| Football | Premier League, Champions League | The exact score after 90 minutes | 3 for the exact score. 1 for the right winner, or for calling a draw, with the wrong score. 0 otherwise. |
+| Basketball | NBA, WNBA | The winner and the winning margin, overtime included | 1 for the right winner, plus 2 more for the right margin: 1 to 5, 6 to 10, 11 to 15, or 16 or more. |
 
-| Sport | What you predict | Points |
-| --- | --- | --- |
-| Football | The exact score | 3 for the exact score. 1 for the right result (win, draw or loss) with the wrong score. 0 otherwise. |
-| Basketball | The winner and the winning margin | 1 for the right winner, plus 2 more for the right margin band: 1 to 5, 6 to 10, 11 to 15, or 16 and over. |
-| Tennis | The winner and the number of sets | 1 for the right winner, plus 2 more for the right number of sets. |
+Every match gives at most 3 points. The extra 2 in basketball only count when the winner is right.
+The full rules, with examples, are in [docs/RULES.md](docs/RULES.md).
 
-The bonus points only count when the winner is right. The full rules, with examples for each
-sport, are in [docs/RULES.md](docs/RULES.md).
+**Tennis comes later.** Its scoring rule is built and checked like the other two, but no free feed
+of tennis fixtures was found, so it is not offered yet.
 
 ### What makes it different
 
-- **No trusted organiser.** Nobody, including the league host and us, can alter picks, scores or
-  the table.
-- **The rules are fixed in public.** Each sport's scoring rule is published before the season and
-  can never be changed.
-- **Anyone can check the table.** It is not stored in a private database. Anyone can recompute it
-  and get the same result.
-- **Your record is yours.** It shows hits and misses, follows you between leagues, and cannot be
-  deleted.
+- **No trusted organiser.** Nobody, including the person who started the group and Kickoff itself,
+  can change a pick, a score or the table after kickoff.
+- **The rules are fixed in public.** Each sport's scoring rule is a published circuit that can
+  never be changed.
+- **Nobody enters the matches or the results.** They come from live sports data, so nobody in a
+  group can get one wrong on purpose.
+- **Anyone can check the table.** It is not kept in a private database. Anyone can read the record
+  on X Layer and rebuild the same table with one command.
+- **Your record is yours.** It shows hits and misses and cannot be edited.
 
 ## Who it is for
 
@@ -80,9 +85,126 @@ sport, are in [docs/RULES.md](docs/RULES.md).
 
 ## How it earns
 
-Brands pay to run sponsored leagues with prizes, and private leagues pay for extras.
+Brands pay to run sponsored groups with prizes, and private groups pay for extras.
 
-There is no betting. Players never stake money.
+Kickoff is a prediction game and it is free to play. Players predict, and play for the table.
+
+## How it runs, piece by piece
+
+This is what happens behind the screens, and how far each piece has got.
+
+### 1. Real fixtures arrive from two feeds
+
+A small program in [`feed/`](feed/) asks two sports-data services for the week's matches:
+
+| Feed | Competitions |
+| --- | --- |
+| [football-data.org](https://www.football-data.org) | Premier League, Champions League |
+| [balldontlie](https://www.balldontlie.io) | NBA, WNBA |
+
+It puts every match into one shape, whichever feed it came from, and turns each finished match
+into a result the scoring rules can take:
+
+- **Football:** the score after 90 minutes. A match that ended 3 – 2 after extra time counts as the
+  2 – 2 it was at 90 minutes.
+- **Basketball:** the winner and the winning margin from the final score, overtime included.
+- **Postponed, called off, abandoned or awarded by a committee:** void, so nobody scores.
+- **Anything the feed cannot be sure of** (a finished match with no score, say) is marked "not
+  sure" with the reason and gets no result until a person has looked. Nothing is guessed.
+
+**The two keys.** Each feed needs a key, which is free with an account on its site. A key is a
+password for a program: it tells the feed who is asking.
+
+- Kickoff's two keys are kept in this repository's **GitHub secrets**, under the names
+  `FOOTBALL_DATA_KEY` and `BALLDONTLIE_KEY`. A secret can be used by GitHub when it runs the
+  program, but nobody can read it, including people with access to the repository.
+- The keys are not in the code and not in this repository's history.
+- When the program runs, each key is sent only to the feed it belongs to. It is never printed,
+  saved, or put in a web address.
+- Anyone who wants to run the feed from their own copy needs their own two keys. Both are free:
+  one from football-data.org's sign-up page, one from balldontlie's.
+
+**It has run live.** On 23 November 2026 the feed was run on GitHub with the real keys
+([the run](https://github.com/Mhiah/Kickoff/actions/runs/45249885790)). For 23 to 30 November it
+brought back:
+
+| Competition | Matches |
+| --- | --- |
+| Premier League | 11 |
+| Champions League | 18 |
+| NBA | 53 |
+| WNBA | 0 (out of season) |
+
+Five NBA games had already finished, and each came back with its result worked out. Warriors 88,
+Celtics 87, for example, came back as "the home side by 1 to 5". Nothing was reported as left out
+or uncertain.
+
+To run it again: open the repository's **Actions** tab, choose **Fixtures feed**, and press **Run
+workflow**. The fixtures appear on the run's summary page. More in [feed/README.md](feed/README.md).
+
+**State: built, tested and run live.** The matches are not yet shown on the website or written to
+X Layer.
+
+### 2. A pick is sealed on the player's own device
+
+The first time someone picks, their device makes its own player id. Pressing "Seal my pick" works
+out the pick's **fingerprint**: a short code made from the pick and a secret random number that
+never leaves the device. Nobody can work the pick out from the fingerprint.
+
+The pick and its secret stay in that browser. Only the fingerprint is ever meant to leave it
+before kickoff.
+
+**State: built and working on the website.** The fingerprint is not sent anywhere yet, because the
+part that collects them is not built.
+
+### 3. Picks are locked on X Layer before kickoff
+
+Ten minutes before a match starts, every sealed pick for it is gathered into a **bundle**, and one
+fingerprint covering the whole bundle is written to Kickoff's mailbox on X Layer. X Layer stamps
+the time. Each player gets a **receipt** proving their sealed pick is in the bundle.
+
+From then on nothing can be changed: a different pick would not match its fingerprint, and a
+bundle written after kickoff is stamped late and never counts.
+
+**State: the engine does all of this, and it has been rehearsed against the real TapeOut contracts
+on a private copy of X Layer.** It is not running on X Layer itself.
+
+### 4. Results come in and picks are scored by a fixed rule
+
+After the match, the result from the feed is written to the same mailbox. Players' devices give
+out each pick and its secret, and anyone can check each one against its fingerprint, its receipt
+and the lock on X Layer.
+
+Each pick is then scored by its sport's **scoring circuit**: a small published rule that takes a
+pick and a result and gives 0, 1 or 3 points. Once published it cannot be changed, and anyone can
+run it for free.
+
+**State: the circuits are built and checked on every possible case. Scoring with the real TapeOut
+contracts has been rehearsed.** The circuits are not published on X Layer itself yet.
+
+### 5. The table is rebuilt from the record, never stored
+
+Nothing keeps a table. Anyone can read Kickoff's mailbox on X Layer, apply the rules written in
+[docs/PROTOCOL.md](docs/PROTOCOL.md), and work the table out:
+
+```
+node engine/bin/table.js <Kickoff's id on X Layer>
+```
+
+Everyone who does this gets the same table. A message from anyone but Kickoff's own account is
+ignored, and a player's dispute of a result can never be hidden.
+
+**State: built, and rehearsed end to end on a private copy of X Layer,** including a host cheating
+with a late bundle and an outsider writing a false result. Both were refused.
+
+### 6. The website
+
+Seven screens, in light and dark, for a phone and a computer: home, the group's league, making a
+pick, a match, a player's record, a proof screen called "Check it yourself", and the group. More in
+[web/README.md](web/README.md).
+
+**State: built. Making a pick is real. The matches, table and results shown are made up,** and each
+screen says so at its foot.
 
 ## TapeOut, plainly
 
@@ -92,10 +214,10 @@ These are the tools, what each one is in plain words, and the job it does in Kic
 | Tool | What it is in plain words | Its job in Kickoff |
 | --- | --- | --- |
 | **Circuit** | A tiny rule machine. You give it facts, it gives an answer, and once it is published nobody can change it. | The scoring rules, one per sport. Free for anyone to check. |
-| **Processor** | The workshop a circuit is published from. | Kickoff's own processor is the home of its scoring rules. |
-| **Container** | An account that belongs to a circuit, so it can hold money and own a page. | Each league is one identity with its own page, prize account and mailbox. |
-| **TapeSend** | Sealed mail between those accounts. | Sealed picks before kickoff, reveals after, and the result. |
-| **DeWEB** | A website stored on the blockchain, so it cannot be secretly changed. | The verified copy of the Kickoff site. |
+| **Processor** | The workshop a circuit is published from. | Where Kickoff's scoring rules are published. |
+| **Container** | An account that belongs to a circuit, so it can hold money and own a page. | Kickoff's own account on X Layer. Everything Kickoff says is said from it, and nothing said by any other account counts. |
+| **TapeSend** | A mailbox for those accounts, where every message is stamped with who sent it and when. | The public record: each match announced, each bundle of sealed picks locked before kickoff, each result, and each dispute. |
+| **DeWEB** | A website stored on the blockchain, so it cannot be secretly changed. | The verified copy of the Kickoff site, and where the opened picks are published after each match. |
 | **TapeKit** | The checker that opens a DeWEB site and confirms it is genuine. | Comes with DeWEB. It is how a visitor knows the site is the real one. |
 | **TapeCode** | The tool for uploading to all of the above. | Uploading the site and attaching a normal web address. |
 
@@ -107,16 +229,50 @@ That document leaves scoring and leaderboards for others to build. Kickoff is th
 
 Not every part of Kickoff runs inside a circuit, and it does not need to. TapeOut is used where it
 gives the guarantee: sealed picks, a fixed scoring rule and a permanent record. The pages you click
-through are an ordinary website.
+through are an ordinary website, and the fixtures come from ordinary sports data.
+
+## What has been checked so far
+
+| What | How it was checked | Result |
+| --- | --- | --- |
+| The three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
+| The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
+| The picks engine | 112 tests. Twenty try to cheat, and five have the X Layer node lie about what is on chain | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
+| The website | 27 checks, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
+| The fixtures feed | 22 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
+| What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
+
+GitHub repeats the tests on every change, and the badges at the top of this page show the latest
+results.
 
 ## Honest limits
 
-- **Match results are entered by a person.** The league host enters the result and members can
-  challenge it. A live results feed is meant to replace this later.
-- **Guest picks go in through the league.** A guest plays without a wallet, and the league posts
-  one fingerprint covering everyone's sealed picks before kickoff. The host could leave a pick out,
-  but cannot change one or add one after kickoff. Each guest gets a receipt proving their pick was
-  included.
+- **Nothing is live on X Layer yet.** Everything on chain so far happened on a private copy.
+- **The pieces are not joined up yet.** The website shows made-up matches, and a sealed pick stays
+  on the device.
+- **A result is the feed's word.** Kickoff checks that it is a result that can happen, not that it
+  is true. That is why any player can dispute a result, and why a dispute can never be hidden.
+- **Sealed picks will pass through Kickoff's server.** A player needs no wallet, so the server
+  gathers the fingerprints and Kickoff locks them. The server never sees a pick before kickoff and
+  cannot change one or add one afterwards, but it could leave one out. Each player's receipt is the
+  proof their pick was included. The receipt is not signed yet, so Kickoff could deny having issued
+  it. Signing receipts is still to do.
+- **A pick lives in the browser's storage.** If that is cleared, the secret is gone and the pick
+  can never be opened. A way to back it up is still to do.
+- **The table reader asks one X Layer node.** It checks every message against the mailbox's own
+  fingerprint, but it believes that node about what the mailbox holds. TapeOut's own rule is to
+  ask several nodes and require them to agree. That is still to do.
+- **The free feeds have edges.** The football plan gives scores after a delay, which is fine for
+  final results. It does not cover the Europa League. The WNBA is out of season, so it shows no games until its next season starts.
+- **The feed's saved test examples are built from the feeds' documentation,** not captured from
+  them. The live run saved the real answers, and adding those to the tests is still to do.
+- **The live run had no finished football match in it,** because the week's football had not been
+  played yet. The 90-minute rule has been checked against the feed's documented examples, not yet
+  against a real finished match.
+- **Parts of [docs/RULES.md](docs/RULES.md) and [docs/PROTOCOL.md](docs/PROTOCOL.md) still describe
+  a league run by a host** who adds matches and enters results. The rules for points and for what
+  counts on chain are unchanged, but the wording will be brought up to date with the server and
+  the robot.
 - **TAP-12 is still a draft.** The standard Kickoff builds on may change.
 - **Nothing here is audited.**
 
@@ -125,17 +281,22 @@ through are an ordinary website.
 | Stage | What it is | State |
 | --- | --- | --- |
 | 1 | Project setup: this README, the folders, the licence | Done |
-| 2 | The three scoring circuits and the checker that tests every possible case | Built and checked off chain. Not published on X Layer yet. |
-| 3 | Proving the TapeOut parts on a private copy of X Layer | Done. Four rehearsals and a fees report passed, 29 tests in all, against the real TapeOut contracts: publishing the three circuits and getting the right points on every case; a league's own account and mailbox, with one pick locked before kickoff, opened after and scored; the on-chain site, which only its owner can change and which moves with the league; and a whole season, with the picks engine's values checked on chain. Results in [docs/REHEARSAL-RESULTS.md](docs/REHEARSAL-RESULTS.md). What going live costs, read from the chain, is in [docs/FEES.md](docs/FEES.md). |
-| 4 | The picks engine and the table builder | Built and tested, 112 tests. Sealing a pick, bundling everyone's sealed picks, opening and checking them, scoring them with the same circuit files that go on chain, and building the table and each player's record. Twenty of the tests try to cheat, and every attempt is refused. A rehearsal of a whole season on a copy of X Layer passed: the chain worked out every one of the engine's values again and got the same, and the real circuits scored every pick. The engine also fetches a league from an X Layer node and rebuilds the table from that alone, with one command: `node engine/bin/table.js <league id>`. Five more tests have the node lie about what is on chain, and each lie is caught. The format is written out in [docs/PROTOCOL.md](docs/PROTOCOL.md). A second season rehearsal passed too: a league was played through the real mailbox and site store on a copy of X Layer, with two cheats and a dispute, then fetched back from its id alone, and the table came out the same ([rehearsal 5](docs/REHEARSAL-RESULTS.md)). GitHub repeats it on every change to the engine. Still to do: asking several nodes instead of one. See [engine/README.md](engine/README.md). |
-| 5 | The website | Started. Every screen is built, in light and dark, for a phone and a computer: home, league, making a pick, a match, a player's record, the proof screen and the group. Making a pick is real: it is sealed on the player's own device with the picks engine and kept there. It is not sent anywhere yet, and the matches, table and results shown are made up; each screen says so. The fixtures feed is built too: it reads real matches and results for the Premier League, Champions League, NBA and WNBA, and turns each result into the form the scoring circuits take, with 22 tests against saved examples. It has not yet been run against the live feeds. Still to do: Kickoff's server, the robot that writes to X Layer, and joining them up. See [web/README.md](web/README.md) and [feed/README.md](feed/README.md). |
-| 6 | Going live on X Layer: processor, circuits, the first league | Not started |
-| 7 | Publishing the site, with the verified copy on DeWEB | Not started |
-| 8 | A real test league with real people and real matches | Not started |
-| 9 | Players with their own TapeOut identity, and sponsor prizes | Not started |
-| 10 | Demo video and submission | Not started |
+| 2 | The scoring circuits, and the checker that tests every possible case | Done. Not published on X Layer yet. |
+| 3 | Proving the TapeOut parts on a private copy of X Layer | Done. Rehearsals 1 to 4 and the fees report, 29 tests against the real contracts. |
+| 4 | The picks engine and the table builder | Done, 112 tests, with a fifth rehearsal that plays a season on chain and reads it back. Still to do: asking several nodes instead of one. |
+| 5 | The website's screens | Done, with made-up data. |
+| 6 | Sealing a pick for real, on the player's own device | Done. |
+| 7 | The fixtures feed | Done, and run live against the real feeds. |
+| 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Not started |
+| 9 | The robot: announces fixtures, locks picks before kickoff and posts results on X Layer | Not started |
+| 10 | Joining it up: real fixtures and real tables on the website | Not started |
+| 11 | Going live on X Layer: the circuits and Kickoff's account | Not started |
+| 12 | Publishing the site, with the verified copy on DeWEB | Not started |
+| 13 | A real test group with real people and real matches | Not started |
+| 14 | Players with their own TapeOut identity, and sponsor prizes | Not started |
+| 15 | Demo video and submission | Not started |
 
-**The scoring circuits so far**
+**The scoring circuits**
 
 | Circuit | Gates | Cases checked | Cases wrong |
 | --- | --- | --- | --- |
@@ -143,26 +304,35 @@ through are an ordinary website.
 | Basketball | 20 | 64 (every possible case) | 0 |
 | Tennis | 37 | 128 (every possible case) | 0 |
 
-Each case was evaluated four ways: with Kickoff's own evaluator, with TapeOut's official reference
-evaluator, by the real TapeOut contracts on a private copy of X Layer
-([docs/REHEARSAL-RESULTS.md](docs/REHEARSAL-RESULTS.md)), and by the JavaScript reader the website
-uses ([engine/README.md](engine/README.md)). The full results are in [docs/CHECK-RESULTS.md](docs/CHECK-RESULTS.md), and anyone can
-repeat the check with `python3 circuits/check.py`. GitHub also repeats it on every push, and the
-badge at the top of this page shows whether it passed.
-
 Nothing is deployed, so there are no contract addresses, no circuit IDs and no live link yet. They
 will be listed here as soon as they exist.
+
+## Try it yourself
+
+You need Node 22 or newer. The circuit check also needs Python 3. Nothing has to be installed.
+
+| To do this | Run this |
+| --- | --- |
+| Check the scoring circuits on every possible case | `python3 circuits/check.py` |
+| Run the picks engine's tests | `cd engine && npm test` |
+| Run the website's checks | `node --test "web/test/*.test.js"` |
+| See the website on your own computer | `cd web && python3 -m http.server 8000`, then open `http://localhost:8000` |
+| Run the feed's tests (no key needed) | `cd feed && npm test` |
+| Fetch this week's real fixtures (needs your own two keys) | `FOOTBALL_DATA_KEY=... BALLDONTLIE_KEY=... node feed/bin/fixtures.js` |
+
+The rehearsals on a private copy of X Layer need [Foundry](https://getfoundry.sh), and are
+explained in [chain/README.md](chain/README.md) and [engine/README.md](engine/README.md).
 
 ## What is in this repository
 
 | Folder | What goes in it |
 | --- | --- |
 | `circuits/` | The three scoring circuits in TapeOut's format, and the checker. Start with [circuits/README.md](circuits/README.md) |
-| `chain/` | Rehearsals of the parts that touch X Layer, run on a private copy of it |
-| `engine/` | The picks engine: sealing, bundling, opening, scoring with the circuits, and the table |
+| `chain/` | Rehearsals of the parts that touch X Layer, run on a private copy of it. Start with [chain/README.md](chain/README.md) |
+| `engine/` | The picks engine: sealing, bundling, opening, scoring with the circuits, the table, and reading it all back from X Layer. Start with [engine/README.md](engine/README.md) |
 | `feed/` | The fixtures feed: real matches and results from live sports data. Start with [feed/README.md](feed/README.md) |
 | `web/` | The website. Start with [web/README.md](web/README.md) |
-| `docs/` | The rules in plain words, design notes, test results and evidence |
+| `docs/` | The rules in plain words, what goes on chain, test results, rehearsal results and fees. Start with [docs/README.md](docs/README.md) |
 
 ## License
 

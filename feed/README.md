@@ -6,8 +6,9 @@ type them in.
 > [!NOTE]
 > **What is here:** readers for both feeds, the rules for turning a feed's result into a Kickoff
 > result, a command that prints a week's fixtures, and 22 tests that run against saved examples
-> with no key. **Not here yet:** anything that puts these matches on the website or on X Layer.
-> That is the server and the robot, which come next.
+> with no key. It has been run live against the real feeds, and it worked.
+> **Not here yet:** anything that puts these matches on the website or on X Layer. That is the
+> server and the robot, which come next.
 
 ## What it covers
 
@@ -60,7 +61,56 @@ marked `unknown` with the reason. It gets no result until a person has looked.
 **Never hidden.** A match the feed describes badly (no start time, a side with no name) is left
 out and listed under problems. If one feed fails, the other still runs, and the failure is listed.
 
-## See this week's fixtures
+## The keys
+
+Each feed needs a key, which is free with an account on its site. A key is a password for a
+program: it tells the feed who is asking.
+
+| Key | Where it comes from | The name it is kept under |
+| --- | --- | --- |
+| Football | An account at [football-data.org](https://www.football-data.org/client/register). The key arrives by email. | `FOOTBALL_DATA_KEY` |
+| Basketball | An account at [app.balldontlie.io](https://app.balldontlie.io). The key is shown after logging in. | `BALLDONTLIE_KEY` |
+
+Kickoff's own two keys are kept in this repository's **GitHub secrets** (Settings, then Secrets and
+variables, then Actions). GitHub can use a secret when it runs the feed, but nobody can read one
+back, including people with access to the repository. The keys are not in the code and not in the
+repository's history.
+
+When the feed runs, each key is sent only to the feed it belongs to, in a header. It is never
+printed, saved, or put in a web address, and a test checks that.
+
+Anyone running the feed from their own copy of this repository needs their own two keys, saved
+under the same two names.
+
+## The live run
+
+On 23 November 2026 the feed was run on GitHub with the real keys:
+[the run](https://github.com/Mhiah/Kickoff/actions/runs/45249885790), at commit `396b078`. It
+passed on the first try. For 23 to 30 November it brought back:
+
+| Competition | Matches | |
+| --- | --- | --- |
+| Premier League | 11 | all still to be played |
+| Champions League | 18 | all still to be played |
+| NBA | 53 | 5 finished, each with its result worked out |
+| WNBA | 0 | out of season |
+
+The five finished NBA games, as the feed's scores were turned into Kickoff results:
+
+| Game | Score | Result |
+| --- | --- | --- |
+| Bulls v Nuggets | 145 – 151 | the away side by 6 to 10 |
+| Jazz v Mavericks | 114 – 116 | the away side by 1 to 5 |
+| Wizards v Magic | 116 – 96 | the home side by 16 or more |
+| Knicks v Pacers | 113 – 106 | the home side by 6 to 10 |
+| Warriors v Celtics | 88 – 87 | the home side by 1 to 5 |
+
+Nothing was reported as left out or uncertain.
+
+To run it again: open the repository's **Actions** tab, choose **Fixtures feed**, and press **Run
+workflow**. The fixtures appear on the run's summary page.
+
+## See this week's fixtures on your own computer
 
 You need Node 22 or newer and the two keys. Nothing to install.
 
@@ -92,8 +142,11 @@ scoring circuits and check the points.
 ## Honest limits
 
 - **The saved examples are built from the feeds' documentation,** not captured from the feeds.
-  Each one that is copied from the documentation is marked. Real answers will be saved from the
-  first live run and added to the tests.
+  Each one that is copied from the documentation is marked. The live run kept the feeds' real
+  answers on its page for 14 days. Adding those to the tests is still to do.
+- **The live run had no finished football match in it,** because the week's football had not been
+  played yet. So the 90-minute rule has been checked against the feed's documented examples, and
+  not yet against a real finished match.
 - **A result is the feed's word.** Kickoff checks it is a result that can happen, not that it is
   true. That is why any player can dispute a result.
 - **The free football plan gives scores after a delay.** That is fine for final results, which is
