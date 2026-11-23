@@ -47,8 +47,11 @@ contract LeagueAccountTest is Rehearsal {
     }
 
     function _send(uint256 fromId, address to, bytes32 ref, bytes memory payload) internal returns (uint256 index) {
+        // Look the address up first. "Act as the deployer" only covers the very next call, so the
+        // lookup must not sit between it and the send.
+        bytes32 endpoint = HUB.endpointOf(to);
         vm.prank(deployer);
-        index = HUB.send(address(processor), fromId, HUB.endpointOf(to), ref, payload);
+        index = HUB.send(address(processor), fromId, endpoint, ref, payload);
     }
 
     /// The fingerprint of a football pick. It hides the pick until the salt is given out.
