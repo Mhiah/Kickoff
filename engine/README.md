@@ -8,10 +8,10 @@ It is plain JavaScript with nothing to install, and it runs the same in Node and
 the website and anyone checking a league use exactly the same code.
 
 > [!NOTE]
-> **What is here:** sealing, bundling, opening and checking, scoring with the circuits, and the
-> table and personal records, with 64 tests. **Not here yet:** reading a league's facts from the
-> chain, and the rehearsal that runs a whole league on a copy of X Layer. At the moment the table
-> builder is handed the facts. It does not fetch them.
+> **What is here:** sealing, bundling, opening and checking, scoring with the circuits, the table
+> and personal records, and reading a league back from its inbox, with 87 tests. **Not here yet:**
+> the part that fetches a league's inbox from a live X Layer node. At the moment the reader is
+> handed the inbox's messages. It applies every rule to them, but it does not go and get them.
 
 ## How a pick stays secret, then gets proven
 
@@ -99,6 +99,25 @@ The table is ordered as [docs/RULES.md](../docs/RULES.md) says: most points, the
 picks, then most 1-point picks. Players level on all three share a position, and the next position
 is skipped.
 
+## Reading a league back from the chain
+
+Everything a league does is in its inbox in TapeOut's mailbox: the matches it announced, the
+bundles it locked, the results it gave. `src/reader.js` takes that inbox's messages and works out
+the league, believing nothing it cannot check. `src/league.js` then joins that with the published
+files of opened picks and hands it to the table builder. So the table comes from chain data and
+files that prove themselves, and from nothing else.
+
+The exact format of each message, and every rule for what counts, is written out in
+[docs/PROTOCOL.md](../docs/PROTOCOL.md). In short:
+
+- Only the league's own account speaks for the league. Anyone can write to an inbox, so the rest
+  is ignored.
+- A match's id is made from its facts, kickoff time included, so the kickoff cannot be moved
+  afterwards.
+- The last lock stamped before kickoff is in force. A lock stamped at or after kickoff never is.
+- The last result is in force, so a mistake can be corrected, but every result stays on the record.
+- A member's challenge is never hidden.
+
 ## The cheating the tests try
 
 Each of these is a test in `test/open.test.js`, and each is refused:
@@ -122,6 +141,15 @@ And in `test/table.test.js`, at the level of a whole league:
 - Opening the same pick twice does not score twice.
 - A published list of sealed picks that does not match the chain is not taken on trust.
 
+And in `test/reader.test.js`, at the level of what is on chain:
+
+- A stranger writing to the league's inbox: none of it is believed.
+- A bundle locked after kickoff is not in force.
+- The league swapping in a new bundle after kickoff: the one locked before kickoff stays in force.
+- Moving the kickoff time: a later kickoff is a different match, and picks do not carry over.
+- A match announced after its own kickoff does not count.
+- A message carrying someone else's reference is not believed.
+
 The tree itself is checked against the published reference values from RFC 6962, and every leaf of
 every tree from 1 to 17 leaves is checked to have a proof that works only for its own place.
 
@@ -134,6 +162,8 @@ every tree from 1 to 17 leaves is checked to have a proof that works only for it
   by the league, so the league could deny having issued it. Signing receipts is still to do.
 - **This hides a pick behind a fingerprint. It does not encrypt it.** Encrypted messages between
   players who have their own TapeOut identity are a later step.
+- **A league decides when to publish the opened picks.** Until it does, the chain shows a bundle
+  was locked but not who is in it. A player can publish their own opening without waiting.
 
 ## The engine and the chain agree
 
@@ -171,6 +201,11 @@ npm test
 | `src/circuit.js` | Reading a TapeOut circuit and working out its answer, in JavaScript |
 | `src/score.js` | Scoring an opened pick with the circuits, and turning a real score into a result |
 | `src/table.js` | The league table and every player's record |
+| `src/match.js` | A match's id, made from the facts about it |
+| `src/messages.js` | What a league writes on chain, and how to read each message |
+| `src/reader.js` | Reading a league back from its inbox, and deciding what to believe |
+| `src/openings.js` | The published file of opened picks |
+| `src/league.js` | From the chain to the table in one step |
 | `src/bytes.js` | Small helpers for raw bytes, and SHA-256 from the platform |
 | `src/index.js` | Everything, in one place to import from |
 | `scripts/vectors.js` | Plays out a small fixed league and writes down every value, for the chain rehearsal to check |
