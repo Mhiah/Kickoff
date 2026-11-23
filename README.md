@@ -8,16 +8,26 @@ X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during thi
 [![Engine tests](https://github.com/Mhiah/Kickoff/actions/workflows/engine.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/engine.yml)
 [![X Layer rehearsal](https://github.com/Mhiah/Kickoff/actions/workflows/rehearsal.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/rehearsal.yml)
 [![Season rehearsal](https://github.com/Mhiah/Kickoff/actions/workflows/season.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/season.yml)
+[![Website checks](https://github.com/Mhiah/Kickoff/actions/workflows/web.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/web.yml)
 
 > [!NOTE]
 > **Where this is today:** the rules are written, the three scoring circuits are built and checked
 > on every possible case, and rehearsals on a private copy of X Layer have run every TapeOut part
 > Kickoff depends on against the real contracts: publishing the circuits and scoring with them, a
 > league's own account and mailbox, and the on-chain site. The picks engine and the table builder
-> are built and tested. Nothing is live on X Layer itself yet, and the website is not built yet. This README describes
-> what Kickoff is and how it will work. The section
+> are built and tested. The website's screens are built, showing made-up data. Nothing is live on
+> X Layer itself yet. This README describes what Kickoff is and how it will work. The section
 > [Where the build is](#where-the-build-is) says exactly what exists, and it is updated as each
 > part is finished.
+
+> [!IMPORTANT]
+> **The plan changed on 23 November 2026, and parts of this page are still catching up.** Kickoff
+> will carry real competitions, with fixtures and results arriving by themselves from live sports
+> data: the Premier League and the Champions League for football, the NBA and the WNBA for
+> basketball. Tennis comes later. A person will no longer type in matches or results, and a
+> "league" among friends becomes a group that plays those competitions. The sections below still
+> describe the earlier design in places, with tennis and a host who enters results. They will be
+> rewritten when the feed and the server that go with the new plan are built.
 
 ## What Kickoff is
 
@@ -116,7 +126,7 @@ through are an ordinary website.
 | 2 | The three scoring circuits and the checker that tests every possible case | Built and checked off chain. Not published on X Layer yet. |
 | 3 | Proving the TapeOut parts on a private copy of X Layer | Done. Four rehearsals and a fees report passed, 29 tests in all, against the real TapeOut contracts: publishing the three circuits and getting the right points on every case; a league's own account and mailbox, with one pick locked before kickoff, opened after and scored; the on-chain site, which only its owner can change and which moves with the league; and a whole season, with the picks engine's values checked on chain. Results in [docs/REHEARSAL-RESULTS.md](docs/REHEARSAL-RESULTS.md). What going live costs, read from the chain, is in [docs/FEES.md](docs/FEES.md). |
 | 4 | The picks engine and the table builder | Built and tested, 112 tests. Sealing a pick, bundling everyone's sealed picks, opening and checking them, scoring them with the same circuit files that go on chain, and building the table and each player's record. Twenty of the tests try to cheat, and every attempt is refused. A rehearsal of a whole season on a copy of X Layer passed: the chain worked out every one of the engine's values again and got the same, and the real circuits scored every pick. The engine also fetches a league from an X Layer node and rebuilds the table from that alone, with one command: `node engine/bin/table.js <league id>`. Five more tests have the node lie about what is on chain, and each lie is caught. The format is written out in [docs/PROTOCOL.md](docs/PROTOCOL.md). A second season rehearsal passed too: a league was played through the real mailbox and site store on a copy of X Layer, with two cheats and a dispute, then fetched back from its id alone, and the table came out the same ([rehearsal 5](docs/REHEARSAL-RESULTS.md)). GitHub repeats it on every change to the engine. Still to do: asking several nodes instead of one. See [engine/README.md](engine/README.md). |
-| 5 | The website | Not started |
+| 5 | The website | Started. Every screen is built, in light and dark, for a phone and a computer, showing made-up data: home, league, making a pick, a match, a player's record, the proof screen and the group. Nothing on it is live yet, and each screen says so. Still to do: sealing a pick for real, the fixtures feed, Kickoff's server, the robot that writes to X Layer, and joining them up. See [web/README.md](web/README.md). |
 | 6 | Going live on X Layer: processor, circuits, the first league | Not started |
 | 7 | Publishing the site, with the verified copy on DeWEB | Not started |
 | 8 | A real test league with real people and real matches | Not started |
@@ -148,7 +158,7 @@ will be listed here as soon as they exist.
 | `circuits/` | The three scoring circuits in TapeOut's format, and the checker. Start with [circuits/README.md](circuits/README.md) |
 | `chain/` | Rehearsals of the parts that touch X Layer, run on a private copy of it |
 | `engine/` | The picks engine: sealing, bundling, opening, scoring with the circuits, and the table |
-| `web/` | The website |
+| `web/` | The website. Start with [web/README.md](web/README.md) |
 | `docs/` | The rules in plain words, design notes, test results and evidence |
 
 ## License
