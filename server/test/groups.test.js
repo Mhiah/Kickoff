@@ -31,6 +31,16 @@ test("friends join with the code, however they type it", async () => {
   assert.equal(seen.body.members.length, 3);
 });
 
+test("whoever started the group is listed first, even if someone joins in the same second", async () => {
+  const s = server();
+  for (let i = 0; i < 6; i++) {
+    const [starter, friend] = [await device(), await device()];
+    const { body: group } = await s.post(starter, "/api/groups", { name: "Same second", playerName: "Starter" });
+    const joined = await s.post(friend, `/api/groups/${group.code}/join`, { playerName: "Friend" });
+    assert.deepEqual(joined.body.members.map((m) => m.name), ["Starter", "Friend"]);
+  }
+});
+
 test("a device can list the groups it is in", async () => {
   const s = server();
   const [ada, bola] = [await device(), await device()];

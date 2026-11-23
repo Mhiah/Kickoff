@@ -175,7 +175,7 @@ by the right key. The server is only ever sent fingerprints before kickoff, neve
 **State: the engine does all of this, and it has been rehearsed against the real TapeOut contracts
 on a private copy of X Layer.** It is not running on X Layer itself. **The server's rules are built
 and tested,** including a test that goes from three phones, through the server, to the final table.
-It has no database and is not on the internet yet.
+It can keep its records in a real database, but it has not been put on the internet yet.
 
 ### 4. Results come in and picks are scored by a fixed rule
 
@@ -248,7 +248,7 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | The picks engine | 120 tests. Twenty-three try to cheat, and five have the X Layer node lie about what is on chain | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
 | The website | 27 checks, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 22 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
-| The server | 32 tests. They send picks in someone else's name, play old requests back, open a different pick from the one sealed, and use the robot's addresses without its key | All pass; every one is refused ([details](server/README.md)) |
+| The server | 51 tests. They send picks in someone else's name, play old requests back, open a different pick from the one sealed, and use the robot's addresses without its key | All pass; every one is refused ([details](server/README.md)) |
 | What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
 
 GitHub repeats the tests on every change, and the badges at the top of this page show the latest
@@ -261,8 +261,8 @@ results.
   on the device.
 - **A result is the feed's word.** Kickoff checks that it is a result that can happen, not that it
   is true. That is why any player can dispute a result, and why a dispute can never be hidden.
-- **The server keeps nothing yet.** Its rules are built and tested, but it has no database and no
-  home on the internet.
+- **The server is not on the internet yet.** Its rules and its database connection are built and
+  tested, but against a stand-in database, not a real one.
 - **Sealed picks will pass through Kickoff's server.** A player needs no wallet, so the server
   gathers the fingerprints and Kickoff locks them. The server never sees a pick before kickoff and
   cannot change one or add one afterwards, but it could leave one out. Each player's receipt is the
@@ -298,7 +298,7 @@ results.
 | 5 | The website's screens | Done, with made-up data. |
 | 6 | Sealing a pick for real, on the player's own device | Done. |
 | 7 | The fixtures feed | Done, and run live against the real feeds. |
-| 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Partly done. The rules, signed requests and addresses are built, with 32 tests. Still to do: a database, putting it online, and connecting the website. |
+| 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Partly done. The rules, signed requests, addresses and database connection are built, with 51 tests. Still to do: putting it online, and connecting the website. |
 | 9 | The robot: announces fixtures, locks picks before kickoff and posts results on X Layer | Not started |
 | 10 | Joining it up: real fixtures and real tables on the website | Not started |
 | 11 | Going live on X Layer: the circuits and Kickoff's account | Not started |
@@ -345,6 +345,7 @@ explained in [chain/README.md](chain/README.md) and [engine/README.md](engine/RE
 | `engine/` | The picks engine: sealing, bundling, opening, scoring with the circuits, the table, and reading it all back from X Layer. Start with [engine/README.md](engine/README.md) |
 | `feed/` | The fixtures feed: real matches and results from live sports data. Start with [feed/README.md](feed/README.md) |
 | `server/` | Kickoff's server: groups, and sealed picks until they are locked. Start with [server/README.md](server/README.md) |
+| `api/`, `vercel.json` | What the web host needs: where the server starts, and where the website's files are |
 | `web/` | The website. Start with [web/README.md](web/README.md) |
 | `docs/` | The rules in plain words, what goes on chain, test results, rehearsal results and fees. Start with [docs/README.md](docs/README.md) |
 

@@ -1,7 +1,7 @@
 // Shared bits for the server's tests.
 import { FOOTBALL, BASKETBALL, matchId, newDeviceKey, playerIdOf, signRequest, toHex } from "../../engine/src/index.js";
 import { createHandler } from "../src/http.js";
-import { createKickoff } from "../src/kickoff.js";
+import { CLOSES_BEFORE, SETTLE, createKickoff } from "../src/kickoff.js";
 import { MemoryStore } from "../src/store.js";
 
 export const LEAGUE = "0000000000000000000000c424ad6fe8a46a34fa9b0610959beaba8a2c6b6982";
@@ -17,8 +17,7 @@ export async function device() {
 }
 
 /** A server with a clock the test can move. */
-export function server({ adminKey = ADMIN_KEY } = {}) {
-  const store = new MemoryStore();
+export function server({ adminKey = ADMIN_KEY, store = new MemoryStore() } = {}) {
   const clock = { now: START };
   let n = 0;
   const kickoff = createKickoff({ store, league: LEAGUE, random: () => 4821 + n++ });
@@ -29,6 +28,11 @@ export function server({ adminKey = ADMIN_KEY } = {}) {
     /** A device sends something, signed at the server's current time unless told otherwise. */
     post: async (who, path, payload = {}, at = clock.now) => handle({ method: "POST", path, headers: {}, body: await who.sign("POST", path, payload, at) }),
     robot: (path, body = null, key = ADMIN_KEY) => handle({ method: "POST", path, headers: { "x-kickoff-admin": key }, body }),
+    /** Move the clock to the first moment the robot may bundle a match's picks, and bundle them. */
+    freeze(fixture) {
+      clock.now = Math.max(clock.now, fixture.kickoff - CLOSES_BEFORE + SETTLE);
+      return this.robot(`/api/admin/freeze/${fixture.id}`);
+    },
   };
 }
 
@@ -48,8 +52,8 @@ export async function fixtures() {
 }
 
 /** A server with the two matches already on its list. */
-export async function serverWithFixtures() {
-  const s = server();
+export async function serverWithFixtures(options) {
+  const s = server(options);
   const f = await fixtures();
   const put = await s.robot("/api/admin/fixtures", { fixtures: Object.values(f) });
   if (put.status !== 200) throw new Error(JSON.stringify(put.body));

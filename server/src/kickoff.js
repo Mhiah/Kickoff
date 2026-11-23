@@ -21,6 +21,11 @@ import {
 
 /** Picks close this many seconds before a match starts. */
 export const CLOSES_BEFORE = 10 * 60;
+/**
+ * A bundle is frozen no sooner than this many seconds after picks close, so a pick that was
+ * accepted in the last instant has been written down before the bundle is made.
+ */
+export const SETTLE = 5;
 export const MAX_GROUP_NAME = 40;
 export const MAX_PLAYER_NAME = 24;
 export const MAX_MEMBERS = 200;
@@ -76,13 +81,15 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     async createGroup({ player, now, name, playerName }) {
       const groupName = tidyName(name, MAX_GROUP_NAME, "The group's name");
       const who = tidyName(playerName, MAX_PLAYER_NAME, "Your name");
+      // The code is claimed and the group written in one step, so two groups started at the same
+      // moment can never be given the same code.
       let code = null;
       for (let tries = 0; tries < 30 && code === null; tries++) {
         const candidate = codeFor(groupName, String(random(10000)).padStart(4, "0"));
-        if ((await store.get(`group:${candidate}`)) === null) code = candidate;
+        const claimed = await store.setIfAbsent(`group:${candidate}`, { code: candidate, name: groupName, startedBy: player, startedAt: now, plays: [...COMPETITIONS] });
+        if (claimed) code = candidate;
       }
       if (code === null) refuse(503, "Could not make a code for the group. Try again.");
-      await store.set(`group:${code}`, { code, name: groupName, startedBy: player, startedAt: now, plays: [...COMPETITIONS] });
       await store.tableSet(`members:${code}`, player, { name: who, joinedAt: now });
       await store.tableSet(`groups-of:${player}`, code, { joinedAt: now });
       return this.group({ code });
@@ -103,7 +110,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       return this.group({ code: group.code });
     },
 
-    /** A group and its members, oldest member first. Anyone with the code can see this. */
+    /** A group and its members: whoever started it, then the rest in the order they joined. Anyone with the code can see this. */
     async group({ code }) {
       if (typeof code !== "string") refuse(400, "That is not a group code.");
       const tidy = code.trim().toUpperCase();
@@ -111,7 +118,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       const group = (await store.get(`group:${tidy}`)) ?? refuse(404, "There is no group with that code.");
       const members = Object.entries(await store.tableAll(`members:${tidy}`))
         .map(([player, m]) => ({ player, name: m.name, joinedAt: m.joinedAt }))
-        .sort((a, b) => a.joinedAt - b.joinedAt || a.player.localeCompare(b.player));
+        .sort((a, b) => (b.player === group.startedBy) - (a.player === group.startedBy) || a.joinedAt - b.joinedAt || a.player.localeCompare(b.player));
       return { ...group, members };
     },
 
@@ -172,8 +179,8 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     },
 
     /**
-     * Close a match's picks for good and bundle them. Done once, just before the bundle's
-     * fingerprint is written to X Layer. After this nothing can be added or changed.
+     * Bundle a match's picks for good. Done once, a few seconds after picks close, just before the
+     * bundle's fingerprint is written to X Layer. After this nothing can be added or changed.
      * @returns { match, count, root, entries }
      */
     async freeze({ now, match }) {
@@ -181,6 +188,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       const already = await store.get(`frozen:${match}`);
       if (already) return { match, count: already.entries.length, root: already.root, entries: already.entries, frozenAt: already.frozenAt };
       if (now >= f.kickoff) refuse(409, "This match has kicked off. A bundle made now would never count.");
+      if (now < f.kickoff - CLOSES_BEFORE + SETTLE) refuse(409, "Picks for this match are still open, or closed a moment ago. A bundle is made a few seconds after they close.");
       const sealed = await store.tableAll(`sealed:${match}`);
       const entries = Object.entries(sealed)
         .map(([player, s]) => ({ player, fingerprint: s.fingerprint }))

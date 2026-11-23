@@ -6,7 +6,7 @@ import {
   FOOTBALL, BASKETBALL, basketballResult, buildBundle, encodePick, fromHex, loadCircuits, lockMessage, lockRef, matchMessage,
   resultMessage, sealPick, tableFromChain, toHex, verifyReceipt,
 } from "../../engine/src/index.js";
-import { CLOSES_BEFORE } from "../src/kickoff.js";
+import { CLOSES_BEFORE, SETTLE } from "../src/kickoff.js";
 import { HOUR, LEAGUE, device, serverWithFixtures } from "./helpers.js";
 
 /** A device seals a pick the way the website does: the pick stays on the device, only the fingerprint is returned to send. */
@@ -131,7 +131,14 @@ test("freezing bundles the picks exactly as the engine does, and after it nothin
     sealed.push(await seal(who, s.f.football, { home: i, away: 1 }));
     await s.post(who, "/api/picks", { match: s.f.football.id, fingerprint: sealed[i].fingerprint });
   }
-  s.clock.now = s.f.football.kickoff - CLOSES_BEFORE;
+  // Not while picks are open, and not in the first seconds after they close.
+  s.clock.now = s.f.football.kickoff - CLOSES_BEFORE - 1;
+  assert.equal((await s.robot(`/api/admin/freeze/${s.f.football.id}`)).status, 409);
+  s.clock.now = s.f.football.kickoff - CLOSES_BEFORE + SETTLE - 1;
+  const tooSoon = await s.robot(`/api/admin/freeze/${s.f.football.id}`);
+  assert.equal(tooSoon.status, 409);
+  assert.match(tooSoon.body.error, /still open, or closed a moment ago/);
+  s.clock.now = s.f.football.kickoff - CLOSES_BEFORE + SETTLE;
   const frozen = await s.robot(`/api/admin/freeze/${s.f.football.id}`);
   assert.equal(frozen.status, 200);
   assert.equal(frozen.body.count, 3);
@@ -150,7 +157,7 @@ test("freezing bundles the picks exactly as the engine does, and after it nothin
 
 test("a match can be frozen with no picks in it", async () => {
   const s = await serverWithFixtures();
-  const frozen = await s.robot(`/api/admin/freeze/${s.f.basketball.id}`);
+  const frozen = await s.freeze(s.f.basketball);
   assert.equal(frozen.body.count, 0);
   assert.equal(frozen.body.root, toHex((await buildBundle({ league: LEAGUE, match: s.f.basketball.id, entries: [] })).root));
 });
@@ -172,7 +179,7 @@ test("every player gets a receipt that proves their pick is in the locked bundle
   const early = await s.get(`/api/matches/${s.f.football.id}/receipt/${players[0].player}`);
   assert.equal(early.status, 409);
   assert.match(early.body.error, /not been locked yet/);
-  const { body: frozen } = await s.robot(`/api/admin/freeze/${s.f.football.id}`);
+  const { body: frozen } = await s.freeze(s.f.football);
   for (const who of players) {
     const { status, body: r } = await s.get(`/api/matches/${s.f.football.id}/receipt/${who.player}`);
     assert.equal(status, 200);
@@ -194,7 +201,7 @@ test("a pick is opened only after the start, and only by the pick and secret tha
   const bolas = await seal(bola, s.f.football, { home: 1, away: 1 });
   await s.post(ada, "/api/picks", { match: s.f.football.id, fingerprint: adas.fingerprint });
   await s.post(bola, "/api/picks", { match: s.f.football.id, fingerprint: bolas.fingerprint });
-  await s.robot(`/api/admin/freeze/${s.f.football.id}`);
+  await s.freeze(s.f.football);
   const open = (who, mine) => s.post(who, "/api/opened", { match: s.f.football.id, pickByte: mine.pickByte, salt: mine.salt });
 
   s.clock.now = s.f.football.kickoff - 1;
@@ -259,9 +266,8 @@ test("the whole way through: from phones, through the server, to the table the e
   const files = {};
   for (const key of ["football", "basketball"]) {
     const f = s.f[key];
-    // Ten minutes before the start the robot freezes the bundle and locks it on chain.
-    s.clock.now = f.kickoff - CLOSES_BEFORE;
-    const { body: frozen } = await s.robot(`/api/admin/freeze/${f.id}`);
+    // Just after picks close the robot freezes the bundle and locks it on chain.
+    const { body: frozen } = await s.freeze(f);
     const bundle = await buildBundle({ league: LEAGUE, match: f.id, entries: frozen.entries });
     assert.equal(toHex(bundle.root), frozen.root);
     post(s.clock.now, await lockMessage(bundle));

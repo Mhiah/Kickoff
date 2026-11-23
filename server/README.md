@@ -5,9 +5,10 @@ picks so they can be locked on X Layer together.
 
 > [!NOTE]
 > **What is here:** the server's rules as tested code, the way a device proves it is itself, the
-> addresses the website will talk to, and a version that runs on your own computer. 32 tests.
-> **Not here yet:** a database (everything is kept in memory and is gone when it stops), a home on
-> the internet, and the website's side of the conversation. Those are the next steps.
+> addresses the website will talk to, the connection to a real database, the entry point a web
+> host uses, and a version that runs on your own computer. 51 tests.
+> **Not here yet:** it has not been put on the internet, so no real database is connected, and the
+> website does not talk to it. Those are the next steps.
 
 ## Why there is a server at all
 
@@ -91,6 +92,9 @@ match have closed."
 | Slipping a pick into storage after the bundle is frozen | The bundle does not change. |
 | Using the robot's addresses with a guessed key, or a player's signature | Refused. |
 | Moving a match's start time under the same id | Refused: a moved match is a new match. |
+| Making a bundle while picks are still open | Refused. A bundle is made a few seconds after picks close. |
+| Two groups started at the same moment | They can never be given the same code. |
+| The database failing, or its token being wrong | The player is told something went wrong. Nothing about the database is shown. |
 
 One test goes the whole way: three phones seal picks for a football match and a basketball match,
 the server bundles them, the locks and results are written the way the robot will write them, the
@@ -108,19 +112,43 @@ You need Node 22 or newer. Nothing has to be installed.
 
 Run this way, everything is kept in memory and is gone when it stops.
 
+## The database, and going on the internet
+
+The server keeps very little: single values, and small tables. Online it keeps them in a Redis
+database, the kind Vercel offers through its Marketplace, spoken to with plain web requests so
+there is still nothing to install. Every database test is run twice, once against the in-memory
+store and once against a stand-in for the real one, so the two are known to behave the same.
+
+The host's settings decide everything. None of them is in the code:
+
+| Setting | What it is |
+| --- | --- |
+| `KV_REST_API_URL` and `KV_REST_API_TOKEN` | The database's address and token. Vercel adds these itself when a database is connected. |
+| `KICKOFF_ADMIN_KEY` | The robot's key. If it is not set, the robot's addresses are switched off. |
+| `KICKOFF_LEAGUE` | Kickoff's id on X Layer. Until Kickoff is live there, a stand-in is used. |
+
+With no database set, every address answers "Kickoff's database is not connected yet." It never
+pretends to keep things it would forget.
+
+`vercel.json` at the top of the repo tells Vercel to serve the website from `web/` and to pass
+every `/api/...` address to `api/index.mjs`, which starts the server.
+
 ## What is in this folder
 
 | File | What it is |
 | --- | --- |
 | `src/kickoff.js` | The rules: groups, sealed picks, freezing, receipts, opening |
 | `src/http.js` | The addresses, and who may use each |
-| `src/store.js` | Where things are kept. For now, in memory |
+| `src/store.js` | Keeping things in memory, for the tests and your own computer |
+| `src/redis-store.js` | Keeping things in the real database |
+| `src/web.js` | The server as a web host runs it, built from the host's settings |
 | `bin/dev.js` | The server on your own computer |
 | `test/` | The tests |
 
 ## Honest limits
 
-- **Nothing is kept yet.** The database is the next step.
+- **It is not on the internet yet.** The database connection is built and tested against a
+  stand-in, not against a real database. That happens when it is first put online.
 - **The website does not talk to it yet.** A sealed pick still stays on the device.
 - **A receipt is not signed.** Kickoff could deny having issued one. Signing receipts is still to do.
 - **The server could leave a pick out of a bundle.** A player can check for their receipt as soon as
