@@ -55,8 +55,7 @@ fingerprint instead, which is how guest picks work.
 
 ### 3. The on-chain site
 
-`test/LeagueSite.t.sol`. Written. Its result is recorded in
-[docs/REHEARSAL-RESULTS.md](../docs/REHEARSAL-RESULTS.md) once it has run.
+`test/LeagueSite.t.sol`. **Passed on its first run, 23 November 2026.**
 
 Kickoff keeps a verified copy of its website on chain, in the account of a circuit. This rehearsal:
 
@@ -79,6 +78,9 @@ Kickoff keeps a verified copy of its website on chain, in the account of a circu
 - **Publishing a circuit costs 0.0013 OKB.**
 - **Opening a circuit's own account costs 0.08 OKB.** Every league that wants its own identity pays
   this once. Sending messages through the mailbox costs only gas.
+- **A site's on-chain name is free at the moment.** The monthly fee read from the chain was 0. The
+  name is written `<circuit id>.2.<processor number>.tape`.
+- **Uploading the site costs only gas.**
 
 So a wallet that creates a Kickoff processor needs BEM as well as OKB. The other route is to publish
 the circuits on an existing processor, which needs OKB only. The numbers are in

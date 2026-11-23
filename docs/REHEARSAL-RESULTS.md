@@ -86,4 +86,35 @@ are tested with the picks engine.
 
 ## Rehearsal 3: the on-chain site
 
-Written, not yet recorded here. This section is filled in after its first run.
+| | |
+| --- | --- |
+| Date | 23 November 2026 |
+| Run | <https://github.com/Mhiah/Kickoff/actions/runs/45217742997> |
+| Commit | `78628b7` |
+| Result | **5 of 5 tests passed on the first run** (rehearsals 1 and 2 passed again in the same run, 21 of 21 in all) |
+
+What was confirmed, with TapeOut's real site store:
+
+- **A page can be uploaded and read back.** The bytes read from the chain were the bytes uploaded,
+  the fingerprint stored on chain was the page's SHA-256, and the file was listed by name.
+- **A bigger file goes up in pieces and reads back whole.** A 60,000-byte file was uploaded in
+  three pieces. While only the first piece was there, the file did not match its fingerprint, so a
+  half-uploaded file can be told apart from a finished one. Once complete it matched, and a read
+  across the join between two pieces was seamless.
+- **Only the owner can change the site.** A stranger's attempts to replace, add to and remove a
+  page were all refused. The owner could do all three.
+- **The site moves with the league.** After the circuit was handed to a new owner, the league's
+  account was the same account and the page was unchanged, the old owner could no longer change
+  it, and the new owner could.
+
+What the probe found about a site's on-chain name:
+
+| Question | Answer |
+| --- | --- |
+| What does the name cost? | Nothing at the moment. The monthly fee read from the chain was 0. |
+| How must the name be written? | `<circuit id>.2.<processor number>.tape`. In the rehearsal that was `1.2.443.tape`: circuit 1, the 2 that stands for X Layer, processor 443. |
+| What is the processor number? | The processor's place in the factory's list, counting from 0. |
+| How long does one month buy? | 30 days. |
+
+The number 443 belongs to the rehearsal. When Kickoff's processor is created on the real network
+it gets whatever number is next at that moment.
