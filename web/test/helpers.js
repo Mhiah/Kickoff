@@ -26,7 +26,7 @@ export async function contextAt(now, store = createStore(new FakeStorage()), ext
   const matchIds = {};
   for (const [id, fixture] of Object.entries(fixtures)) matchIds[id] = await matchIdOf(SAMPLE_LEAGUE, fixture, COMPETITIONS);
   const player = await createDevice(store).player();
-  return { now, fixtures, matchIds, picks: store.all(player), lasting: store.lasting, editing: null, store, mine: noGroup(player), ...extra };
+  return { now, real: false, league: SAMPLE_LEAGUE, fixtures, matchIds, picks: store.all(player), lasting: store.lasting, editing: null, store, mine: noGroup(player), ...extra };
 }
 
 /** Seal a pick on the context's device and return the context as it is afterwards. */

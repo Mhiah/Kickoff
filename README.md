@@ -155,8 +155,11 @@ never leaves the device. Nobody can work the pick out from the fingerprint.
 The pick and its secret stay in that browser. Only the fingerprint is ever meant to leave it
 before kickoff.
 
-**State: built and working on the website.** The fingerprint is not sent anywhere yet. The server
-that collects them is partly built (see below), and the website is not connected to it.
+**State: built and working on the website.** For a real match the phone then sends the fingerprint
+to Kickoff's server, fetches and checks its receipt once picks are locked, and opens the pick after
+kickoff, all by itself. That is built and checked against the server's own code. It has not
+happened on the live site yet, because no real matches are on the server's list until the robot is
+built. Until then the site shows made-up matches, and a pick for one of those stays on the phone.
 
 ### 3. Picks are locked on X Layer before kickoff
 
@@ -247,7 +250,7 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | The three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
 | The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
 | The picks engine | 120 tests. Twenty-three try to cheat, and five have the X Layer node lie about what is on chain | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
-| The website | 43 checks, some of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
+| The website | 54 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 22 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
 | The server | 53 tests. They send picks in someone else's name, play old requests back, open a different pick from the one sealed, and use the robot's addresses without its key | All pass; every one is refused ([details](server/README.md)) |
 | What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
@@ -259,7 +262,7 @@ results.
 
 - **Nothing is live on X Layer yet.** Everything on chain so far happened on a private copy.
 - **The pieces are only partly joined up.** Groups on the website are real. The matches, table and
-  results are still made up, and a sealed pick stays on the device.
+  results are still made up, so no sealed pick has been sent on the live site yet.
 - **A player is one phone and browser.** The key that makes someone a player is kept in the
   browser. If its saved data is cleared, that player is gone. A backup is still to do.
 - **A result is the feed's word.** Kickoff checks that it is a result that can happen, not that it
@@ -301,7 +304,7 @@ results.
 | 5 | The website's screens | Done, with made-up data. |
 | 6 | Sealing a pick for real, on the player's own device | Done. |
 | 7 | The fixtures feed | Done, and run live against the real feeds. |
-| 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Partly done. The rules, signed requests, addresses and database connection are built, with 53 tests, and it is online with a real database. The website uses it for groups. Still to do: sending sealed picks from the website, receipts, and opening picks. |
+| 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Partly done. The rules, signed requests, addresses and database connection are built, with 53 tests, and it is online with a real database. The website uses it for groups, and is ready to send sealed picks, check receipts and open picks once real matches are on the list. |
 | 9 | The robot: announces fixtures, locks picks before kickoff and posts results on X Layer | Not started |
 | 10 | Joining it up: real fixtures and real tables on the website | Not started |
 | 11 | Going live on X Layer: the circuits and Kickoff's account | Not started |

@@ -4,6 +4,7 @@
 // A screen that shows matches to pick is also handed `ctx`, what is true right now:
 //
 //   now        the time, in seconds
+//   real       true once the matches come from Kickoff's server; false while they are made up
 //   fixtures   the matches still to be played, by id
 //   matchIds   each fixture's match id, by fixture id
 //   picks      the picks kept on this device, by match id
@@ -13,8 +14,9 @@
 //              { player, groups, group (the one being looked at, or null), name, offline }
 
 import { COMPETITIONS, check, group, match, record, scores, voided, week } from "./data/sample.js";
-import { MARK, SAMPLE_NOTE, TOGGLE, comp, esc, stamp, titlebar } from "./lib/html.js";
+import { MARK, REAL_MATCHES_NOTE, SAMPLE_NOTE, TOGGLE, comp, esc, stamp, titlebar } from "./lib/html.js";
 import { BAND_KEYS, bandWords, pickWords } from "./lib/picks.js";
+import { standing } from "./lib/sync.js";
 import { ordinal, placeName, standings } from "./lib/standings.js";
 import { clock, closesAt, dayLabel, hasClosed, howLong, todayLabel } from "./lib/time.js";
 
@@ -91,7 +93,10 @@ ${SAMPLE_NOTE}`;
 function fixtureRow(ctx, id) {
   const f = ctx.fixtures[id];
   let action;
-  if (yourPick(ctx, id)) action = `<a class="sealed-box" href="#/pick/${id}" aria-label="Your pick is sealed. See it or change it.">Sealed</a>`;
+  const mine = yourPick(ctx, id);
+  const stands = mine ? standing(mine, f, ctx.now) : null;
+  if (stands === "waiting" || stands === "missed" || stands === "problem") action = `<a class="sealed-box unsent" href="#/pick/${id}" aria-label="Your pick is sealed but has not reached Kickoff. See why.">Not entered</a>`;
+  else if (mine) action = `<a class="sealed-box" href="#/pick/${id}" aria-label="Your pick is sealed. See it or change it.">Sealed</a>`;
   else if (hasClosed(ctx.now, f.kickoff)) action = `<span class="small muted">Closed</span>`;
   else action = `<a class="btn small go" href="#/pick/${id}">Pick</a>`;
   return `<div class="row" data-comp="${f.comp}"><div class="grow">${comp(f.comp)}<div class="title">${teams(f)}</div><div class="sub">${clock(f.kickoff)}. Picks close ${clock(closesAt(f.kickoff))}.</div></div>${action}</div>`;
@@ -100,6 +105,7 @@ function fixtureRow(ctx, id) {
 function weekHtml(ctx) {
   const ids = inOrder(ctx);
   const picked = ids.filter((id) => yourPick(ctx, id)).length;
+  const total = ctx.real ? ids.length : week.total;
   const dayNames = [...new Set(ids.map((id) => dayLabel(ctx.fixtures[id].kickoff)))];
   const days = dayNames
     .map((day) => {
@@ -113,10 +119,10 @@ function weekHtml(ctx) {
   return `
   <h2>This week</h2>
   <div class="chips" role="group" aria-label="Show one competition"><button type="button" data-filter="all" aria-pressed="true">All</button>${chips}</div>
-  <p class="small muted" style="margin:10px 0 0">You have picked ${picked} of ${week.total} matches. Pick as many as you like.</p>
+  <p class="small muted" style="margin:10px 0 0">You have picked ${picked} of ${total} matches. Pick as many as you like.</p>
   ${days}
   <p class="small muted" data-empty hidden style="margin-top:14px">No matches in this competition this week.</p>
-  <p class="say-so"><button type="button" class="link" data-preview-note="In this preview only five of the week's matches are shown.">Show all ${week.total} matches this week</button></p>
+  ${ctx.real ? "" : `<p class="say-so"><button type="button" class="link" data-preview-note="In this preview only five of the week's matches are shown.">Show all ${week.total} matches this week</button></p>`}
   <p class="say-so muted" data-note-out role="status"></p>`;
 }
 
@@ -164,7 +170,7 @@ ${titlebar({
 <div class="tiles">
   <div class="glass tile"><small>Your place</small><b>${ordinal(you.position)}</b><span>${you.sharedWith.length ? `shared with ${esc(you.sharedWith.join(" and "))}` : `of ${group.players.length}`}</span></div>
   <div class="glass tile"><small>Your points</small><b>${you.points}</b><span>${you.threes} spot on, ${you.ones} right winner</span></div>
-  <div class="glass tile"><small>Picked this week</small><b>${picked} of ${week.total}</b><span>pick as many as you like</span></div>
+  <div class="glass tile"><small>Picked this week</small><b>${picked} of ${ctx.real ? ids.length : week.total}</b><span>pick as many as you like</span></div>
   <div class="glass tile"><small>Next to close</small><b>${next ? esc(closesIn) : "Nothing open"}</b><span>${next ? teams(next) : "new matches arrive each week"}</span></div>
 </div>
 
@@ -192,7 +198,7 @@ ${
     <p class="say-so"><a class="link" href="#/record">Every match you picked</a></p>
   </section>
 </div>
-${SAMPLE_NOTE}`;
+${ctx.real ? REAL_MATCHES_NOTE : SAMPLE_NOTE}`;
   return { html, title: `${group.name} on Kickoff`, tab: "league", wide: true };
 }
 
@@ -222,6 +228,31 @@ function pickControls(f, entry) {
       </div>`;
 }
 
+/**
+ * Where a sealed pick stands: one or two words on the card, and a short line only when something
+ * needs the player's attention. A made-up match gets nothing; the foot of the page covers it.
+ */
+function standingMark(entry, f, ctx) {
+  const mark = (kind, words, line = "") => `<div class="state ${kind}">${words}</div>${line ? `<div class="small muted state-line">${line}</div>` : ""}`;
+  switch (standing(entry, f, ctx.now)) {
+    case "made-up":
+      return "";
+    case "waiting":
+      return mark("warn", "Not entered yet", "No connection. It will try again.");
+    case "sent":
+    case "closed":
+      return mark("", "Entered");
+    case "locked":
+      return mark("", "Locked in");
+    case "opened":
+      return mark("", "Revealed");
+    case "missed":
+      return mark("bad", "Not entered in time", "It does not count for this match.");
+    default:
+      return mark("bad", "Problem", esc(entry.problem));
+  }
+}
+
 export function pick(id, ctx) {
   const f = ctx.fixtures[id];
   if (!f) return league(null, ctx);
@@ -233,9 +264,8 @@ export function pick(id, ctx) {
   const rules = football
     ? ["The exact score gets 3 points.", "The right winner, or calling a draw, gets 1 point.", "It is the score after 90 minutes. Extra time and penalties do not count."]
     : ["The right winner gets 1 point.", "Add 2 points if you also get how much they win by.", "Overtime counts."];
-  const keptWhere = ctx.lasting
-    ? "It is kept in this browser, on this phone. If you clear your browser's data, it cannot be opened after " + start + "."
-    : "This browser is not keeping anything, so the pick will be gone when you close it. Private browsing does this.";
+  // The one thing said out loud: a private window keeps nothing, so the pick would be lost.
+  const notKept = ctx.lasting ? "" : `<div class="note warn" style="margin-top:14px"><b>Private window.</b> This pick will be lost when you close it.</div>`;
 
   let body;
   if (editing) {
@@ -243,19 +273,18 @@ export function pick(id, ctx) {
 <div class="glass picker" data-picker="${football ? "football" : "basketball"}">${pickControls(f, entry)}</div>
 <ul class="rules">${rules.map((r) => `<li>${r}</li>`).join("")}</ul>
 <button type="button" class="btn go" data-seal="${id}">${entry ? "Seal my new pick" : "Seal my pick"}</button>
-<p class="after" data-note-out role="status">Nobody can see a sealed pick, not even Kickoff. You can change yours until picks close. It is kept on this phone, so come back on this phone after ${start} and it opens by itself.</p>`;
+<p class="after" data-note-out role="status">Nobody can see it before ${start}. You can change it until picks close.</p>`;
   } else if (entry) {
-    const mark = `0x${entry.fingerprint.slice(0, 8)}…${entry.fingerprint.slice(-8)}`;
     body = `
 <div class="glass sealed" role="status">
-  <div class="small muted">Your pick, sealed on this phone</div>
+  <div class="small muted">Your pick</div>
   <div class="yours${football ? "" : " words"}">${esc(pickWords(entry, f))}</div>
   <div class="small muted">Sealed at ${clock(entry.sealedAt)} on ${esc(dayLabel(entry.sealedAt))}. Only you can see it.</div>
-  <div class="finger"><small class="muted">Its fingerprint. This is all anyone else gets to see before ${start}.</small><code>${mark}</code></div>
+  ${standingMark(entry, f, ctx)}
 </div>
-${closed ? `<p class="after">Picks for this match have closed, so it can no longer be changed.</p>` : `<button type="button" class="btn quiet" data-change="${id}" style="margin-top:14px">Change my pick</button>`}
-<div class="note warn" style="margin-top:14px"><b>Not sent anywhere yet.</b> The part of Kickoff that collects sealed picks is still being built, so this pick is on your phone but not in your group.</div>
-<p class="after">${keptWhere}</p>`;
+${closed ? "" : `<button type="button" class="btn quiet" data-change="${id}" style="margin-top:14px">Change my pick</button>`}
+${entry.replaced ? `<p class="after">Your later pick was not sent in time, so this one counts.</p>` : ""}
+${notKept}`;
   } else {
     body = `<div class="note" style="margin-top:6px">Picks for this match have closed.</div>`;
   }
@@ -268,7 +297,7 @@ ${closed ? `<p class="after">Picks for this match have closed, so it can no long
   <span class="clock">${closed ? "Picks have closed" : `Picks close at ${clock(closesAt(f.kickoff))}, in ${esc(howLong(ctx.now, closesAt(f.kickoff)))}`}</span>
 </div>
 ${body}
-${SAMPLE_NOTE}`;
+${f.real ? "" : SAMPLE_NOTE}`;
   return { html, title: `${f.home} v ${f.away} on Kickoff`, tab: "league" };
 }
 

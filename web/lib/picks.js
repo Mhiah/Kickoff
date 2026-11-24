@@ -95,6 +95,7 @@ export function createStore(storage) {
  *
  * @param player  this device's player id, as hex
  * @returns the entry that was kept: { match, player, sport, pick, pickByte, salt, fingerprint, sealedAt }
+ *          and, if an earlier pick had already been sent, `fallback`: that earlier entry
  */
 export async function seal({ store, league, fixture, competitions, pick, now, player }) {
   if (hasClosed(now, fixture.kickoff)) throw new Error("Picks for this match have closed.");
@@ -102,6 +103,12 @@ export async function seal({ store, league, fixture, competitions, pick, now, pl
   const facts = fixtureFacts(fixture, competitions);
   const match = await matchId(league, facts);
   const sealed = await sealPick({ league, match, sport: facts.sport, pick, player: fromHex(player) });
+  // If a pick for this match has already been sent to Kickoff, keep it until the new one has been
+  // sent too. Should the new one never get through, the earlier one is still the one Kickoff holds,
+  // and without its secret it could never be opened.
+  const before = store.get(toHex(match));
+  const { fallback: olderFallback = null, ...beforeItself } = before?.player === player ? before : {};
+  const fallback = before?.player === player ? (before.sent ? beforeItself : olderFallback) : null;
   const entry = {
     match: toHex(match),
     player,
@@ -111,6 +118,7 @@ export async function seal({ store, league, fixture, competitions, pick, now, pl
     salt: toHex(sealed.salt),
     fingerprint: toHex(sealed.fingerprint),
     sealedAt: now,
+    ...(fallback ? { fallback } : {}),
   };
   store.save(entry);
   return entry;

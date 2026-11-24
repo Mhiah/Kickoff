@@ -7,8 +7,11 @@ The Kickoff website.
 > is real: pressing "Seal my pick" seals it on your own device with the picks engine, and keeps the
 > pick and its secret there. **Groups are real too:** the group screen talks to Kickoff's server, so
 > starting a group gives a real code and a friend can join with it from their own phone.
-> **Not here yet:** a sealed pick is not sent anywhere, and the matches, table and results on the
-> other screens are still invented. Each of those screens says so at its foot.
+> **Ready, but waiting for real matches:** for a real match the phone sends the pick's fingerprint to
+> the server, checks its receipt once picks are locked, and opens the pick after kickoff.
+> **Not here yet:** real matches. Until the robot puts them on the server's list the site shows
+> made-up ones, and a pick for one of those stays on the phone. The table and results are invented
+> too. Each of those screens says so at its foot.
 
 ## The screens
 
@@ -82,12 +85,14 @@ hand. A test fails if it differs from the engine by a single byte.
 | `lib/picks.js` | Sealing a pick on the device and keeping it there |
 | `lib/device.js` | This device's own key, and the player id made from it |
 | `lib/server.js` | Talking to Kickoff's server, with everything signed by the device's key |
+| `lib/fixtures.js` | The matches to pick: real ones from the server once there are any, made-up ones until then |
+| `lib/sync.js` | Carrying a sealed pick through: sent, receipt checked, opened after kickoff |
 | `lib/groups.js` | The groups this device plays in, kept on the device so they show at once and offline |
 | `config.js` | Where Kickoff's server is |
 | `lib/time.js` | Times as the screens show them, and when picks close |
 | `lib/html.js` | Small pieces every screen uses: the mark, the switch, the time stamp |
 | `lib/standings.js` | Turning picks into a table, with shared places |
-| `engine/` | The copy of the picks engine's sealing code, and of its code for a device's key |
+| `engine/` | The copy of the picks engine's code for sealing, for a device's key, and for checking a receipt |
 | `scripts/sync-engine.js` | Makes that copy |
 | `data/sample.js` | The made-up data |
 | `fonts/` | Gelasio and its licence |
@@ -99,10 +104,12 @@ You need Node 22 or newer. This runs the website together with Kickoff's server,
 groups work:
 
 ```
-node server/bin/dev.js
+node server/bin/dev.js --matches
 ```
 
-Then open `http://localhost:8787` in a browser.
+Then open `http://localhost:8787` in a browser. `--matches` puts a few made-up matches on the
+server's list, the first closing in five minutes, so a pick can be followed all the way: sent,
+closed, and (after the robot's part is done by hand) locked.
 
 ## No sign-up and no wallet
 
@@ -130,6 +137,14 @@ started on one phone and joined from another, a refused join shows the server's 
 whoever started a group can change what it plays, a group plays at least one competition, the
 private half of the key is never sent, and a phone that is offline shows what it last saw and
 says so.
+
+For a pick's journey, they follow one from a phone through the server: only the fingerprint is
+sent before kickoff, a changed pick is the one that gets locked, an offline phone waits and says
+so, a pick that never got through is marked as not counting, and if a changed pick never gets
+through, the earlier one that did is kept so it can still be opened. Three of them have the
+server cheat: it leaves a pick out, or hands back a receipt that does not prove the pick. The
+phone notices each time and says so. A match is only shown if the phone works out the same id
+for it that the server gave.
 
 For picks, they confirm the fingerprint is exactly the one the engine works out from the same
 facts, a pick that cannot happen is refused, picks close ten minutes before the start to the

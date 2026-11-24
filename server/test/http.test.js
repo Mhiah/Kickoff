@@ -1,13 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { ADMIN_KEY, HOUR, device, fixtures, server, serverWithFixtures } from "./helpers.js";
+import { ADMIN_KEY, HOUR, LEAGUE, device, fixtures, server, serverWithFixtures } from "./helpers.js";
 
 test("the list of matches is open to anyone, soonest first", async () => {
   const s = await serverWithFixtures();
   const { status, body } = await s.get("/api/fixtures");
   assert.equal(status, 200);
   assert.deepEqual(body.fixtures.map((f) => f.label), ["Premier League: Arsenal v Chelsea", "NBA: Knicks v Bucks"]);
+  assert.equal(body.league, LEAGUE, "with the league they belong to, so a device can work out each match's id for itself");
   assert.equal(body.fixtures[0].id, s.f.football.id);
 });
 

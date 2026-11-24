@@ -42,4 +42,6 @@ export function titlebar({ eyebrow = "", before = "", heading, headingClass = ""
 }
 
 /** The line at the foot of every screen until Kickoff is live. */
+/** The same line once the matches are real but the table is not yet. */
+export const REAL_MATCHES_NOTE = `<p class="sample">The matches this week are real. The group, table and results shown here are still made up.</p>`;
 export const SAMPLE_NOTE = `<p class="sample">A preview with made-up names and matches. Nothing here is live yet.</p>`;

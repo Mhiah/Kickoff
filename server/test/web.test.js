@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { newDeviceKey, signRequest } from "../../engine/src/index.js";
-import { MAX_BODY, fromEnv, pathOf } from "../src/web.js";
+import { MAX_BODY, PREVIEW_LEAGUE, fromEnv, pathOf } from "../src/web.js";
 import { FAKE_TOKEN, FAKE_URL, fakeRedis } from "./fake-redis.js";
 import { fixtures } from "./helpers.js";
 
@@ -22,7 +22,7 @@ test("the hosted server answers real web requests, start to finish", async () =>
   assert.equal(empty.status, 200);
   assert.equal(empty.headers.get("content-type"), "application/json; charset=utf-8");
   assert.equal(empty.headers.get("cache-control"), "no-store");
-  assert.deepEqual(await empty.json(), { fixtures: [] });
+  assert.deepEqual(await empty.json(), { league: PREVIEW_LEAGUE, fixtures: [] });
 
   const f = await fixtures();
   const put = await handler(new Request(`${SITE}/api/admin/fixtures`, { method: "POST", headers: { "x-kickoff-admin": "the-robots-key", "content-type": "application/json" }, body: JSON.stringify({ fixtures: Object.values(f) }) }));

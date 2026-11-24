@@ -83,6 +83,9 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
   };
 
   return {
+    /** Kickoff's id on X Layer. Every match id and every sealed pick is made with it. */
+    league,
+
     // ---------------------------------------------------------------- groups
 
     /**

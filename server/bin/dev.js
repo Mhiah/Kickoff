@@ -3,6 +3,8 @@
 // is gone when it stops. It also serves the website from ../web, so the two can be tried together.
 //
 //   node server/bin/dev.js            then open http://localhost:8787
+//   node server/bin/dev.js --matches  the same, with a few made-up matches on the list, so sending
+//                                     a sealed pick can be tried. The first closes in a few minutes.
 //
 // The league id is a stand-in, and the robot's key is "dev".
 
@@ -11,6 +13,7 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { BASKETBALL, FOOTBALL, matchId, toHex } from "../../engine/src/index.js";
 import { createHandler } from "../src/http.js";
 import { createKickoff } from "../src/kickoff.js";
 import { MemoryStore } from "../src/store.js";
@@ -20,7 +23,26 @@ const LEAGUE = process.env.KICKOFF_LEAGUE ?? "0000000000000000000000c424ad6fe8a4
 const WEB = fileURLToPath(new URL("../../web/", import.meta.url));
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8" };
 
-const handle = createHandler({ kickoff: createKickoff({ store: new MemoryStore(), league: LEAGUE }), now: () => Math.floor(Date.now() / 1000), adminKey: process.env.KICKOFF_ADMIN_KEY ?? "dev" });
+const kickoff = createKickoff({ store: new MemoryStore(), league: LEAGUE });
+const handle = createHandler({ kickoff, now: () => Math.floor(Date.now() / 1000), adminKey: process.env.KICKOFF_ADMIN_KEY ?? "dev" });
+
+if (process.argv.includes("--matches")) {
+  const now = Math.floor(Date.now() / 1000);
+  const minutes = Number(process.env.FIRST_CLOSES_IN ?? 5);
+  const made = [
+    ["pl", FOOTBALL, "Premier League", "Arsenal", "Chelsea", now + (minutes + 10) * 60],
+    ["cl", FOOTBALL, "Champions League", "Real Madrid", "Bayern", now + 26 * 3600],
+    ["nba", BASKETBALL, "NBA", "Knicks", "Bucks", now + 30 * 3600],
+    ["nba", BASKETBALL, "NBA", "Warriors", "Nuggets", now + 54 * 3600],
+  ];
+  const fixtures = [];
+  for (const [comp, sport, competition, home, away, kickoffAt] of made) {
+    const label = `${competition}: ${home} v ${away}`;
+    fixtures.push({ id: toHex(await matchId(LEAGUE, { sport, kickoff: kickoffAt, bestOf: 0, label })), feedId: `dev:${home}`, comp, sport, kickoff: kickoffAt, label, home, away, state: "scheduled" });
+  }
+  await kickoff.putFixtures({ fixtures });
+  console.log(`${fixtures.length} made-up matches are on the list. Picks for the first close in ${minutes} minutes.`);
+}
 
 async function readBody(request, limit = 200_000) {
   let size = 0;

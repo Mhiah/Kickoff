@@ -1,7 +1,7 @@
 // The addresses the website talks to, and what each one does.
 //
 //   Anyone may ask
-//     GET  /api/fixtures                         every match on Kickoff's list
+//     GET  /api/fixtures                         Kickoff's id on X Layer, and every match on its list
 //     GET  /api/groups/<code>                    a group and its members
 //     GET  /api/matches/<match>                  how many picks are in; after kickoff, the opened picks
 //     GET  /api/matches/<match>/receipt/<player> a player's proof their sealed pick was locked
@@ -57,7 +57,7 @@ export function createHandler({ kickoff, now, adminKey = null }) {
   };
 
   const routes = [
-    ["GET", /^\/api\/fixtures$/, async () => ({ fixtures: await kickoff.fixtures() })],
+    ["GET", /^\/api\/fixtures$/, async () => ({ league: kickoff.league, fixtures: await kickoff.fixtures() })],
     ["GET", /^\/api\/groups\/([^/]+)$/, async (r, code) => kickoff.group({ code: decodeURIComponent(code) })],
     ["GET", /^\/api\/matches\/([0-9a-f]{64})$/, async (r, match) => kickoff.match({ now: now(), match })],
     ["GET", /^\/api\/matches\/([0-9a-f]{64})\/receipt\/([0-9a-f]{64})$/, async (r, match, player) => kickoff.receipt({ match, player })],

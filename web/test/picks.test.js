@@ -125,7 +125,7 @@ test("a browser that refuses to store anything still works for the visit, and sa
     assert.deepEqual(store.get(entry.match), entry);
     assert.equal(store.lasting, false);
     const screen = pick("ars-che", await contextAt(NOW, store));
-    assert.match(screen.html, /will be gone when you close it/);
+    assert.match(screen.html, /<b>Private window\.<\/b> This pick will be lost when you close it\./);
   }
 });
 
@@ -145,17 +145,21 @@ test("the pick screen shows your own pick back to you once it is sealed", async 
   const before = pick("ars-che", ctx).html;
   assert.match(before, /data-seal="ars-che"/);
   assert.match(before, />Seal my pick</);
-  assert.ok(!before.includes("sealed on this phone"));
+  assert.ok(!before.includes('class="glass sealed"'));
+  assert.match(before, /Nobody can see it before kickoff\. You can change it until picks close\.</);
 
   const after = await sealOn(ctx, "ars-che", { home: 2, away: 1 });
   const html = pick("ars-che", after).html;
-  assert.match(html, /Your pick, sealed on this phone/);
+  assert.match(html, /<div class="small muted">Your pick<\/div>/);
+  assert.match(html, /Sealed at \d\d:\d\d on [A-Z][a-z]+ \d+ [A-Z][a-z]+\. Only you can see it\.</);
+  // The screen is the pick and one button. No explanations.
+  for (const gone of ["fingerprint", "Why this phone", "kept in this browser", "goes no further", "0x"]) assert.ok(!html.includes(gone), `"${gone}" is back on the pick screen`);
+  const words = html.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+  assert.ok(words < 75, `the sealed pick screen has ${words} words on it`);
   assert.match(html, /<div class="yours">2 – 1<\/div>/);
   assert.match(html, /Change my pick/);
-  assert.match(html, /Not sent anywhere yet/);
   assert.ok(!html.includes("data-seal="), "the seal button is gone until you choose to change the pick");
   const kept = after.picks[after.matchIds["ars-che"]];
-  assert.ok(html.includes(`0x${kept.fingerprint.slice(0, 8)}`), "it shows the start of the fingerprint");
   assert.ok(!html.includes(kept.salt), "the secret is never put on the page");
 });
 
@@ -180,7 +184,7 @@ test("once picks have closed, a match cannot be picked and a sealed pick cannot 
   const after = await contextAt(late, sealed.store);
 
   const yours = pick("rma-bay", after).html;
-  assert.match(yours, /can no longer be changed/);
+  assert.match(yours, /Picks have closed/);
   assert.ok(!yours.includes("data-change"));
   assert.ok(!yours.includes("data-seal="));
 
@@ -213,7 +217,7 @@ test("a pick sealed for a match that has since moved is not counted for the new 
   const matchIds = { ...sealed.matchIds, "ars-che": await matchIdOf(SAMPLE_LEAGUE, moved["ars-che"], COMPETITIONS) };
   const html = pick("ars-che", { ...sealed, fixtures: moved, matchIds }).html;
   assert.match(html, />Seal my pick</);
-  assert.ok(!html.includes("sealed on this phone"));
+  assert.ok(!html.includes('class="glass sealed"'));
 });
 
 test("times read the way the screens show them", () => {

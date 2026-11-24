@@ -3,9 +3,12 @@
 import { SERVER } from "./config.js";
 import { COMPETITIONS, SAMPLE_LEAGUE, sampleFixtures } from "./data/sample.js";
 import { createDevice } from "./lib/device.js";
+import { createFixtures } from "./lib/fixtures.js";
 import { createGroups } from "./lib/groups.js";
-import { createStore, matchIdOf, seal } from "./lib/picks.js";
+import { createStore, seal } from "./lib/picks.js";
 import { createClient } from "./lib/server.js";
+import { syncPicks } from "./lib/sync.js";
+import { hasClosed } from "./lib/time.js";
 import { checkScreen, frame, groupScreen, home, league, matchScreen, pick, recordScreen } from "./screens.js";
 
 const routes = { "": home, league, pick, match: matchScreen, record: recordScreen, check: checkScreen, group: groupScreen };
@@ -18,21 +21,25 @@ try {
 }
 const store = createStore(storage);
 const device = createDevice(store);
-const groups = createGroups({ store, device, client: createClient({ base: SERVER, device }) });
+const client = createClient({ base: SERVER, device });
+const groups = createGroups({ store, device, client });
+const matches = createFixtures({ store, client, competitions: COMPETITIONS, sample: { league: SAMPLE_LEAGUE, fixtures: sampleFixtures } });
 
 document.body.insertAdjacentHTML("afterbegin", frame());
 const view = document.getElementById("view");
 let editing = null; // the fixture whose pick is being changed, if any
 let drawing = 0;
+let drawnAt = ""; // which matches had closed or started when the screen was last drawn
+
+/** Which matches have closed and which have started: when this changes, the screen is out of date. */
+const stage = (ctx) => Object.entries(ctx.fixtures).map(([id, f]) => `${id}:${hasClosed(ctx.now, f.kickoff) ? 1 : 0}${ctx.now >= f.kickoff ? 1 : 0}`).join(",");
 
 /** What is true right now: the time, the matches, this player's groups, and the picks kept on this device. */
 async function context() {
   const now = Math.floor(Date.now() / 1000);
-  const fixtures = sampleFixtures(now);
-  const matchIds = {};
-  for (const [id, fixture] of Object.entries(fixtures)) matchIds[id] = await matchIdOf(SAMPLE_LEAGUE, fixture, COMPETITIONS);
+  const { real, league, fixtures, matchIds } = await matches.view(now);
   const mine = await groups.view();
-  return { now, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine };
+  return { now, real, league, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine };
 }
 
 async function draw({ keepPlace = false } = {}) {
@@ -41,6 +48,7 @@ async function draw({ keepPlace = false } = {}) {
   const ctx = await context();
   if (mine !== drawing) return; // a newer draw has started
   const screen = (routes[name] ?? home)(arg, ctx);
+  drawnAt = stage(ctx);
   document.body.classList.toggle("public", Boolean(screen.public));
   view.className = screen.wide ? "wide" : "";
   view.innerHTML = screen.html;
@@ -106,9 +114,10 @@ document.addEventListener("click", async (event) => {
     const ctx = await context();
     const fixture = ctx.fixtures[target.dataset.seal];
     try {
-      await seal({ store, league: SAMPLE_LEAGUE, fixture, competitions: COMPETITIONS, pick: chosen, now: ctx.now, player: ctx.mine.player });
+      await seal({ store, league: ctx.league, fixture, competitions: COMPETITIONS, pick: chosen, now: ctx.now, player: ctx.mine.player });
       editing = null;
       await draw();
+      carry(); // send it, without making the player wait
     } catch (error) {
       say(target, error.message);
     }
@@ -208,10 +217,43 @@ async function catchUp() {
   }
 }
 
+/**
+ * Fetch the matches, then carry each sealed pick as far as it can go now: sent, receipt, opened.
+ * Draws again if anything changed, unless a pick is being made on the screen at this moment.
+ */
+let carrying = false;
+async function carry() {
+  if (carrying) return;
+  carrying = true;
+  try {
+    let changed = await matches.refresh();
+    const ctx = await context();
+    if (ctx.real) changed = (await syncPicks({ store, client, player: ctx.mine.player, league: ctx.league, fixtures: ctx.fixtures, now: ctx.now })) || changed;
+    // Draw again if something changed, or if picks have closed or a match has started since the
+    // screen was drawn. A pick being made is left alone, unless its match has just closed.
+    const moved = stage(ctx) !== drawnAt;
+    if (moved || (changed && !view.querySelector("[data-picker]"))) await draw({ keepPlace: true });
+  } catch {
+    // Tried again on the next round.
+  } finally {
+    carrying = false;
+  }
+}
+
 window.addEventListener("hashchange", () => {
   editing = null;
   draw();
   if (location.hash.startsWith("#/group")) catchUp();
 });
-window.addEventListener("online", catchUp);
-draw().then(catchUp);
+window.addEventListener("online", () => {
+  catchUp();
+  carry();
+});
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) carry();
+});
+setInterval(carry, 20_000);
+draw().then(() => {
+  catchUp();
+  carry();
+});
