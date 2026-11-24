@@ -8,7 +8,7 @@ import { createDevice } from "../lib/device.js";
 import { createFixtures } from "../lib/fixtures.js";
 import { createStore, pickWords, seal } from "../lib/picks.js";
 import { createClient } from "../lib/server.js";
-import { standing, syncPicks } from "../lib/sync.js";
+import { RETRY_AFTER, standing, syncPicks } from "../lib/sync.js";
 import { league, pick } from "../screens.js";
 import { FakeStorage, NOW, noGroup } from "./helpers.js";
 
@@ -292,17 +292,28 @@ test("CHEAT: a receipt that does not prove the pick is not accepted", async () =
     async (q) => ({ ...(await honest(q)), path: ["ee".repeat(32)] }),
     async (q) => ({ ...(await honest(q)), count: 3 }),
   ];
+  let asked = 0;
   for (const lie of lies) {
-    ada.client.receipt = lie;
+    ada.client.receipt = (q) => (asked++, lie(q));
+    online.clock.now += RETRY_AFTER; // a refused step is not asked again straight away
     await ada.carry();
     assert.equal(await ada.stands(online.football), "problem");
     assert.equal(ada.store.get(online.football).receipt, undefined);
     assert.match(await ada.screen(online.football), /receipt does not prove this pick was locked/);
   }
+  // Asked again at once, the phone leaves the server alone for a few minutes.
+  await ada.carry();
+  await ada.carry();
+  assert.equal(asked, lies.length);
   // The true receipt clears it.
   ada.client.receipt = honest;
+  online.clock.now += RETRY_AFTER;
   await ada.carry();
-  assert.equal(await ada.stands(online.football), "locked");
+  const cleared = ada.store.get(online.football);
+  assert.equal(cleared.receipt.count, 2);
+  assert.equal(cleared.problem, undefined);
+  // By now the match has started, so the pick went on to be revealed as well.
+  assert.equal(await ada.stands(online.football), "opened");
 });
 
 test("a pick is never opened before the match starts, even if the phone's clock runs fast", async () => {

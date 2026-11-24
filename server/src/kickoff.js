@@ -82,6 +82,27 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     return (await store.tableGet("fixtures", match)) ?? refuse(404, "That match is not on Kickoff's list.");
   };
 
+  /**
+   * Bundle a match's picks, once, a few seconds after they close. After picks close nothing can be
+   * added or changed, so the bundle comes out the same whenever it is made and whoever asks first.
+   * That is why the server does this by itself, the first time anyone looks at the match after
+   * picks have closed: it does not wait to be told, so a late robot cannot leave a match unbundled.
+   * @returns the frozen bundle, or null if picks have not closed yet
+   */
+  const settle = async (f, now) => {
+    const already = await store.get(`frozen:${f.id}`);
+    if (already) return already;
+    if (now < f.kickoff - CLOSES_BEFORE + SETTLE) return null;
+    const sealed = await store.tableAll(`sealed:${f.id}`);
+    const entries = Object.entries(sealed)
+      .map(([player, s]) => ({ player, fingerprint: s.fingerprint }))
+      .sort((a, b) => a.player.localeCompare(b.player));
+    const bundle = await buildBundle({ league, match: f.id, entries: entries.map((e) => ({ player: fromHex(e.player), fingerprint: fromHex(e.fingerprint) })) });
+    // Two requests arriving together both work out the same bundle. The first to write it wins.
+    await store.setIfAbsent(`frozen:${f.id}`, { entries, root: toHex(bundle.root), frozenAt: now });
+    return store.get(`frozen:${f.id}`);
+  };
+
   return {
     /** Kickoff's id on X Layer. Every match id and every sealed pick is made with it. */
     league,
@@ -174,7 +195,6 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       if (!isId(fingerprint)) refuse(400, "That is not a sealed pick.");
       if (f.state !== "scheduled") refuse(409, "This match is no longer open for picks.");
       if (now >= f.kickoff - CLOSES_BEFORE) refuse(409, "Picks for this match have closed.");
-      if (await store.get(`frozen:${match}`)) refuse(409, "Picks for this match have closed.");
       const before = await store.tableGet(`sealed:${match}`, player);
       if (before && at <= before.signedAt) refuse(409, "A newer pick from this device is already in.");
       await store.tableSet(`sealed:${match}`, player, { fingerprint, signedAt: at, receivedAt: now });
@@ -182,9 +202,9 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     },
 
     /** What a player has sealed for a match, as the server holds it. */
-    async sealedBy({ player, match }) {
-      await fixture(match);
-      const frozen = await store.get(`frozen:${match}`);
+    async sealedBy({ player, now, match }) {
+      const f = await fixture(match);
+      const frozen = await settle(f, now);
       if (frozen) {
         const entry = frozen.entries.find((e) => e.player === player);
         return entry ? { fingerprint: entry.fingerprint, locked: true } : null;
@@ -194,30 +214,21 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     },
 
     /**
-     * Bundle a match's picks for good. Done once, a few seconds after picks close, just before the
-     * bundle's fingerprint is written to X Layer. After this nothing can be added or changed.
-     * @returns { match, count, root, entries }
+     * A match's bundle: the picks that were in when picks closed. The server makes it by itself
+     * (see settle above); this is how the robot asks for it, to write its fingerprint to X Layer.
+     * Refused while picks are still open.
+     * @returns { match, count, root, entries, frozenAt }
      */
     async freeze({ now, match }) {
       const f = await fixture(match);
-      const already = await store.get(`frozen:${match}`);
-      if (already) return { match, count: already.entries.length, root: already.root, entries: already.entries, frozenAt: already.frozenAt };
-      if (now >= f.kickoff) refuse(409, "This match has kicked off. A bundle made now would never count.");
-      if (now < f.kickoff - CLOSES_BEFORE + SETTLE) refuse(409, "Picks for this match are still open, or closed a moment ago. A bundle is made a few seconds after they close.");
-      const sealed = await store.tableAll(`sealed:${match}`);
-      const entries = Object.entries(sealed)
-        .map(([player, s]) => ({ player, fingerprint: s.fingerprint }))
-        .sort((a, b) => a.player.localeCompare(b.player));
-      const bundle = await buildBundle({ league, match, entries: entries.map((e) => ({ player: fromHex(e.player), fingerprint: fromHex(e.fingerprint) })) });
-      const frozen = { entries, root: toHex(bundle.root), frozenAt: now };
-      await store.set(`frozen:${match}`, frozen);
-      return { match, count: entries.length, root: frozen.root, entries, frozenAt: now };
+      const frozen = (await settle(f, now)) ?? refuse(409, "Picks for this match are still open, or closed a moment ago. A bundle is made a few seconds after they close.");
+      return { match, count: frozen.entries.length, root: frozen.root, entries: frozen.entries, frozenAt: frozen.frozenAt };
     },
 
     /** A player's receipt: the proof their sealed pick is in the bundle. Available once picks are frozen. */
-    async receipt({ player, match }) {
-      await fixture(match);
-      const frozen = (await store.get(`frozen:${match}`)) ?? refuse(409, "Picks for this match have not been locked yet.");
+    async receipt({ player, now, match }) {
+      const f = await fixture(match);
+      const frozen = (await settle(f, now)) ?? refuse(409, "Picks for this match have not been locked yet.");
       if (!frozen.entries.some((e) => e.player === player)) refuse(404, "There is no sealed pick from this player in the bundle.");
       const bundle = await buildBundle({ league, match, entries: frozen.entries.map((e) => ({ player: fromHex(e.player), fingerprint: fromHex(e.fingerprint) })) });
       const r = await receiptFor(bundle, fromHex(player));
@@ -233,7 +244,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     async openPick({ player, now, match, pickByte, salt }) {
       const f = await fixture(match);
       if (now < f.kickoff) refuse(409, "A pick cannot be opened before the match starts.");
-      const frozen = (await store.get(`frozen:${match}`)) ?? refuse(409, "No picks were locked for this match, so there is nothing to open.");
+      const frozen = await settle(f, now);
       const entry = frozen.entries.find((e) => e.player === player) ?? refuse(404, "You have no sealed pick in this match's bundle.");
       if (!Number.isInteger(pickByte) || pickByte < 0 || pickByte > 255 || !isId(salt)) refuse(400, "That is not an opened pick.");
       const fingerprint = await fingerprintOf({ league, match, sport: f.sport, pickByte, player: fromHex(player), salt: fromHex(salt) });
@@ -253,7 +264,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
      */
     async match({ now, match }) {
       const f = await fixture(match);
-      const frozen = await store.get(`frozen:${match}`);
+      const frozen = await settle(f, now);
       const sealedCount = frozen ? frozen.entries.length : Object.keys(await store.tableAll(`sealed:${match}`)).length;
       const out = { fixture: f, sealedCount, locked: frozen ? { root: frozen.root, count: frozen.entries.length, frozenAt: frozen.frozenAt } : null, opened: [] };
       if (now >= f.kickoff && frozen) {
@@ -271,7 +282,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     async openingsFile({ now, match }) {
       const f = await fixture(match);
       if (now < f.kickoff) refuse(409, "Picks are not opened before the match starts.");
-      const frozen = (await store.get(`frozen:${match}`)) ?? refuse(404, "No picks were locked for this match.");
+      const frozen = await settle(f, now);
       const entries = frozen.entries.map((e) => ({ player: fromHex(e.player), fingerprint: fromHex(e.fingerprint) }));
       const bundle = await buildBundle({ league, match, entries });
       const opened = await store.tableAll(`opened:${match}`);

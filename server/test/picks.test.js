@@ -162,12 +162,46 @@ test("a match can be frozen with no picks in it", async () => {
   assert.equal(frozen.body.root, toHex((await buildBundle({ league: LEAGUE, match: s.f.basketball.id, entries: [] })).root));
 });
 
-test("a bundle made after kickoff is refused, because it could never count", async () => {
+test("the server bundles a match's picks by itself, the first time anyone looks after picks close", async () => {
   const s = await serverWithFixtures();
-  s.clock.now = s.f.football.kickoff;
-  const frozen = await s.robot(`/api/admin/freeze/${s.f.football.id}`);
-  assert.equal(frozen.status, 409);
-  assert.match(frozen.body.error, /has kicked off/);
+  const [ada, bola] = [await device(), await device()];
+  const adas = await seal(ada, s.f.football, { home: 2, away: 1 });
+  const bolas = await seal(bola, s.f.football, { home: 1, away: 1 });
+  await s.post(ada, "/api/picks", { match: s.f.football.id, fingerprint: adas.fingerprint });
+  await s.post(bola, "/api/picks", { match: s.f.football.id, fingerprint: bolas.fingerprint });
+  const receipt = () => s.get(`/api/matches/${s.f.football.id}/receipt/${ada.player}`);
+  // While picks are open, and for the few seconds after they close, there is no bundle.
+  s.clock.now = s.f.football.kickoff - CLOSES_BEFORE + SETTLE - 1;
+  assert.equal((await receipt()).status, 409);
+  assert.equal((await s.get(`/api/matches/${s.f.football.id}`)).body.locked, null);
+  // One second later a phone asks for its receipt. Nobody has told the server to bundle anything.
+  s.clock.now += 1;
+  const r = await receipt();
+  assert.equal(r.status, 200);
+  assert.equal(r.body.count, 2);
+  const expected = await buildBundle({ league: LEAGUE, match: s.f.football.id, entries: [ada, bola].map((p, i) => ({ player: p.player, fingerprint: [adas, bolas][i].fingerprint })) });
+  assert.equal(r.body.root, toHex(expected.root));
+  // The robot, asking later, is handed that same bundle.
+  s.clock.now += 120;
+  const asked = await s.robot(`/api/admin/freeze/${s.f.football.id}`);
+  assert.equal(asked.body.root, r.body.root);
+  assert.equal(asked.body.frozenAt, s.f.football.kickoff - CLOSES_BEFORE + SETTLE);
+});
+
+test("if nobody looks until after kickoff, the bundle is still the picks that were in when picks closed", async () => {
+  const s = await serverWithFixtures();
+  const ada = await device();
+  const adas = await seal(ada, s.f.football, { home: 2, away: 1 });
+  await s.post(ada, "/api/picks", { match: s.f.football.id, fingerprint: adas.fingerprint });
+  // The robot never runs. The first anyone hears of this match again is Ada opening her pick.
+  s.clock.now = s.f.football.kickoff + 3600;
+  const late = await s.post(await device(), "/api/picks", { match: s.f.football.id, fingerprint: "ee".repeat(32) });
+  assert.equal(late.status, 409, "nothing gets in after picks close, bundle or no bundle");
+  const opened = await s.post(ada, "/api/opened", { match: s.f.football.id, pickByte: adas.pickByte, salt: adas.salt });
+  assert.equal(opened.status, 200);
+  const seen = await s.get(`/api/matches/${s.f.football.id}`);
+  assert.equal(seen.body.locked.count, 1);
+  assert.deepEqual(seen.body.opened, [{ player: ada.player, pickByte: adas.pickByte }]);
 });
 
 test("every player gets a receipt that proves their pick is in the locked bundle", async () => {
@@ -224,17 +258,6 @@ test("a pick is opened only after the start, and only by the pick and secret tha
   assert.deepEqual(seen.body.opened, [{ player: ada.player, pickByte: adas.pickByte }]);
   assert.equal(seen.body.sealedBy.length, 2, "after the start, everyone can see who sealed a pick");
   assert.ok(!JSON.stringify(seen.body).includes(adas.salt), "the secret is in the openings file, not the summary");
-});
-
-test("a pick that was never locked cannot be opened", async () => {
-  const s = await serverWithFixtures();
-  const ada = await device();
-  const adas = await seal(ada, s.f.football, { home: 2, away: 1 });
-  await s.post(ada, "/api/picks", { match: s.f.football.id, fingerprint: adas.fingerprint });
-  s.clock.now = s.f.football.kickoff + 60; // the robot never froze this match
-  const opened = await s.post(ada, "/api/opened", { match: s.f.football.id, pickByte: adas.pickByte, salt: adas.salt });
-  assert.equal(opened.status, 409);
-  assert.match(opened.body.error, /No picks were locked for this match/);
 });
 
 test("the whole way through: from phones, through the server, to the table the engine builds from the chain", async () => {

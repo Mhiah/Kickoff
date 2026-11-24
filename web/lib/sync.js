@@ -18,6 +18,9 @@ import { verifyReceipt } from "../engine/bundle.js";
 import { fromHex } from "../engine/bytes.js";
 import { closesAt } from "./time.js";
 
+/** How long to wait before asking again after the server has refused a step, in seconds. */
+export const RETRY_AFTER = 5 * 60;
+
 /**
  * @param store     from createStore()
  * @param client    from createClient()
@@ -35,16 +38,18 @@ export async function syncPicks({ store, client, player, league, fixtures, now }
     let entry = { ...kept };
     const closes = closesAt(fixture.kickoff);
     const isSent = (e) => e.sent?.fingerprint === e.fingerprint;
+    // After the server has refused a step, it is not asked again straight away.
+    if (entry.problem && entry.triedAt && now >= entry.triedAt && now - entry.triedAt < RETRY_AFTER) continue;
 
     // 1. Send it, while picks are open.
     if (!isSent(entry) && now < closes) {
       try {
         const answer = await client.sendPick({ match, fingerprint: entry.fingerprint });
-        const { fallback, waiting, problem, ...rest } = entry;
+        const { fallback, waiting, problem, triedAt, ...rest } = entry;
         entry = { ...rest, sent: { fingerprint: entry.fingerprint, at: answer.receivedAt ?? now } };
       } catch (error) {
         if (error.unreachable) entry.waiting = true;
-        else entry.problem = error.message;
+        else Object.assign(entry, { problem: error.message, triedAt: now });
       }
     }
 
@@ -62,14 +67,14 @@ export async function syncPicks({ store, client, player, league, fixtures, now }
           r.fingerprint === entry.fingerprint &&
           (await verifyReceipt({ league, match, player, fingerprint: r.fingerprint, index: r.index, count: r.count, path: r.path.map(fromHex), root: r.root }));
         if (proves) {
-          const { problem, ...rest } = entry;
+          const { problem, triedAt, ...rest } = entry;
           entry = { ...rest, receipt: { index: r.index, count: r.count, path: r.path, root: r.root } };
         } else {
-          entry.problem = "Kickoff's receipt does not prove this pick was locked.";
+          Object.assign(entry, { problem: "Kickoff's receipt does not prove this pick was locked.", triedAt: now });
         }
       } catch (error) {
         // 409: the bundle has not been made yet. Anything else unreachable: try again later.
-        if (error.status === 404) entry.problem = "Kickoff left this pick out of the locked bundle.";
+        if (error.status === 404) Object.assign(entry, { problem: "Kickoff left this pick out of the locked bundle.", triedAt: now });
       }
     }
 
@@ -77,10 +82,10 @@ export async function syncPicks({ store, client, player, league, fixtures, now }
     if (entry.receipt && !entry.opened && now >= fixture.kickoff) {
       try {
         await client.openPick({ match, pickByte: entry.pickByte, salt: entry.salt });
-        const { problem, ...rest } = entry;
+        const { problem, triedAt, ...rest } = entry;
         entry = { ...rest, opened: { at: now } };
       } catch (error) {
-        if (!error.unreachable) entry.problem = error.message;
+        if (!error.unreachable) Object.assign(entry, { problem: error.message, triedAt: now });
       }
     }
 

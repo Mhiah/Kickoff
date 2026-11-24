@@ -222,11 +222,17 @@ async function catchUp() {
  * Draws again if anything changed, unless a pick is being made on the screen at this moment.
  */
 let carrying = false;
+let matchesAskedAt = 0;
 async function carry() {
   if (carrying) return;
   carrying = true;
   try {
-    let changed = await matches.refresh();
+    // The list of matches changes a few times a day, so it is asked for at most every five minutes.
+    let changed = false;
+    if (Date.now() - matchesAskedAt >= 5 * 60_000) {
+      matchesAskedAt = Date.now();
+      changed = await matches.refresh();
+    }
     const ctx = await context();
     if (ctx.real) changed = (await syncPicks({ store, client, player: ctx.mine.player, league: ctx.league, fixtures: ctx.fixtures, now: ctx.now })) || changed;
     // Draw again if something changed, or if picks have closed or a match has started since the

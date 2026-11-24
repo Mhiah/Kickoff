@@ -1,0 +1,14 @@
+{
+  "name": "kickoff-robot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kickoff's robot: puts each week's real matches on Kickoff's list and keeps them up to date.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\""
+  }
+}

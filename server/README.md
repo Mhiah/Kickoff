@@ -74,7 +74,7 @@ Only Kickoff's robot may use these, with a key of its own:
 | Address | What it does |
 | --- | --- |
 | `POST /api/admin/fixtures` | Put the feed's matches on the list, and update their state |
-| `POST /api/admin/freeze/<match>` | Close a match's picks for good and bundle them |
+| `POST /api/admin/freeze/<match>` | A match's bundle, once picks have closed. The server makes the bundle by itself; this is how the robot asks for it |
 
 When the server will not do something, it says why in plain words, for example "Picks for this
 match have closed."
@@ -92,7 +92,7 @@ match have closed."
 | Opening a different pick from the one sealed | Refused. |
 | Opening with someone else's pick and secret | Refused. |
 | Opening before the match starts | Refused. |
-| Making a bundle after kickoff | Refused, because it could never count. |
+| Nobody asking for a bundle until after kickoff | The bundle is still exactly the picks that were in when picks closed. |
 | Slipping a pick into storage after the bundle is frozen | The bundle does not change. |
 | Using the robot's addresses with a guessed key, or a player's signature | Refused. |
 | Moving a match's start time under the same id | Refused: a moved match is a new match. |

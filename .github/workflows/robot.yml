@@ -1,0 +1,77 @@
+# Kickoff's robot.
+#
+# Every half hour it makes Kickoff's list of matches agree with the two sports feeds: new matches
+# are added, finished ones get their score, postponed ones are called off. Its report is on each
+# run's own page.
+#
+# It needs four secrets, set in the repository's settings and never written anywhere else:
+#   KICKOFF_ADMIN_KEY   the robot's key, which Kickoff's server also holds
+#   FOOTBALL_DATA_KEY   the football feed's key
+#   BALLDONTLIE_KEY     the basketball feed's key
+# Until KICKOFF_ADMIN_KEY is set, it only looks and reports, and changes nothing.
+name: Robot
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only say what would change, and change nothing"
+        type: boolean
+        default: false
+  push:
+    paths:
+      - "robot/**"
+      - "feed/src/**"
+      - "engine/src/**"
+      - "server/src/**"
+      - ".github/workflows/robot.yml"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kickoff-robot
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test the robot
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run the tests
+        run: node --test "robot/test/*.test.js"
+
+  fixtures:
+    name: Bring Kickoff's list of matches up to date
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      KICKOFF_SERVER: https://kickoff-two-xi.vercel.app
+      KICKOFF_ADMIN_KEY: ${{ secrets.KICKOFF_ADMIN_KEY }}
+      FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+      BALLDONTLIE_KEY: ${{ secrets.BALLDONTLIE_KEY }}
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run the robot
+        run: |
+          if [ -z "$KICKOFF_ADMIN_KEY" ]; then
+            echo "The robot's key is not set yet, so this run only looks." >> "$GITHUB_STEP_SUMMARY"
+            node robot/bin/robot.js fixtures --dry-run
+          elif [ "$DRY_RUN" = "true" ]; then
+            node robot/bin/robot.js fixtures --dry-run
+          else
+            node robot/bin/robot.js fixtures
+          fi

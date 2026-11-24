@@ -11,6 +11,7 @@ X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during thi
 [![Website checks](https://github.com/Mhiah/Kickoff/actions/workflows/web.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/web.yml)
 [![Fixtures feed](https://github.com/Mhiah/Kickoff/actions/workflows/feed.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/feed.yml)
 [![Server tests](https://github.com/Mhiah/Kickoff/actions/workflows/server.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/server.yml)
+[![Robot](https://github.com/Mhiah/Kickoff/actions/workflows/robot.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/robot.yml)
 
 > [!NOTE]
 > **Where this is today (23 November 2026).** The scoring rules, the picks engine, the website's
@@ -157,9 +158,10 @@ before kickoff.
 
 **State: built and working on the website.** For a real match the phone then sends the fingerprint
 to Kickoff's server, fetches and checks its receipt once picks are locked, and opens the pick after
-kickoff, all by itself. That is built and checked against the server's own code. It has not
-happened on the live site yet, because no real matches are on the server's list until the robot is
-built. Until then the site shows made-up matches, and a pick for one of those stays on the phone.
+kickoff, all by itself. That is built and checked against the server's own code. The robot that
+puts real matches on the server's list is built too (see [robot/README.md](robot/README.md)). Until
+its key is set and it has run, the site shows made-up matches, and a pick for one of those stays
+on the phone.
 
 ### 3. Picks are locked on X Layer before kickoff
 
@@ -253,6 +255,7 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | The website | 54 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 22 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
 | The server | 53 tests. They send picks in someone else's name, play old requests back, open a different pick from the one sealed, and use the robot's addresses without its key | All pass; every one is refused ([details](server/README.md)) |
+| The robot | 14 tests, run against the server's own code and stand-ins for the feeds: new matches, results, postponements, moved matches, a feed going back on a result, a failing feed, and where each key is sent | All pass ([details](robot/README.md)) |
 | What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
 
 GitHub repeats the tests on every change, and the badges at the top of this page show the latest
@@ -267,8 +270,9 @@ results.
   browser. If its saved data is cleared, that player is gone. A backup is still to do.
 - **A result is the feed's word.** Kickoff checks that it is a result that can happen, not that it
   is true. That is why any player can dispute a result, and why a dispute can never be hidden.
-- **The server has no real matches yet.** Groups work on the live site. Sealed picks have not been
-  sent to the live server, because no real matches are on its list until the robot is built.
+- **Picks are locked on Kickoff's server, not yet on X Layer.** Once picks close the server
+  bundles them and nothing can be added. But until the robot writes each bundle's fingerprint to
+  X Layer, that lock is Kickoff's word and not something anyone can check on chain.
 - **Sealed picks will pass through Kickoff's server.** A player needs no wallet, so the server
   gathers the fingerprints and Kickoff locks them. The server never sees a pick before kickoff and
   cannot change one or add one afterwards, but it could leave one out. Each player's receipt is the
@@ -305,7 +309,7 @@ results.
 | 6 | Sealing a pick for real, on the player's own device | Done. |
 | 7 | The fixtures feed | Done, and run live against the real feeds. |
 | 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Partly done. The rules, signed requests, addresses and database connection are built, with 53 tests, and it is online with a real database. The website uses it for groups, and is ready to send sealed picks, check receipts and open picks once real matches are on the list. |
-| 9 | The robot: announces fixtures, locks picks before kickoff and posts results on X Layer | Not started |
+| 9 | The robot: announces fixtures, locks picks before kickoff and posts results on X Layer | Partly done. It keeps Kickoff's list of matches in step with the feeds every half hour, with 14 tests. Still to do: its jobs on X Layer, rehearsed on a private copy first. |
 | 10 | Joining it up: real fixtures and real tables on the website | Not started |
 | 11 | Going live on X Layer: the circuits and Kickoff's account | Not started |
 | 12 | Publishing the site, with the verified copy on DeWEB | Not started |
@@ -336,6 +340,7 @@ You need Node 22 or newer. The circuit check also needs Python 3. Nothing has to
 | See the website on your own computer, with groups working | `node server/bin/dev.js`, then open `http://localhost:8787` |
 | Run the feed's tests (no key needed) | `cd feed && npm test` |
 | Run the server's tests | `cd server && npm test` |
+| Run the robot's tests | `cd robot && npm test` |
 | Fetch this week's real fixtures (needs your own two keys) | `FOOTBALL_DATA_KEY=... BALLDONTLIE_KEY=... node feed/bin/fixtures.js` |
 
 The rehearsals on a private copy of X Layer need [Foundry](https://getfoundry.sh), and are
@@ -349,6 +354,7 @@ explained in [chain/README.md](chain/README.md) and [engine/README.md](engine/RE
 | `chain/` | Rehearsals of the parts that touch X Layer, run on a private copy of it. Start with [chain/README.md](chain/README.md) |
 | `engine/` | The picks engine: sealing, bundling, opening, scoring with the circuits, the table, and reading it all back from X Layer. Start with [engine/README.md](engine/README.md) |
 | `feed/` | The fixtures feed: real matches and results from live sports data. Start with [feed/README.md](feed/README.md) |
+| `robot/` | Kickoff's robot: keeps the list of matches in step with the feeds. Start with [robot/README.md](robot/README.md) |
 | `server/` | Kickoff's server: groups, and sealed picks until they are locked. Start with [server/README.md](server/README.md) |
 | `api/`, `vercel.json` | What the web host needs: where the server starts, and where the website's files are |
 | `web/` | The website. Start with [web/README.md](web/README.md) |

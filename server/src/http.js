@@ -18,7 +18,7 @@
 //
 //   Only the robot may use these, with the admin key
 //     POST /api/admin/fixtures        { fixtures }              put matches on the list
-//     POST /api/admin/freeze/<match>                            close a match's picks and bundle them
+//     POST /api/admin/freeze/<match>                            a match's bundle, once picks have closed
 //
 // This file knows nothing about any particular web host. It takes a request as plain values and
 // returns { status, body }, so the same code runs in the tests, on a laptop, and when hosted.
@@ -60,7 +60,7 @@ export function createHandler({ kickoff, now, adminKey = null }) {
     ["GET", /^\/api\/fixtures$/, async () => ({ league: kickoff.league, fixtures: await kickoff.fixtures() })],
     ["GET", /^\/api\/groups\/([^/]+)$/, async (r, code) => kickoff.group({ code: decodeURIComponent(code) })],
     ["GET", /^\/api\/matches\/([0-9a-f]{64})$/, async (r, match) => kickoff.match({ now: now(), match })],
-    ["GET", /^\/api\/matches\/([0-9a-f]{64})\/receipt\/([0-9a-f]{64})$/, async (r, match, player) => kickoff.receipt({ match, player })],
+    ["GET", /^\/api\/matches\/([0-9a-f]{64})\/receipt\/([0-9a-f]{64})$/, async (r, match, player) => kickoff.receipt({ now: now(), match, player })],
     ["GET", /^\/api\/matches\/([0-9a-f]{64})\/openings$/, async (r, match) => JSON.parse(await kickoff.openingsFile({ now: now(), match }))],
 
     ["POST", /^\/api\/groups$/, async (r) => {
@@ -82,7 +82,7 @@ export function createHandler({ kickoff, now, adminKey = null }) {
     }],
     ["POST", /^\/api\/picks\/mine$/, async (r) => {
       const s = await signed(r);
-      return { sealed: await kickoff.sealedBy({ player: s.player, match: s.match }) };
+      return { sealed: await kickoff.sealedBy({ player: s.player, now: now(), match: s.match }) };
     }],
     ["POST", /^\/api\/opened$/, async (r) => {
       const s = await signed(r);
