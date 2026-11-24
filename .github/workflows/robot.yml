@@ -1,8 +1,9 @@
 # Kickoff's robot.
 #
 # Every half hour it makes Kickoff's list of matches agree with the two sports feeds: new matches
-# are added, finished ones get their score, postponed ones are called off. Its report is on each
-# run's own page.
+# are added, finished ones get their score, postponed ones are called off. Once it has a wallet it
+# also does Kickoff's work on X Layer: it locks each match's sealed picks before kickoff, records
+# each result, and publishes the opened picks. What it did is on each run's own page.
 #
 # How it keeps going: GitHub's own timer proved unreliable for this (it did not fire at all in the
 # robot's first seven hours). So the robot keeps itself awake. One run works for about five and a
@@ -10,11 +11,14 @@
 # kept only as a safety net: every two hours it checks whether the robot is awake, and starts it
 # if it is not.
 #
-# It needs three secrets, set in the repository's settings and never written anywhere else:
-#   KICKOFF_ADMIN_KEY   the robot's key, which Kickoff's server also holds
-#   FOOTBALL_DATA_KEY   the football feed's key
-#   BALLDONTLIE_KEY     the basketball feed's key
-# Until KICKOFF_ADMIN_KEY is set, it only looks and reports, and changes nothing.
+# Its secrets are set in the repository's settings and written nowhere else:
+#   KICKOFF_ADMIN_KEY    the robot's key, which Kickoff's server also holds
+#   FOOTBALL_DATA_KEY    the football feed's key
+#   BALLDONTLIE_KEY      the basketball feed's key
+#   KICKOFF_WALLET_KEY   the private key of the robot's wallet on X Layer
+# and two settings that are not secret (repository variables):
+#   KICKOFF_PROCESSOR, KICKOFF_CIRCUIT   which TapeOut circuit is the league
+# Until KICKOFF_ADMIN_KEY is set it only looks. Until the wallet is set it writes nothing to X Layer.
 name: Robot
 
 on:
@@ -82,6 +86,10 @@ jobs:
       KICKOFF_ADMIN_KEY: ${{ secrets.KICKOFF_ADMIN_KEY }}
       FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
       BALLDONTLIE_KEY: ${{ secrets.BALLDONTLIE_KEY }}
+      # The robot's wallet on X Layer. Until all three are set, nothing is written to X Layer.
+      KICKOFF_WALLET_KEY: ${{ secrets.KICKOFF_WALLET_KEY }}
+      KICKOFF_PROCESSOR: ${{ vars.KICKOFF_PROCESSOR }}
+      KICKOFF_CIRCUIT: ${{ vars.KICKOFF_CIRCUIT }}
       GH_TOKEN: ${{ github.token }}
       HANDOVER: ${{ inputs.handover }}
     steps:
@@ -107,31 +115,14 @@ jobs:
             echo "go=no" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Do the job every half hour
+      # `cast` signs what the robot writes to X Layer. It is only used once the robot has a wallet.
+      - uses: foundry-rs/foundry-toolchain@v1
         if: steps.check.outputs.go == 'yes'
-        run: |
-          if [ -z "$KICKOFF_ADMIN_KEY" ]; then
-            echo "The robot's key is not set yet, so it only looks." | tee -a "$GITHUB_STEP_SUMMARY"
-            look="--dry-run"
-          fi
-          failed=0
-          for round in 1 2 3 4 5 6 7 8 9 10 11; do
-            echo "::group::Round $round, $(date -u '+%H:%M') UTC"
-            if [ "$round" = "1" ]; then quiet=""; else quiet="--quiet"; fi
-            if node robot/bin/robot.js fixtures $look $quiet; then failed=0; else failed=$((failed + 1)); echo "::warning::Round $round did not go through. It will try again next round."; fi
-            echo "::endgroup::"
-            if [ "$round" != "11" ]; then sleep 1740; fi
-          done
-          echo "failed_in_a_row=$failed" >> "$GITHUB_ENV"
+
+      - name: Stay awake and do the work
+        if: steps.check.outputs.go == 'yes'
+        run: node robot/bin/robot.js watch --minutes 320
 
       - name: Start the next run
         if: always() && steps.check.outputs.go == 'yes'
         run: gh workflow run robot.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f handover=true
-
-      - name: Say so if the last rounds all failed
-        if: steps.check.outputs.go == 'yes'
-        run: |
-          if [ "${failed_in_a_row:-0}" -ge 3 ]; then
-            echo "The last $failed_in_a_row rounds failed. Look at the reports on this page."
-            exit 1
-          fi

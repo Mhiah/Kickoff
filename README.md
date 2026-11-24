@@ -255,7 +255,7 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | The website | 54 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 22 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
 | The server | 53 tests. They send picks in someone else's name, play old requests back, open a different pick from the one sealed, and use the robot's addresses without its key | All pass; every one is refused ([details](server/README.md)) |
-| The robot | 14 tests, run against the server's own code and stand-ins for the feeds: new matches, results, postponements, moved matches, a feed going back on a result, a failing feed, and where each key is sent | All pass ([details](robot/README.md)) |
+| The robot | 32 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, and refusing a bundle that does not add up | All pass ([details](robot/README.md)) |
 | What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
 
 GitHub repeats the tests on every change, and the badges at the top of this page show the latest
@@ -270,6 +270,9 @@ results.
   browser. If its saved data is cleared, that player is gone. A backup is still to do.
 - **A result is the feed's word.** Kickoff checks that it is a result that can happen, not that it
   is true. That is why any player can dispute a result, and why a dispute can never be hidden.
+- **More than 32 players on one match will not fit on chain yet.** The opened picks for a match
+  are published as one file on the league's on-chain site, which takes 24,000 bytes: 32 players.
+  Splitting the file is still to do.
 - **Picks are locked on Kickoff's server, not yet on X Layer.** Once picks close the server
   bundles them and nothing can be added. But until the robot writes each bundle's fingerprint to
   X Layer, that lock is Kickoff's word and not something anyone can check on chain.
@@ -309,7 +312,7 @@ results.
 | 6 | Sealing a pick for real, on the player's own device | Done. |
 | 7 | The fixtures feed | Done, and run live against the real feeds. |
 | 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Partly done. The rules, signed requests, addresses and database connection are built, with 53 tests, and it is online with a real database. The website uses it for groups, and is ready to send sealed picks, check receipts and open picks once real matches are on the list. |
-| 9 | The robot: announces fixtures, locks picks before kickoff and posts results on X Layer | Partly done. It keeps Kickoff's list of matches in step with the feeds every half hour, with 14 tests, and is running live. Still to do: its jobs on X Layer, rehearsed on a private copy first. |
+| 9 | The robot: announces fixtures, locks picks before kickoff and posts results on X Layer | Partly done. It keeps Kickoff's list of matches in step with the feeds every half hour, with 14 tests, and is running live. Its work on X Layer (locking each match's picks before kickoff, recording results, publishing opened picks) is built and rehearsed on a private copy of X Layer, and gets switched on when Kickoff goes live. 32 tests. |
 | 10 | Joining it up: real fixtures and real tables on the website | Not started |
 | 11 | Going live on X Layer: the circuits and Kickoff's account | Not started |
 | 12 | Publishing the site, with the verified copy on DeWEB | Not started |

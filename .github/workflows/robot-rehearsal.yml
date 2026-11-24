@@ -1,0 +1,68 @@
+# A rehearsal of Kickoff's robot on a private copy of X Layer mainnet.
+#
+# The robot's wallet becomes a league, three phones enter sealed picks through Kickoff's own server
+# code, and the robot announces, locks, records results and publishes opened picks through
+# TapeOut's real mailbox and site store. It signs with `cast`, exactly as it will for real, using
+# a throwaway key made for this run. Then the table is rebuilt from the copy of X Layer alone.
+# Nothing is sent to the real network and nothing is paid.
+name: Robot rehearsal
+
+on:
+  push:
+    paths:
+      - "robot/**"
+      - "engine/src/**"
+      - "server/src/**"
+      - "circuits/out/**"
+      - ".github/workflows/robot-rehearsal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rehearse:
+    name: The robot works a season on a copy of X Layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      XLAYER_RPC_URL: https://rpc.xlayer.tech
+      COPY: http://127.0.0.1:8545
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Start a private copy of X Layer
+        run: |
+          anvil --fork-url "$XLAYER_RPC_URL" --port 8545 --retries 10 > anvil.log 2>&1 &
+          for i in $(seq 1 60); do
+            if cast chain-id --rpc-url "$COPY" > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          echo "The copy is of chain $(cast chain-id --rpc-url "$COPY"), at block $(cast block-number --rpc-url "$COPY")"
+
+      - name: The robot's rehearsal
+        run: |
+          # A key made for this run only. It never holds real money and is thrown away afterwards.
+          KEY="0x$(openssl rand -hex 32)"
+          echo "::add-mask::$KEY"
+          node robot/scripts/rehearse.js --node "$COPY" --cast-key "$KEY" --summary rehearsal.md
+
+      - name: Put the output on the run's summary page
+        if: always()
+        run: |
+          {
+            echo '## The robot on a private copy of X Layer'
+            echo '```'
+            cat rehearsal.md 2>/dev/null || echo 'the rehearsal did not finish'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show the copy's log if something went wrong
+        if: failure()
+        run: tail -n 60 anvil.log
