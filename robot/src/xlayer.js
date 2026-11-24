@@ -19,9 +19,9 @@ import { callData, decode, eventTopic } from "../../engine/src/abi.js";
 import { XLAYER, connect, fetchLeague, fetchSiteFile, fromHex, leagueId, openingsPath, parseLeagueId, readLeague, toHex } from "../../engine/src/index.js";
 
 const quantity = (n) => `0x${BigInt(n).toString(16)}`;
-const TRANSFER = `0x${toHex(eventTopic("Transfer(address,address,uint256)"))}`;
+export const TRANSFER = `0x${toHex(eventTopic("Transfer(address,address,uint256)"))}`;
 /** The smallest circuit there is: one gate that flips its one input. Publishing it is what makes an account a league. */
-const ONE_GATE = "0x00000002000002";
+export const ONE_GATE = "0x00000002000002";
 
 async function receiptOf(rpc, hash, tries = 300) {
   for (let i = 0; i < tries; i++) {
@@ -83,7 +83,7 @@ export async function castSender({ node, key, exec = run }) {
 }
 
 /** Ask a contract a question. */
-async function ask(rpc, to, signature, values, types) {
+export async function ask(rpc, to, signature, values, types) {
   return decode(types, fromHex(await rpc("eth_call", [{ to, data: callData(signature, values) }, "latest"])));
 }
 

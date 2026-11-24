@@ -9,7 +9,7 @@ Kickoff's robot: the program that does by itself what nobody should have to do b
 > **Built and rehearsed, not switched on:** its work on X Layer. It locks each match's sealed picks
 > before kickoff, records each result, and publishes the opened picks, through TapeOut's mailbox
 > and site store. It is rehearsed on a private copy of X Layer on every change. It is switched on
-> when the robot is given a wallet. 32 tests.
+> when the robot is given a wallet. 42 tests.
 
 ## What it does now
 
@@ -69,6 +69,12 @@ the league's id, and the table is rebuilt from the chain alone. It has to come o
 bola 2, chidi 0. The **Robot rehearsal** check on GitHub runs it on every change, signing with
 `cast` exactly as the robot will for real.
 
+Its first run on a copy of the real X Layer, on 24 November 2026, passed all 11 checks
+([the run](https://github.com/Mhiah/Kickoff/actions/runs/45378783993), written up as rehearsal 6
+in [docs/REHEARSAL-RESULTS.md](../docs/REHEARSAL-RESULTS.md)). Becoming a league cost 0.082 OKB
+of test money, once. After that, locking two matches, recording their results and publishing their
+opened picks cost 0.000014 OKB in all.
+
 ### The robot's wallet
 
 To write to X Layer the robot needs a wallet of its own, holding a little OKB for fees:
@@ -79,6 +85,26 @@ To write to X Layer the robot needs a wallet of its own, holding a little OKB fo
 | GitHub, in the repository's variables | `KICKOFF_PROCESSOR`, `KICKOFF_CIRCUIT` | Which TapeOut circuit is the league. Not secret. |
 
 Until all three are set, nothing is written to X Layer and the robot only keeps the list up to date.
+
+### Going live
+
+Going live is done once, by the robot's wallet, and costs about 0.09 OKB. The wallet publishes one
+small circuit on a TapeOut processor and opens its account, which makes it the league. Then it
+publishes Kickoff's three scoring circuits. Kickoff uses a processor that already exists and gives
+its transistors away, so everything is paid in OKB.
+
+The **Go live on X Layer** workflow on GitHub does it, and never runs by itself:
+
+| Choice | What it does |
+| --- | --- |
+| `look` | Reads X Layer and says what is still to do, what it costs, whether the wallet holds enough, and which league it would make. Sends nothing and pays nothing. |
+| `go` | Does it. Runs only if the words `GO LIVE` are typed in the box. |
+
+`go` is safe to run again after a failure. It works out what to do from what X Layer already shows
+for the wallet, so a step that went through is never paid for twice. It sends nothing at all if the
+wallet is short, or if the league it would make is not the one Kickoff's server is set up for.
+The **Robot rehearsal** check goes live on a private copy of X Layer on every change, with a
+throwaway wallet and test money.
 
 ## Closing picks is not the robot's job
 
@@ -128,8 +154,10 @@ Every run's report is on its own page.
 | `src/xlayer.js` | Reads the league's record and writes to it, through TapeOut's mailbox and site store. Also how a wallet becomes a league. |
 | `src/server.js` | What the robot asks Kickoff's server for |
 | `src/watch.js` | Staying awake: the half-hourly rhythm, and being on time for each lock |
+| `src/golive.js` | Going live: works out what is still to do on X Layer and what it costs, and does it |
 | `scripts/rehearse.js` | The rehearsal on a private copy of X Layer |
 | `bin/robot.js` | The commands: `fixtures` for one round on the list, `watch` to stay awake |
+| `bin/golive.js` | The commands for going live: `look` and `go` |
 | `test/` | The tests, run against the server's own code and stand-ins for the two feeds |
 
 ## Honest limits

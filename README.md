@@ -255,7 +255,8 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | The website | 54 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 22 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
 | The server | 53 tests. They send picks in someone else's name, play old requests back, open a different pick from the one sealed, and use the robot's addresses without its key | All pass; every one is refused ([details](server/README.md)) |
-| The robot | 32 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, and refusing a bundle that does not add up | All pass ([details](robot/README.md)) |
+| The robot | 42 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, and going live without paying for anything twice | All pass ([details](robot/README.md)) |
+| The robot on a copy of X Layer | The robot's own code announcing, locking, recording results and publishing opened picks through TapeOut's real contracts, signing with `cast`, then the table rebuilt from the chain alone | 11 of 11 checks passed on the first run ([rehearsal 6](docs/REHEARSAL-RESULTS.md)) |
 | What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
 
 GitHub repeats the tests on every change, and the badges at the top of this page show the latest
@@ -314,7 +315,7 @@ results.
 | 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Partly done. The rules, signed requests, addresses and database connection are built, with 53 tests, and it is online with a real database. The website uses it for groups, and is ready to send sealed picks, check receipts and open picks once real matches are on the list. |
 | 9 | The robot: announces fixtures, locks picks before kickoff and posts results on X Layer | Partly done. It keeps Kickoff's list of matches in step with the feeds every half hour, with 14 tests, and is running live. Its work on X Layer (locking each match's picks before kickoff, recording results, publishing opened picks) is built and rehearsed on a private copy of X Layer, and gets switched on when Kickoff goes live. 32 tests. |
 | 10 | Joining it up: real fixtures and real tables on the website | Not started |
-| 11 | Going live on X Layer: the circuits and Kickoff's account | Not started |
+| 11 | Going live on X Layer: the circuits and Kickoff's account | Partly done. The switch is built, with 10 tests, and rehearsed on a private copy of X Layer: a look that says the cost and sends nothing, and a go that needs the words GO LIVE. Nothing is on the real X Layer yet, because the robot has no wallet. |
 | 12 | Publishing the site, with the verified copy on DeWEB | Not started |
 | 13 | A real test group with real people and real matches | Not started |
 | 14 | Players with their own TapeOut identity, and sponsor prizes | Not started |

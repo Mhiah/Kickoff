@@ -209,6 +209,50 @@ What this rehearsal does not cover: a real league. The league here lived only on
 gone when the run ended. It also asks one node, the copy itself. Asking several independent nodes
 and requiring them to agree is still to do.
 
+## Rehearsal 6: the robot
+
+| | |
+| --- | --- |
+| Date | 24 November 2026 |
+| Run | <https://github.com/Mhiah/Kickoff/actions/runs/45378783993> |
+| Commit | `e73380e` |
+| Copy of X Layer at block | 76,748,495 |
+| Result | **11 of 11 checks passed on the first run** |
+
+The earlier rehearsals had a script play the league. This one has the real pieces do it: Kickoff's
+server code, the robot's own rules and its own hands on X Layer, and phones that seal, enter and
+open picks the way the website does. The robot signed every transaction with `cast` and a
+throwaway key made for the run, which is how it will sign for real.
+
+What happened:
+
+- **The robot's wallet became a league** by publishing one small circuit on an existing TapeOut
+  processor and opening its account. That cost 0.081967 OKB of test money.
+- **Three matches went on Kickoff's list.** Three phones entered sealed picks for two of them.
+- **While picks were open the robot wrote nothing.** Five seconds after picks closed for each of
+  the two matches, it announced the match and locked its three sealed picks, 595 seconds before
+  kickoff.
+- **The match nobody picked was never written to X Layer.**
+- **A changed bundle was locked with the league's own key two hours after kickoff**, with one
+  player's pick swapped for the real score. That player then tried to open the swapped pick, and
+  the server refused.
+- **The robot recorded both results and published both files of opened picks.**
+- **A second robot started with no memory and wrote nothing.** Seven messages were in the league's
+  inbox before and after.
+- **The table was rebuilt from the copy of X Layer alone** and came out as ada 6, bola 2, chidi 0.
+  The lock in force for the football was the one made before kickoff, not the changed one. A
+  reader found no message to disbelieve.
+
+What it cost, on the copy: after the one fee for becoming a league, announcing and locking two
+matches cost 0.000006 OKB, and recording two results and publishing two files cost 0.000008 OKB.
+So the running cost of a match is a few millionths of an OKB. Nearly everything is the single fee
+for opening the league's account.
+
+What this rehearsal does not cover: the real network, a wallet holding real OKB, and time passing
+at its real pace. On the copy the rehearsal sets the clock itself. The robot's timing is checked
+separately, in its tests. It also covers three players. A match picked by more than 32 will not
+fit in one file on the league's site yet.
+
 ## The fees report
 
 | | |

@@ -66,3 +66,66 @@ jobs:
       - name: Show the copy's log if something went wrong
         if: failure()
         run: tail -n 60 anvil.log
+
+  golive:
+    name: Going live, rehearsed on a copy of X Layer
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      XLAYER_RPC_URL: http://127.0.0.1:8545
+      # Only read, to check that the league this makes is the one Kickoff's server is set up for.
+      KICKOFF_SERVER: https://kickoff-two-xi.vercel.app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Start a private copy of X Layer
+        run: |
+          anvil --fork-url https://rpc.xlayer.tech --port 8545 --retries 10 > anvil.log 2>&1 &
+          for i in $(seq 1 60); do
+            if cast chain-id --rpc-url "$XLAYER_RPC_URL" > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          echo "The copy is of chain $(cast chain-id --rpc-url "$XLAYER_RPC_URL"), at block $(cast block-number --rpc-url "$XLAYER_RPC_URL")"
+
+      - name: Go live on the copy, with a throwaway wallet
+        run: |
+          # A key made for this run only. It never holds real money and is thrown away afterwards.
+          export KICKOFF_WALLET_KEY="0x$(openssl rand -hex 32)"
+          echo "::add-mask::$KICKOFF_WALLET_KEY"
+          wallet=$(cast wallet address --private-key "$KICKOFF_WALLET_KEY")
+
+          echo "== An empty wallet: the look says it is short, and going live sends nothing"
+          node robot/bin/golive.js look | tee look-empty.txt
+          grep -q "THE WALLET IS SHORT BY" look-empty.txt
+          if node robot/bin/golive.js go --confirm "GO LIVE" > go-empty.txt; then echo "it went live with an empty wallet"; exit 1; fi
+          grep -q "so nothing was sent" go-empty.txt
+          test "$(cast nonce "$wallet" --rpc-url "$XLAYER_RPC_URL")" = "0"
+
+          echo "== Test money on the copy: 0.1 OKB"
+          cast rpc anvil_setBalance "$wallet" 0x16345785d8a0000 --rpc-url "$XLAYER_RPC_URL" > /dev/null
+          node robot/bin/golive.js look | tee look.txt
+          grep -q "The wallet holds enough." look.txt
+
+          echo "== Without the words GO LIVE, nothing is sent"
+          if node robot/bin/golive.js go --confirm "yes"; then echo "it went live without being asked properly"; exit 1; fi
+          test "$(cast nonce "$wallet" --rpc-url "$XLAYER_RPC_URL")" = "0"
+
+          echo "== Going live"
+          node robot/bin/golive.js go --confirm "GO LIVE" | tee go.txt
+          grep -q "Kickoff is live." go.txt
+          left=$(cast balance "$wallet" --rpc-url "$XLAYER_RPC_URL")
+
+          echo "== Going live a second time sends nothing and pays nothing"
+          node robot/bin/golive.js go --confirm "GO LIVE" | tee again.txt
+          grep -q "There was nothing left to do, so nothing was sent." again.txt
+          test "$(cast balance "$wallet" --rpc-url "$XLAYER_RPC_URL")" = "$left"
+
+      - name: Show the copy's log if something went wrong
+        if: failure()
+        run: tail -n 60 anvil.log

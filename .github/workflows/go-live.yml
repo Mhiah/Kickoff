@@ -1,0 +1,73 @@
+# Going live on X Layer. Done once.
+#
+# The robot's wallet publishes one small circuit on a TapeOut processor and opens its account,
+# which makes it Kickoff's league. Then it publishes Kickoff's three scoring circuits.
+#
+# This never runs by itself. Somebody has to press "Run workflow", and there are two choices:
+#
+#   look   reads X Layer and says what is still to do and what it costs. It sends nothing and
+#          pays nothing. Run it as often as you like.
+#   go     does it, and spends real OKB from the robot's wallet (about 0.09 OKB in all). It only
+#          runs if the words GO LIVE are typed in the box. What is already done is left alone, so
+#          it is safe to run again after a failure.
+#
+# The wallet's private key is the repository secret KICKOFF_WALLET_KEY. It is handed to the signing
+# tool and to nothing else, and is never printed.
+name: Go live on X Layer
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "look = only look and say the cost. go = do it (spends real OKB)"
+        type: choice
+        options:
+          - look
+          - go
+        default: look
+      confirm:
+        description: "Only for go: type GO LIVE"
+        type: string
+        default: ""
+      new_league:
+        description: "Only for go: carry on even if the league would not be the one the server is set up for"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Never two at once.
+concurrency:
+  group: go-live
+  cancel-in-progress: false
+
+jobs:
+  golive:
+    name: "Going live: ${{ inputs.step }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      KICKOFF_SERVER: https://kickoff-two-xi.vercel.app
+      KICKOFF_WALLET_KEY: ${{ secrets.KICKOFF_WALLET_KEY }}
+      KICKOFF_PROCESSOR: ${{ vars.KICKOFF_PROCESSOR }}
+      STEP: ${{ inputs.step }}
+      CONFIRM: ${{ inputs.confirm }}
+      NEW_LEAGUE: ${{ inputs.new_league }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Look
+        if: inputs.step == 'look'
+        run: node robot/bin/golive.js look
+
+      - name: Go live
+        if: inputs.step == 'go'
+        run: |
+          args=(go --confirm "$CONFIRM")
+          if [ "$NEW_LEAGUE" = "true" ]; then args+=(--new-league); fi
+          node robot/bin/golive.js "${args[@]}"
