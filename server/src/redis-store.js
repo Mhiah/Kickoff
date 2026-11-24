@@ -71,6 +71,9 @@ export class RedisStore {
   async tableSet(table, name, value) {
     await this.command("HSET", this.prefix + table, name, JSON.stringify(value));
   }
+  async tableDelete(table, name) {
+    await this.command("HDEL", this.prefix + table, name);
+  }
   async tableAll(table) {
     const answer = (await this.command("HGETALL", this.prefix + table)) ?? [];
     // The answer is a flat list: name, value, name, value…

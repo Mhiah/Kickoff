@@ -9,6 +9,7 @@
 //   setIfAbsent(key, value)  set it only if nothing is there yet; says whether it did
 //   tableGet(table, name)    one value from a table, or null
 //   tableSet(table, name, value)
+//   tableDelete(table, name) take one value out of a table
 //   tableAll(table)          every value in a table, as { name: value }
 
 export class MemoryStore {
@@ -33,6 +34,9 @@ export class MemoryStore {
   async tableSet(table, name, value) {
     if (!this.tables.has(table)) this.tables.set(table, new Map());
     this.tables.get(table).set(name, structuredClone(value));
+  }
+  async tableDelete(table, name) {
+    this.tables.get(table)?.delete(name);
   }
   async tableAll(table) {
     return Object.fromEntries([...(this.tables.get(table) ?? [])].map(([name, value]) => [name, structuredClone(value)]));

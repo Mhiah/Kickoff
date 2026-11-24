@@ -9,6 +9,7 @@ import { createStore, seal } from "./lib/picks.js";
 import { createClient } from "./lib/server.js";
 import { syncPicks } from "./lib/sync.js";
 import { hasClosed } from "./lib/time.js";
+import { createWallet } from "./lib/wallet.js";
 import { checkScreen, frame, groupScreen, home, league, matchScreen, pick, recordScreen } from "./screens.js";
 
 const routes = { "": home, league, pick, match: matchScreen, record: recordScreen, check: checkScreen, group: groupScreen };
@@ -23,6 +24,7 @@ const store = createStore(storage);
 const device = createDevice(store);
 const client = createClient({ base: SERVER, device });
 const groups = createGroups({ store, device, client });
+const wallet = createWallet({ device, client });
 const matches = createFixtures({ store, client, competitions: COMPETITIONS, sample: { league: SAMPLE_LEAGUE, fixtures: sampleFixtures } });
 
 document.body.insertAdjacentHTML("afterbegin", frame());
@@ -160,6 +162,22 @@ document.addEventListener("click", async (event) => {
     } catch (error) {
       target.setAttribute("aria-checked", String(!on));
       say(target, error.message);
+    }
+    return;
+  }
+  // Linking a wallet: the wallet signs a note, which costs nothing, and Kickoff's server checks it.
+  if (target.matches("[data-link-wallet]")) {
+    const out = () => view.querySelector("[data-wallet-out]");
+    target.disabled = true;
+    if (out()) out().textContent = "";
+    try {
+      const result = await wallet.link();
+      groups.linked(result);
+      await draw({ keepPlace: true });
+      if (out()) out().textContent = result.carried > 0 ? `Wallet linked. ${result.carried === 1 ? "Your group is back." : "Your groups are back."}` : "Wallet linked.";
+    } catch (error) {
+      if (out()) out().textContent = error.message;
+      target.disabled = false;
     }
     return;
   }

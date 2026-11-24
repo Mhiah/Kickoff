@@ -10,7 +10,7 @@ the website and anyone checking a league use exactly the same code.
 > [!NOTE]
 > **What is here:** sealing, bundling, opening and checking, scoring with the circuits, the table
 > and personal records, reading a league back from its inbox, and fetching that inbox and the
-> opened picks from an X Layer node, with 120 tests. **Not live yet:** no league exists on X Layer
+> opened picks from an X Layer node, with 127 tests. **Not live yet:** no league exists on X Layer
 > itself. The fetching has been run against a stand-in node in the tests, and against the real
 > TapeOut contracts on a private copy of X Layer, where it passed
 > ([rehearsal 5](../docs/REHEARSAL-RESULTS.md)). It has not been run against a real league.

@@ -14,5 +14,6 @@ export * from "./openings.js";
 export * from "./league.js";
 export * from "./xlayer.js";
 export * from "./identity.js";
+export * from "./wallet.js";
 export { keccak256 } from "./keccak.js";
 export { fromHex, toHex } from "./bytes.js";

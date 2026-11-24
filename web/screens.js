@@ -14,6 +14,7 @@
 //              { player, groups, group (the one being looked at, or null), name, offline }
 
 import { COMPETITIONS, check, group, match, record, scores, voided, week } from "./data/sample.js";
+import { sits } from "./lib/groups.js";
 import { MARK, REAL_MATCHES_NOTE, SAMPLE_NOTE, TOGGLE, comp, esc, stamp, titlebar } from "./lib/html.js";
 import { BAND_KEYS, bandWords, pickWords } from "./lib/picks.js";
 import { standing } from "./lib/sync.js";
@@ -443,6 +444,13 @@ function joinForm(mine) {
 const OFFLINE_NOTE = `<div class="note warn" style="margin-top:14px"><b>Kickoff could not be reached.</b> This is what this phone last saw. It will catch up when you are back online.</div>`;
 const DEVICE_NOTE = `<div class="note" style="margin-top:16px"><b>No sign-up and no wallet.</b> This phone and browser become your player. Use the same ones each time, and do not clear the browser's saved data, or Kickoff will not know it is you.</div>`;
 
+/** For someone on a new phone: linking the wallet they linked before brings their groups back. */
+const WALLET_BACK = `<div class="wallet-row"><span class="muted">Linked a wallet before?</span><button type="button" class="btn small quiet" data-link-wallet>Bring my groups back</button></div>
+<p class="say-so muted" data-wallet-out role="status"></p>`;
+
+/** A wallet's address, shortened to its two ends. */
+const shortWallet = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`;
+
 /**
  * The group screen. `arg` is "start" or "join" to show just that form.
  * With no group yet, both forms are shown.
@@ -459,12 +467,13 @@ ${titlebar({ heading })}
 <p class="sub">${g ? `<a href="#/group">Back to ${esc(g.name)}</a>` : arg === "start" ? 'Have a code already? <a href="#/group/join">Join with a code</a>.' : arg === "join" ? 'No code yet? <a href="#/group/start">Start a group</a>.' : "Play with your friends. Start a group and share its code, or join one with a code."}</p>
 ${mine.offline ? OFFLINE_NOTE : ""}
 ${forms}
+${g || mine.wallet ? "" : WALLET_BACK}
 ${DEVICE_NOTE}`;
     return { html, title: `${heading} on Kickoff`, tab: "group", real: true };
   }
 
-  const isStarter = g.startedBy === mine.player;
-  const starter = g.members.find((m) => m.player === g.startedBy);
+  const starter = g.members.find((m) => sits(m, g.startedBy));
+  const isStarter = starter ? sits(starter, mine.player) : g.startedBy === mine.player;
   const count = `${g.members.length} ${g.members.length === 1 ? "player" : "players"}`;
   const plays = Object.keys(COMPETITIONS)
     .map((key) => {
@@ -475,8 +484,15 @@ ${DEVICE_NOTE}`;
       return `<div class="row"><div class="grow">${comp(key, "big")}<div class="sub">${SPORT_WORDS[COMPETITIONS[key].sport]}</div></div>${control}</div>`;
     })
     .join("");
+  // A wallet is optional. Your own row offers the link, and any seat with one says so.
   const players = g.members
-    .map((m) => `<div class="row"><div class="grow"><div class="title" style="margin:0">${esc(m.name)}${m.player === mine.player ? '<span class="tag">you</span>' : ""}</div>${m.player === g.startedBy ? '<div class="sub">Started the group</div>' : ""}</div></div>`)
+    .map((m) => {
+      const me = sits(m, mine.player);
+      const linked = m.linked || (me && Boolean(mine.wallet));
+      const under = [m === starter ? "Started the group" : "", me && mine.wallet ? esc(shortWallet(mine.wallet)) : ""].filter(Boolean).join(" · ");
+      const side = linked ? '<span class="state plain">Wallet linked</span>' : me ? '<button type="button" class="btn small quiet" data-link-wallet>Link a wallet</button>' : "";
+      return `<div class="row"><div class="grow"><div class="title" style="margin:0">${esc(m.name)}${me ? '<span class="tag">you</span>' : ""}</div>${under ? `<div class="sub">${under}</div>` : ""}</div>${side}</div>`;
+    })
     .join("");
   const others = mine.groups.filter((other) => other.code !== g.code);
   const switcher = others.length
@@ -498,6 +514,7 @@ ${mine.offline ? OFFLINE_NOTE : ""}
 
 <h2>Players</h2>
 <div class="glass">${players}</div>
+<p class="say-so muted" data-wallet-out role="status"></p>
 ${switcher}
 
 <div class="more"><a href="#/group/start">Start another group</a><a href="#/group/join">Join another group</a></div>`;

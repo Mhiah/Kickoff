@@ -24,6 +24,8 @@ export function fakeRedis() {
         hashes.get(args[0]).set(args[1], args[2]);
         return fresh;
       }
+      case "HDEL":
+        return hashes.get(args[0])?.delete(args[1]) ? 1 : 0;
       case "HGETALL":
         return [...(hashes.get(args[0]) ?? [])].flat();
       default:

@@ -8,6 +8,12 @@ const GROUPS_KEY = "kickoff-groups";
 const NAME_KEY = "kickoff-name";
 
 /**
+ * Whether a seat in a group is this player's. A player who linked a wallet shares one seat between
+ * their devices, and the seat lists all of them.
+ */
+export const sits = (member, player) => member.player === player || (member.players ?? []).includes(player);
+
+/**
  * @param store   from createStore() in picks.js
  * @param client  from createClient() in server.js
  * @param device  from createDevice()
@@ -18,15 +24,17 @@ export function createGroups({ store, client, device }) {
   const kept = () => {
     try {
       const d = JSON.parse(store.read(GROUPS_KEY) ?? "null");
-      if (d && Array.isArray(d.groups)) return { groups: d.groups.filter((g) => g && typeof g.code === "string" && Array.isArray(g.members)), current: d.current ?? null };
+      if (d && Array.isArray(d.groups)) {
+        return { groups: d.groups.filter((g) => g && typeof g.code === "string" && Array.isArray(g.members)), current: d.current ?? null, wallet: typeof d.wallet === "string" ? d.wallet : null };
+      }
     } catch {
       // what was kept is damaged: start again
     }
-    return { groups: [], current: null };
+    return { groups: [], current: null, wallet: null };
   };
-  const keep = (groups, current) => {
+  const keep = (groups, current, wallet = kept().wallet) => {
     const chosen = groups.some((g) => g.code === current) ? current : (groups[0]?.code ?? null);
-    store.write(GROUPS_KEY, JSON.stringify({ groups, current: chosen }));
+    store.write(GROUPS_KEY, JSON.stringify({ groups, current: chosen, wallet }));
   };
   const put = (group) => {
     const { groups } = kept();
@@ -38,18 +46,19 @@ export function createGroups({ store, client, device }) {
   return {
     /** What the screens are handed: this player, their groups, and the one being looked at. */
     async view() {
-      const { groups, current } = kept();
+      const { groups, current, wallet } = kept();
       const player = await device.player();
       const group = groups.find((g) => g.code === current) ?? null;
-      const me = group?.members.find((m) => m.player === player) ?? null;
-      return { player, groups, group, name: me?.name ?? store.read(NAME_KEY) ?? "", offline };
+      const me = group?.members.find((m) => sits(m, player)) ?? null;
+      return { player, groups, group, name: me?.name ?? store.read(NAME_KEY) ?? "", offline, wallet };
     },
     /** Ask the server which groups this device is in. Returns true if what is kept changed. */
     async refresh() {
       const before = store.read(GROUPS_KEY);
       const wasOffline = offline;
       try {
-        keep(await client.myGroups(), kept().current);
+        const { groups, wallet } = await client.mine();
+        keep(groups, kept().current, wallet ?? null);
         offline = false;
       } catch (error) {
         if (!error.unreachable) throw error;
@@ -69,6 +78,10 @@ export function createGroups({ store, client, device }) {
     },
     async setPlays({ code, plays }) {
       return put(await client.setPlays({ code, plays }));
+    },
+    /** Keep what the server said after a wallet was linked (lib/wallet.js): the wallet, and the groups it brought back. */
+    linked({ wallet, groups }) {
+      keep(groups, kept().current, wallet);
     },
     /** Look at another of this device's groups. */
     choose(code) {

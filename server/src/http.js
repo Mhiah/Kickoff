@@ -11,7 +11,8 @@
 //     POST /api/groups                { name, playerName, plays } start a group
 //     POST /api/groups/<code>/join    { playerName }            join one
 //     POST /api/groups/<code>/plays   { plays }                 choose its competitions (its starter only)
-//     POST /api/me/groups             {}                        the groups this device is in
+//     POST /api/me/groups             {}                        the groups this device is in, and its wallet if it linked one
+//     POST /api/wallet                { wallet, linkAt, signature } link a wallet (engine/src/wallet.js)
 //     POST /api/picks                 { match, fingerprint }    send a sealed pick
 //     POST /api/picks/mine            { match }                 what the server holds for this device
 //     POST /api/opened                { match, pickByte, salt } open a pick, after kickoff
@@ -75,7 +76,15 @@ export function createHandler({ kickoff, now, adminKey = null }) {
       const s = await signed(r);
       return kickoff.setPlays({ player: s.player, code: decodeURIComponent(code), plays: s.plays });
     }],
-    ["POST", /^\/api\/me\/groups$/, async (r) => ({ groups: await kickoff.groupsOf({ player: (await signed(r)).player }) })],
+    ["POST", /^\/api\/me\/groups$/, async (r) => {
+      const s = await signed(r);
+      return { groups: await kickoff.groupsOf({ player: s.player }), wallet: (await kickoff.walletOf({ player: s.player }))?.wallet ?? null };
+    }],
+    ["POST", /^\/api\/wallet$/, async (r) => {
+      const s = await signed(r);
+      const link = await kickoff.linkWallet({ player: s.player, now: now(), wallet: s.wallet, at: s.linkAt, signature: s.signature });
+      return { ...link, groups: await kickoff.groupsOf({ player: s.player }) };
+    }],
     ["POST", /^\/api\/picks$/, async (r) => {
       const s = await signed(r);
       return kickoff.sealPick({ player: s.player, now: now(), at: s.at, match: s.match, fingerprint: s.fingerprint });

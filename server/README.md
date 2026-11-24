@@ -6,7 +6,7 @@ picks so they can be locked on X Layer together.
 > [!NOTE]
 > **What is here:** the server's rules as tested code, the way a device proves it is itself, the
 > addresses the website will talk to, the connection to a real database, the entry point a web
-> host uses, and a version that runs on your own computer. 53 tests.
+> host uses, and a version that runs on your own computer. 63 tests.
 > **Online** at <https://kickoff-two-xi.vercel.app> (every address under `/api/`), with a real
 > database. Starting a group, joining it, a changed request and a keyless robot request have all
 > been tried on the live server, and each behaved as the tests say.
@@ -45,6 +45,25 @@ the device. The public half can be seen by anyone.
 The code is in [`engine/src/identity.js`](../engine/src/identity.js), because the website needs the
 same code to sign as the server uses to check.
 
+## Linking a wallet
+
+Nobody needs a wallet to play. A player who has one can link it, and it costs nothing: the wallet
+signs a short note that names the player, and the server checks the signature. Nothing is paid and
+nothing is sent to any chain.
+
+- **It is a way back in.** A new phone that links the same wallet takes the same seat, under the
+  same name, in every group the wallet's other devices are in.
+- **One wallet, one seat, one pick.** A wallet's devices share a seat in a group. If two of them
+  send a pick for the same match, the later one replaces the earlier one.
+- **Other players are told only that a seat has a wallet linked.** Which wallet it is goes to the
+  player's own device and to nobody else.
+- **Only the wallet can link itself.** The note names the player and the time, so a note signed for
+  one player is no use to another, and an old one is refused after fifteen minutes.
+
+The check is in [`engine/src/wallet.js`](../engine/src/wallet.js). It reads a signature and works
+out which wallet made it. It never signs anything and never handles a private key. Its tests read
+back signatures made by Node's own cryptography and one published in web3.js's documentation.
+
 ## The addresses
 
 Anyone may ask:
@@ -64,7 +83,8 @@ A device must sign these:
 | `POST /api/groups` | Start a group, choosing what it plays, and get its code |
 | `POST /api/groups/<code>/join` | Join a group with a name |
 | `POST /api/groups/<code>/plays` | Choose which competitions it plays. Only the person who started it can |
-| `POST /api/me/groups` | The groups this device is in |
+| `POST /api/me/groups` | The groups this device is in, and the wallet it has linked, if any |
+| `POST /api/wallet` | Link a wallet: its address, the note's time, and its signature of the note |
 | `POST /api/picks` | Send a sealed pick. Sending again before picks close replaces it |
 | `POST /api/picks/mine` | What the server holds for this device |
 | `POST /api/opened` | Open a pick, after the match has started |
@@ -164,5 +184,9 @@ every `/api/...` address to `api/index.mjs`, which starts the server.
 - **The server could leave a pick out of a bundle.** A player can check for their receipt as soon as
   picks are locked, but by then it is too late to add the pick. This is the one thing a player has
   to trust the server for, and it is said plainly here.
+- **A linked wallet cannot be changed or taken off yet.** A device links one wallet, once.
+- **Wallets that are themselves contracts cannot link.** Only an ordinary wallet's signature is read.
+- **A pick sealed on a lost phone cannot be opened from a new one.** The pick's secret was on the
+  old phone. The seat and the groups come back; that one pick does not.
 - **A group's code is all that guards it.** Anyone with the code can see the group and join it.
 - **Nothing limits how often a device can ask.** That comes with putting it on the internet.

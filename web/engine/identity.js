@@ -45,6 +45,17 @@ export async function playerIdOf(publicKey) {
   return sha256(concat(PLAYER_TAG, publicKey));
 }
 
+/**
+ * The note a wallet signs to link itself to a player. It is shown to the person in their wallet,
+ * so it is written to be read. The check of the signature is in wallet.js.
+ * @param player  the player id, 64 hex digits
+ * @param wallet  the wallet's address
+ * @param at      the time, in seconds
+ */
+export function walletLinkText({ player, wallet, at }) {
+  return `Kickoff: link this wallet to my player.\nSigning is free and sends nothing.\n\nPlayer: ${player}\nWallet: ${String(wallet).toLowerCase()}\nTime: ${at}`;
+}
+
 /** Exactly what is signed for a request. */
 export function requestText({ method, path, at, payload }) {
   return `kickoff/request/v1\n${method.toUpperCase()} ${path}\n${at}\n${payload}`;
