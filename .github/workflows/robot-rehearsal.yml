@@ -118,13 +118,21 @@ jobs:
           if node robot/bin/golive.js go --confirm "yes"; then echo "it went live without being asked properly"; exit 1; fi
           test "$(cast nonce "$wallet" --rpc-url "$XLAYER_RPC_URL")" = "0"
 
-          echo "== Going live"
-          node robot/bin/golive.js go --confirm "GO LIVE" | tee go.txt
+          # Kickoff is live on the real X Layer, so the league a throwaway wallet would make here is
+          # a new one, not the one Kickoff's server is set up for. Going live has to refuse that
+          # unless it is told a new league is wanted.
+          echo "== A league that is not the server's: nothing is sent"
+          if node robot/bin/golive.js go --confirm "GO LIVE" > go-other.txt; then echo "it made a league the server is not set up for"; exit 1; fi
+          grep -q "not the one Kickoff's server is set up for, so nothing was sent" go-other.txt
+          test "$(cast nonce "$wallet" --rpc-url "$XLAYER_RPC_URL")" = "0"
+
+          echo "== Going live, as a new league"
+          node robot/bin/golive.js go --confirm "GO LIVE" --new-league | tee go.txt
           grep -q "Kickoff is live." go.txt
           left=$(cast balance "$wallet" --rpc-url "$XLAYER_RPC_URL")
 
           echo "== Going live a second time sends nothing and pays nothing"
-          node robot/bin/golive.js go --confirm "GO LIVE" | tee again.txt
+          node robot/bin/golive.js go --confirm "GO LIVE" --new-league | tee again.txt
           grep -q "There was nothing left to do, so nothing was sent." again.txt
           test "$(cast balance "$wallet" --rpc-url "$XLAYER_RPC_URL")" = "$left"
 

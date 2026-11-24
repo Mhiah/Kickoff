@@ -79,6 +79,7 @@ h1 { font-weight: 700; font-size: 31px; line-height: 1.08; letter-spacing: -0.01
 h2 { font-weight: 700; font-size: 20px; line-height: 1.15; margin: 28px 0 10px; }
 h3 { font-weight: 700; font-size: 16.5px; }
 .small { font-size: 14.5px; }
+.fine { font-size: 13px; margin-top: 10px; }
 .muted { color: var(--muted); }
 .link { font-weight: 700; }
 

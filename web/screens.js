@@ -148,10 +148,27 @@ function playedHtml(limit) {
   return `<div class="glass">${rows}</div>`;
 }
 
-/** The next match to pick: the one closing soonest that you have not picked, or failing that any still open. */
-export function nextUp(ctx) {
-  const open = inOrder(ctx).filter((id) => !hasClosed(ctx.now, ctx.fixtures[id].kickoff));
+/**
+ * The next match to pick: the one closing soonest that you have not picked, or failing that any
+ * still open. `plays` narrows it to the competitions a group plays.
+ */
+export function nextUp(ctx, plays = null) {
+  const open = inOrder(ctx).filter((id) => !hasClosed(ctx.now, ctx.fixtures[id].kickoff) && (!plays || plays.includes(ctx.fixtures[id].comp)));
   return open.find((id) => !yourPick(ctx, id)) ?? open[0] ?? null;
+}
+
+/** The card that says what to do next: the next match, when its picks close, and a button to pick it. */
+function nextCard(ctx, nextId) {
+  const next = ctx.fixtures[nextId];
+  return `<div class="slip glass edge ${next.comp}" style="margin-top:18px">
+  <div class="body">
+    ${comp(next.comp)}
+    <div class="teams">${teams(next)}</div>
+    <div class="when">${esc(dayLabel(next.kickoff))}, ${clock(next.kickoff)}.</div>
+    <span class="clock">Picks close in ${esc(howLong(ctx.now, closesAt(next.kickoff)))}</span>
+  </div>
+  <div class="stub"><a class="btn go" href="#/pick/${nextId}">${yourPick(ctx, nextId) ? "See your pick" : "Make your pick"}</a></div>
+</div>`;
 }
 
 export function league(_, ctx) {
@@ -475,13 +492,16 @@ ${DEVICE_NOTE}`;
   const starter = g.members.find((m) => sits(m, g.startedBy));
   const isStarter = starter ? sits(starter, mine.player) : g.startedBy === mine.player;
   const count = `${g.members.length} ${g.members.length === 1 ? "player" : "players"}`;
+  const nextId = nextUp(ctx, g.plays);
   const plays = Object.keys(COMPETITIONS)
     .map((key) => {
       const on = g.plays.includes(key);
       const control = isStarter
         ? `<button type="button" class="switch" role="switch" aria-checked="${on}" aria-label="${esc(COMPETITIONS[key].name)}" data-plays="${key}"><i></i></button>`
         : `<span class="muted small">${on ? "On" : "Off"}</span>`;
-      return `<div class="row"><div class="grow">${comp(key, "big")}<div class="sub">${SPORT_WORDS[COMPETITIONS[key].sport]}</div></div>${control}</div>`;
+      // A competition that is out of season has nothing to pick, and says so.
+      const any = Object.values(ctx.fixtures).some((f) => f.comp === key && !hasClosed(ctx.now, f.kickoff));
+      return `<div class="row"><div class="grow">${comp(key, "big")}<div class="sub">${SPORT_WORDS[COMPETITIONS[key].sport]}${any ? "" : " · No matches right now"}</div></div>${control}</div>`;
     })
     .join("");
   // A wallet is optional. Your own row offers the link, and any seat with one says so.
@@ -504,13 +524,16 @@ ${titlebar({ heading: esc(g.name) })}
 <p class="sub">${isStarter ? "You started this group" : starter ? `${esc(starter.name)} started this group` : "Your group"}. ${count}.</p>
 ${mine.offline ? OFFLINE_NOTE : ""}
 
+${nextId ? `${nextCard(ctx, nextId)}
+<p class="say-so"><a class="link" href="#/league">See every match</a></p>` : `<div class="note" style="margin-top:14px">No matches are open for this group right now. New ones arrive by themselves.</div>`}
+
 <div class="glass invite"><div><small class="muted">Invite code</small><b>${esc(g.code)}</b></div><button type="button" class="btn small go" data-copy="${esc(g.code)}">Copy</button></div>
 <p class="sub">Send this code to your friends. They choose "Join with a code" on Kickoff.</p>
 
 <h2>What this group plays</h2>
 <div class="glass">${plays}</div>
 <p class="say-so muted" data-note-out role="status">${isStarter ? "" : `Only ${starter ? esc(starter.name) : "whoever started the group"} can change this.`}</p>
-<div class="note" style="margin-top:12px">Fixtures and results come in by themselves from live sports data. Nobody in the group adds a match or enters a score, so nobody can get one wrong on purpose.</div>
+<p class="fine muted">Fixtures and results come in by themselves from live sports data.</p>
 
 <h2>Players</h2>
 <div class="glass">${players}</div>

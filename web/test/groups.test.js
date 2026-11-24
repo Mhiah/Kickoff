@@ -8,7 +8,7 @@ import { createGroups } from "../lib/groups.js";
 import { createStore } from "../lib/picks.js";
 import { UNREACHABLE, createClient } from "../lib/server.js";
 import { groupScreen } from "../screens.js";
-import { FakeStorage, NOW, contextAt } from "./helpers.js";
+import { FakeStorage, NOW, contextAt, sealOn } from "./helpers.js";
 
 import { createHandler } from "../../server/src/http.js";
 import { createKickoff } from "../../server/src/kickoff.js";
@@ -196,4 +196,32 @@ test("damaged group records on the device are treated as none, not as a crash", 
     assert.equal(view.group, null);
     assert.deepEqual(view.groups, []);
   }
+});
+
+test("the group screen says what to do next: the next match this group plays, and a button to pick it", async () => {
+  const online = kickoffOnline();
+  const ada = phone(online);
+  await ada.groups.start({ name: "Hoops only", playerName: "Ada", plays: ["nba"] });
+  let ctx = { ...(await contextAt(NOW, ada.store)), mine: await ada.groups.view() };
+  let html = groupScreen(undefined, ctx).html;
+  const [, first] = html.match(/href="#\/pick\/([a-z-]+)">Make your pick</);
+  assert.equal(ctx.fixtures[first].comp, "nba", "a match from a competition this group plays");
+  const nbaInOrder = Object.keys(ctx.fixtures).filter((id) => ctx.fixtures[id].comp === "nba").sort((a, b) => ctx.fixtures[a].kickoff - ctx.fixtures[b].kickoff);
+  assert.equal(first, nbaInOrder[0], "the one that closes soonest");
+  assert.match(html, /Picks close in /);
+  assert.match(html, /href="#\/league">See every match</);
+  assert.ok(html.indexOf("Make your pick") < html.indexOf("Invite code"), "it comes before everything else on the screen");
+
+  // Once that one is picked, the card moves on to the next one not picked yet.
+  ctx = await sealOn(ctx, first, { winner: "home", band: "A" }, { mine: await ada.groups.view() });
+  html = groupScreen(undefined, ctx).html;
+  const [, second] = html.match(/href="#\/pick\/([a-z-]+)">Make your pick</);
+  assert.notEqual(second, first);
+  assert.equal(ctx.fixtures[second].comp, "nba");
+
+  // With nothing open, it says so instead of leaving a gap.
+  const later = { ...(await contextAt(NOW + 30 * 86400, ada.store)), mine: await ada.groups.view() };
+  html = groupScreen(undefined, later).html;
+  assert.doesNotMatch(html, /Make your pick|See your pick/);
+  assert.match(html, /No matches are open for this group right now\./);
 });

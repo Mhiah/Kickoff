@@ -111,7 +111,9 @@ test("a group stops taking players when it is full", async () => {
   for (let i = 1; i < MAX_MEMBERS; i++) await s.store.tableSet(`members:${group.code}`, String(i).padStart(64, "0"), { name: `Player ${i}`, joinedAt: s.clock.now });
   const late = await s.post(await device(), `/api/groups/${group.code}/join`, { playerName: "Late" });
   assert.equal(late.status, 409);
-  assert.match(late.body.error, /This group is full/);
+  assert.equal(MAX_MEMBERS, 30);
+  assert.equal(late.body.error, "This group is full. A group can have 30 players.");
+  assert.equal((await s.get(`/api/groups/${group.code}`)).body.members.length, 30);
   // Someone already in can still change their name.
   assert.equal((await s.post(ada, `/api/groups/${group.code}/join`, { playerName: "Ada B" })).status, 200);
 });

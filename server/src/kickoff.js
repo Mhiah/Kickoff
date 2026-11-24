@@ -33,7 +33,8 @@ export const CLOSES_BEFORE = 10 * 60;
 export const SETTLE = 5;
 export const MAX_GROUP_NAME = 40;
 export const MAX_PLAYER_NAME = 24;
-export const MAX_MEMBERS = 200;
+/** A group is for friends, so it is kept small. When it is full, nobody else can join it. */
+export const MAX_MEMBERS = 30;
 export const COMPETITIONS = ["pl", "cl", "nba", "wnba"];
 
 /** Something the server will not do, with the reason to show the player. */
