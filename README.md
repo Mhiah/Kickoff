@@ -158,10 +158,10 @@ before kickoff.
 
 **State: built and working on the website.** For a real match the phone then sends the fingerprint
 to Kickoff's server, fetches and checks its receipt once picks are locked, and opens the pick after
-kickoff, all by itself. That is built and checked against the server's own code. The robot that
-puts real matches on the server's list is built too (see [robot/README.md](robot/README.md)). Until
-its key is set and it has run, the site shows made-up matches, and a pick for one of those stays
-on the phone.
+kickoff, all by itself. That is built and checked against the server's own code. **It is live:**
+the robot (see [robot/README.md](robot/README.md)) put 74 real matches on the server's list on
+24 November 2026 and keeps them up to date every half hour, so the site now shows real Premier
+League, Champions League and NBA matches to pick.
 
 ### 3. Picks are locked on X Layer before kickoff
 
@@ -309,7 +309,7 @@ results.
 | 6 | Sealing a pick for real, on the player's own device | Done. |
 | 7 | The fixtures feed | Done, and run live against the real feeds. |
 | 8 | Kickoff's server: groups, names, and sealed picks until they are locked | Partly done. The rules, signed requests, addresses and database connection are built, with 53 tests, and it is online with a real database. The website uses it for groups, and is ready to send sealed picks, check receipts and open picks once real matches are on the list. |
-| 9 | The robot: announces fixtures, locks picks before kickoff and posts results on X Layer | Partly done. It keeps Kickoff's list of matches in step with the feeds every half hour, with 14 tests. Still to do: its jobs on X Layer, rehearsed on a private copy first. |
+| 9 | The robot: announces fixtures, locks picks before kickoff and posts results on X Layer | Partly done. It keeps Kickoff's list of matches in step with the feeds every half hour, with 14 tests, and is running live. Still to do: its jobs on X Layer, rehearsed on a private copy first. |
 | 10 | Joining it up: real fixtures and real tables on the website | Not started |
 | 11 | Going live on X Layer: the circuits and Kickoff's account | Not started |
 | 12 | Publishing the site, with the verified copy on DeWEB | Not started |

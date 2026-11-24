@@ -4,7 +4,8 @@ Kickoff's robot: the program that does by itself what nobody should have to do b
 
 > [!NOTE]
 > **What is here:** the robot's first job. Every half hour it makes Kickoff's list of matches agree
-> with the two sports feeds. 14 tests.
+> with the two sports feeds. 14 tests. **It is running live:** its first real run, on 24 November
+> 2026, put 74 matches on the list ([the run](https://github.com/Mhiah/Kickoff/actions/runs/45319717010)).
 > **Not here yet:** its jobs on X Layer: announcing each match, locking each match's picks before
 > kickoff, and posting each result. Those are built next and rehearsed on a private copy of
 > X Layer before they touch the real thing.
