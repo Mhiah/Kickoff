@@ -107,8 +107,10 @@ jobs:
           grep -q "so nothing was sent" go-empty.txt
           test "$(cast nonce "$wallet" --rpc-url "$XLAYER_RPC_URL")" = "0"
 
-          echo "== Test money on the copy: 0.1 OKB"
-          cast rpc anvil_setBalance "$wallet" 0x16345785d8a0000 --rpc-url "$XLAYER_RPC_URL" > /dev/null
+          # The copy quotes a far higher gas price than the real X Layer does, so the wallet is
+          # given more test money than the real one will need.
+          echo "== Test money on the copy: 1 OKB"
+          cast rpc anvil_setBalance "$wallet" 0xde0b6b3a7640000 --rpc-url "$XLAYER_RPC_URL" > /dev/null
           node robot/bin/golive.js look | tee look.txt
           grep -q "The wallet holds enough." look.txt
 
