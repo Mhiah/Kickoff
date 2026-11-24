@@ -4,7 +4,13 @@
 # are added, finished ones get their score, postponed ones are called off. Its report is on each
 # run's own page.
 #
-# It needs four secrets, set in the repository's settings and never written anywhere else:
+# How it keeps going: GitHub's own timer proved unreliable for this (it did not fire at all in the
+# robot's first seven hours). So the robot keeps itself awake. One run works for about five and a
+# half hours, doing its job every half hour, then starts the next run and stops. GitHub's timer is
+# kept only as a safety net: every two hours it checks whether the robot is awake, and starts it
+# if it is not.
+#
+# It needs three secrets, set in the repository's settings and never written anywhere else:
 #   KICKOFF_ADMIN_KEY   the robot's key, which Kickoff's server also holds
 #   FOOTBALL_DATA_KEY   the football feed's key
 #   BALLDONTLIE_KEY     the basketball feed's key
@@ -13,11 +19,15 @@ name: Robot
 
 on:
   schedule:
-    - cron: "7,37 * * * *"
+    - cron: "17 */2 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Only say what would change, and change nothing"
+        description: "Only say what would change, once, and change nothing"
+        type: boolean
+        default: false
+      handover:
+        description: "Started by the previous run (leave unticked)"
         type: boolean
         default: false
   push:
@@ -31,10 +41,7 @@ on:
 
 permissions:
   contents: read
-
-concurrency:
-  group: kickoff-robot
-  cancel-in-progress: false
+  actions: write # only to start its own next run
 
 jobs:
   test:
@@ -49,29 +56,82 @@ jobs:
       - name: Run the tests
         run: node --test "robot/test/*.test.js"
 
-  fixtures:
-    name: Bring Kickoff's list of matches up to date
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+  look:
+    name: Say what would change, and change nothing
+    if: github.event_name == 'workflow_dispatch' && inputs.dry_run
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
       KICKOFF_SERVER: https://kickoff-two-xi.vercel.app
-      KICKOFF_ADMIN_KEY: ${{ secrets.KICKOFF_ADMIN_KEY }}
       FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
       BALLDONTLIE_KEY: ${{ secrets.BALLDONTLIE_KEY }}
-      DRY_RUN: ${{ inputs.dry_run }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Run the robot
+      - run: node robot/bin/robot.js fixtures --dry-run
+
+  awake:
+    name: Keep Kickoff's list of matches up to date
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      KICKOFF_SERVER: https://kickoff-two-xi.vercel.app
+      KICKOFF_ADMIN_KEY: ${{ secrets.KICKOFF_ADMIN_KEY }}
+      FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+      BALLDONTLIE_KEY: ${{ secrets.BALLDONTLIE_KEY }}
+      GH_TOKEN: ${{ github.token }}
+      HANDOVER: ${{ inputs.handover }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Is the robot already awake?
+        id: check
+        run: |
+          # Another run of the robot that is working right now, other than this one. Test runs do not count.
+          others=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow robot.yml --status in_progress --limit 20 --json databaseId,event \
+            --jq "[.[] | select(.databaseId != $GITHUB_RUN_ID and (.event == \"schedule\" or .event == \"workflow_dispatch\"))] | length")
+          if [ "$HANDOVER" = "true" ]; then
+            echo "Started by the previous run, which is finishing."
+            echo "go=yes" >> "$GITHUB_OUTPUT"
+          elif [ "$others" = "0" ]; then
+            echo "The robot was asleep. Waking it."
+            echo "go=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "The robot is already awake, so there is nothing to do." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "go=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Do the job every half hour
+        if: steps.check.outputs.go == 'yes'
         run: |
           if [ -z "$KICKOFF_ADMIN_KEY" ]; then
-            echo "The robot's key is not set yet, so this run only looks." >> "$GITHUB_STEP_SUMMARY"
-            node robot/bin/robot.js fixtures --dry-run
-          elif [ "$DRY_RUN" = "true" ]; then
-            node robot/bin/robot.js fixtures --dry-run
-          else
-            node robot/bin/robot.js fixtures
+            echo "The robot's key is not set yet, so it only looks." | tee -a "$GITHUB_STEP_SUMMARY"
+            look="--dry-run"
+          fi
+          failed=0
+          for round in 1 2 3 4 5 6 7 8 9 10 11; do
+            echo "::group::Round $round, $(date -u '+%H:%M') UTC"
+            if [ "$round" = "1" ]; then quiet=""; else quiet="--quiet"; fi
+            if node robot/bin/robot.js fixtures $look $quiet; then failed=0; else failed=$((failed + 1)); echo "::warning::Round $round did not go through. It will try again next round."; fi
+            echo "::endgroup::"
+            if [ "$round" != "11" ]; then sleep 1740; fi
+          done
+          echo "failed_in_a_row=$failed" >> "$GITHUB_ENV"
+
+      - name: Start the next run
+        if: always() && steps.check.outputs.go == 'yes'
+        run: gh workflow run robot.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f handover=true
+
+      - name: Say so if the last rounds all failed
+        if: steps.check.outputs.go == 'yes'
+        run: |
+          if [ "${failed_in_a_row:-0}" -ge 3 ]; then
+            echo "The last $failed_in_a_row rounds failed. Look at the reports on this page."
+            exit 1
           fi

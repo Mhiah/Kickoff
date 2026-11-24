@@ -3,6 +3,8 @@
 //
 //   node robot/bin/robot.js fixtures            make Kickoff's list match this week's real matches
 //   node robot/bin/robot.js fixtures --dry-run  say what would change, and change nothing
+//   node robot/bin/robot.js fixtures --quiet    the same as the first, but on GitHub the report only
+//                                               goes on the run's page if something changed or went wrong
 //
 // It reads four settings and prints none of them:
 //   KICKOFF_SERVER       Kickoff's server address
@@ -16,6 +18,7 @@ import { inWords, syncFixtures } from "../src/sync.js";
 
 const [command, ...flags] = process.argv.slice(2);
 const dryRun = flags.includes("--dry-run");
+const quiet = flags.includes("--quiet");
 const server = (process.env.KICKOFF_SERVER ?? "").replace(/\/+$/, "");
 const adminKey = process.env.KICKOFF_ADMIN_KEY ?? "";
 
@@ -40,5 +43,6 @@ const report = await syncFixtures({
 const words = inWords(report);
 console.log(words);
 // On GitHub, also put the report on the run's own page.
-if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Kickoff's robot: fixtures\n\n\`\`\`\n${words}\n\`\`\`\n`);
+const news = report.added.length + report.updated.length + report.calledOff.length + report.problems.length > 0;
+if (process.env.GITHUB_STEP_SUMMARY && (news || !quiet)) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Kickoff's robot: fixtures, ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC\n\n\`\`\`\n${words}\n\`\`\`\n`);
 process.exit(report.ok ? 0 : 1);

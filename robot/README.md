@@ -12,7 +12,7 @@ Kickoff's robot: the program that does by itself what nobody should have to do b
 
 ## What it does now
 
-It runs on GitHub, on a timer. Each run:
+It runs on GitHub and does its job every half hour. Each time:
 
 1. Fetches the coming week's matches from the two feeds: Premier League and Champions League from
    one, NBA and WNBA from the other.
@@ -66,7 +66,8 @@ You need Node 22 or newer. Nothing has to be installed.
 | See what a run would change, without changing anything | `KICKOFF_SERVER=https://kickoff-two-xi.vercel.app FOOTBALL_DATA_KEY=… BALLDONTLIE_KEY=… node robot/bin/robot.js fixtures --dry-run` |
 
 On GitHub, open the **Robot** workflow, choose **Run workflow**, and tick "Only say what would
-change" for the same dry run. Every run's report is on its own page.
+change" for the same dry run. Run it with nothing ticked to wake the robot if it has stopped.
+Every run's report is on its own page.
 
 ## What is in this folder
 
@@ -86,5 +87,9 @@ change" for the same dry run. Every run's report is on its own page.
   true. Disputes are how a wrong one gets challenged.
 - **The free feeds are slow.** Scores can arrive some minutes after the final whistle, and the
   robot looks every half hour.
-- **GitHub's timer is not exact.** A run can start several minutes late. Nothing the robot does
-  now depends on exact timing.
+- **GitHub's own timer could not be relied on.** In the robot's first seven hours it did not fire
+  once. So the robot keeps itself awake: one run works for about five and a half hours, then
+  starts the next and stops. GitHub's timer is kept only as a safety net, to wake the robot if it
+  ever stops. If both failed, the list would simply stop updating until someone pressed
+  **Run workflow**. Nothing would be lost, and picks would still close on time, because the server
+  does that by itself.
