@@ -15,7 +15,7 @@ async function seal(who, fixture, pick) {
   return { fingerprint: toHex(sealed.fingerprint), salt: toHex(sealed.salt), pickByte: sealed.pickByte };
 }
 
-test("a sealed pick is taken in, and the server is told only its fingerprint", async () => {
+test("a sealed prediction is taken in, and the server is told only its fingerprint", async () => {
   const s = await serverWithFixtures();
   const ada = await device();
   const mine = await seal(ada, s.f.football, { home: 2, away: 1 });
@@ -31,11 +31,11 @@ test("a sealed pick is taken in, and the server is told only its fingerprint", a
   const seen = await s.get(`/api/matches/${s.f.football.id}`);
   assert.equal(seen.body.sealedCount, 1);
   assert.deepEqual(seen.body.opened, []);
-  assert.equal(seen.body.sealedBy, undefined, "who has picked is not shown before kickoff");
+  assert.equal(seen.body.sealedBy, undefined, "who has predicted is not shown before kickoff");
   assert.ok(!JSON.stringify(seen.body).includes(ada.player));
 });
 
-test("a pick can be changed until picks close, and the last one sent is the one that counts", async () => {
+test("a prediction can be changed until predictions close, and the last one sent is the one that counts", async () => {
   const s = await serverWithFixtures();
   const ada = await device();
   const first = await seal(ada, s.f.football, { home: 2, away: 1 });
@@ -45,10 +45,10 @@ test("a pick can be changed until picks close, and the last one sent is the one 
   await s.post(ada, "/api/picks", { match: s.f.football.id, fingerprint: second.fingerprint });
   const held = await s.post(ada, "/api/picks/mine", { match: s.f.football.id });
   assert.deepEqual(held.body.sealed, { fingerprint: second.fingerprint, locked: false });
-  assert.equal((await s.get(`/api/matches/${s.f.football.id}`)).body.sealedCount, 1, "still one pick, not two");
+  assert.equal((await s.get(`/api/matches/${s.f.football.id}`)).body.sealedCount, 1, "still one prediction, not two");
 });
 
-test("picks close ten minutes before the start, to the second", async () => {
+test("predictions close ten minutes before the start, to the second", async () => {
   const s = await serverWithFixtures();
   const [ada, bola] = [await device(), await device()];
   const closes = s.f.football.kickoff - CLOSES_BEFORE;
@@ -58,13 +58,13 @@ test("picks close ten minutes before the start, to the second", async () => {
   s.clock.now = closes;
   const late = await s.post(bola, "/api/picks", { match: s.f.football.id, fingerprint: (await seal(bola, s.f.football, { home: 1, away: 0 })).fingerprint });
   assert.equal(late.status, 409);
-  assert.match(late.body.error, /Picks for this match have closed/);
+  assert.match(late.body.error, /Predictions for this match have closed/);
   // Nor can the one who was in time change theirs now.
   const change = await s.post(ada, "/api/picks", { match: s.f.football.id, fingerprint: (await seal(ada, s.f.football, { home: 3, away: 3 })).fingerprint });
   assert.equal(change.status, 409);
 });
 
-test("CHEAT: nobody can send or change a pick in another player's name", async () => {
+test("CHEAT: nobody can send or change a prediction in another player's name", async () => {
   const s = await serverWithFixtures();
   const [ada, mallory] = [await device(), await device()];
   const adas = await seal(ada, s.f.football, { home: 2, away: 1 });
@@ -86,7 +86,7 @@ test("CHEAT: nobody can send or change a pick in another player's name", async (
   assert.equal(bare.status, 401);
 });
 
-test("CHEAT: an earlier pick cannot be played back over a later one", async () => {
+test("CHEAT: an earlier prediction cannot be played back over a later one", async () => {
   const s = await serverWithFixtures();
   const ada = await device();
   const first = await seal(ada, s.f.football, { home: 2, away: 1 });
@@ -99,11 +99,11 @@ test("CHEAT: an earlier pick cannot be played back over a later one", async () =
   s.clock.now += 30;
   const replay = await s.handle({ method: "POST", path: "/api/picks", headers: {}, body: firstRequest });
   assert.equal(replay.status, 409);
-  assert.match(replay.body.error, /newer pick from this device is already in/);
+  assert.match(replay.body.error, /newer prediction from this device is already in/);
   assert.equal((await s.post(ada, "/api/picks/mine", { match: s.f.football.id })).body.sealed.fingerprint, second.fingerprint);
 });
 
-test("things that are not picks, or not matches, are refused", async () => {
+test("things that are not predictions, or not matches, are refused", async () => {
   const s = await serverWithFixtures();
   const ada = await device();
   const send = (payload) => s.post(ada, "/api/picks", payload);
@@ -111,7 +111,7 @@ test("things that are not picks, or not matches, are refused", async () => {
   assert.equal((await send({ match: "nope", fingerprint: "cd".repeat(32) })).status, 400);
   assert.equal((await send({ match: s.f.football.id, fingerprint: "CD".repeat(32) })).status, 400);
   assert.equal((await send({ match: s.f.football.id })).status, 400);
-  assert.equal((await send({ match: s.f.football.id, fingerprint: { home: 2, away: 1 } })).status, 400, "a pick in the clear is not accepted");
+  assert.equal((await send({ match: s.f.football.id, fingerprint: { home: 2, away: 1 } })).status, 400, "a prediction in the clear is not accepted");
 });
 
 test("a match that is called off stops taking picks", async () => {
@@ -120,10 +120,10 @@ test("a match that is called off stops taking picks", async () => {
   await s.robot("/api/admin/fixtures", { fixtures: [{ ...s.f.football, state: "void", note: "postponed" }] });
   const sent = await s.post(ada, "/api/picks", { match: s.f.football.id, fingerprint: "cd".repeat(32) });
   assert.equal(sent.status, 409);
-  assert.match(sent.body.error, /no longer open for picks/);
+  assert.match(sent.body.error, /no longer open for predictions/);
 });
 
-test("freezing bundles the picks exactly as the engine does, and after it nothing changes", async () => {
+test("freezing bundles the predictions exactly as the engine does, and after it nothing changes", async () => {
   const s = await serverWithFixtures();
   const players = [await device(), await device(), await device()];
   const sealed = [];
@@ -155,14 +155,14 @@ test("freezing bundles the picks exactly as the engine does, and after it nothin
   assert.equal((await s.get(`/api/matches/${s.f.football.id}`)).body.locked.root, frozen.body.root);
 });
 
-test("a match can be frozen with no picks in it", async () => {
+test("a match can be frozen with no predictions in it", async () => {
   const s = await serverWithFixtures();
   const frozen = await s.freeze(s.f.basketball);
   assert.equal(frozen.body.count, 0);
   assert.equal(frozen.body.root, toHex((await buildBundle({ league: LEAGUE, match: s.f.basketball.id, entries: [] })).root));
 });
 
-test("the server bundles a match's picks by itself, the first time anyone looks after picks close", async () => {
+test("the server bundles a match's predictions by itself, the first time anyone looks after predictions close", async () => {
   const s = await serverWithFixtures();
   const [ada, bola] = [await device(), await device()];
   const adas = await seal(ada, s.f.football, { home: 2, away: 1 });
@@ -188,7 +188,7 @@ test("the server bundles a match's picks by itself, the first time anyone looks 
   assert.equal(asked.body.frozenAt, s.f.football.kickoff - CLOSES_BEFORE + SETTLE);
 });
 
-test("if nobody looks until after kickoff, the bundle is still the picks that were in when picks closed", async () => {
+test("if nobody looks until after kickoff, the bundle is still the predictions that were in when predictions closed", async () => {
   const s = await serverWithFixtures();
   const ada = await device();
   const adas = await seal(ada, s.f.football, { home: 2, away: 1 });
@@ -196,7 +196,7 @@ test("if nobody looks until after kickoff, the bundle is still the picks that we
   // The robot never runs. The first anyone hears of this match again is Ada opening her pick.
   s.clock.now = s.f.football.kickoff + 3600;
   const late = await s.post(await device(), "/api/picks", { match: s.f.football.id, fingerprint: "ee".repeat(32) });
-  assert.equal(late.status, 409, "nothing gets in after picks close, bundle or no bundle");
+  assert.equal(late.status, 409, "nothing gets in after predictions close, bundle or no bundle");
   const opened = await s.post(ada, "/api/opened", { match: s.f.football.id, pickByte: adas.pickByte, salt: adas.salt });
   assert.equal(opened.status, 200);
   const seen = await s.get(`/api/matches/${s.f.football.id}`);
@@ -204,7 +204,7 @@ test("if nobody looks until after kickoff, the bundle is still the picks that we
   assert.deepEqual(seen.body.opened, [{ player: ada.player, pickByte: adas.pickByte }]);
 });
 
-test("every player gets a receipt that proves their pick is in the locked bundle", async () => {
+test("every player gets a receipt that proves their prediction is in the locked bundle", async () => {
   const s = await serverWithFixtures();
   const players = [await device(), await device(), await device(), await device(), await device()];
   for (const [i, who] of players.entries()) {
@@ -228,7 +228,7 @@ test("every player gets a receipt that proves their pick is in the locked bundle
   assert.equal(outsider.status, 404);
 });
 
-test("a pick is opened only after the start, and only by the pick and secret that were sealed", async () => {
+test("a prediction is opened only after the start, and only by the prediction and secret that were sealed", async () => {
   const s = await serverWithFixtures();
   const [ada, bola] = [await device(), await device()];
   const adas = await seal(ada, s.f.football, { home: 2, away: 1 });
@@ -248,7 +248,7 @@ test("a pick is opened only after the start, and only by the pick and secret tha
   const changed = await open(ada, { ...adas, pickByte: encodePick(FOOTBALL, { home: 3, away: 0 }) });
   assert.equal(changed.status, 409);
   assert.match(changed.body.error, /do not produce the fingerprint you sealed/);
-  // CHEAT: Bola tries to open with Ada's pick and secret.
+  // CHEAT: Bola tries to open with Ada's prediction and secret.
   assert.equal((await open(bola, adas)).status, 409);
   // CHEAT: someone with no pick in the bundle tries to open one.
   assert.equal((await open(await device(), adas)).status, 404);

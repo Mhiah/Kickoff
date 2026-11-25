@@ -14,8 +14,9 @@
 
 import { appendFileSync } from "node:fs";
 
-import { XLAYER, leagueOfCircuit, toHex } from "../../engine/src/index.js";
+import { XLAYER, connect, leagueOfCircuit, toHex } from "../../engine/src/index.js";
 import { chainTick, newMemory } from "../src/chain.js";
+import { createNotes, noteMissed, walletWatch } from "../src/notes.js";
 import { createServer } from "../src/server.js";
 import { inWords, syncFixtures } from "../src/sync.js";
 import { watch } from "../src/watch.js";
@@ -70,6 +71,10 @@ if (command === "fixtures") {
 //   KICKOFF_PROCESSOR    the TapeOut processor the league's circuit is on
 //   KICKOFF_CIRCUIT      the league's circuit number
 //   XLAYER_RPC_URL       the X Layer node to use (optional)
+//
+// On GitHub the robot can also leave a note for the person who runs Kickoff (see notes.js): when
+// its wallet runs low, and when a match's picks were not locked in time. That uses the token
+// GitHub hands the workflow (GH_TOKEN) and the repository's name (GITHUB_REPOSITORY).
 
 const minutesAt = flags.indexOf("--minutes");
 const minutes = minutesAt >= 0 ? Number(flags[minutesAt + 1]) : 320;
@@ -83,9 +88,15 @@ const say = (line) => {
 };
 if (!canChange) say("The robot's key is not set, so it only looks at the list of matches and changes nothing.");
 
+/** When Kickoff went live on X Layer: 24 November 2026, 22:34 UTC. Matches from before then were never there to be locked. */
+const LIVE_SINCE = Number(process.env.KICKOFF_LIVE_SINCE || 1795559640);
+
 const kickoff = createServer({ server, adminKey });
 const memory = newMemory();
+const notes = createNotes({ repo: process.env.GITHUB_REPOSITORY, token: process.env.GH_TOKEN });
 let chainRound = null;
+let walletLook = null;
+let unnoted = []; // missed locks whose note could not be written yet
 const { KICKOFF_WALLET_KEY: walletKey, KICKOFF_PROCESSOR: processor, KICKOFF_CIRCUIT: circuit } = process.env;
 if (walletKey && processor && circuit) {
   try {
@@ -98,7 +109,13 @@ if (walletKey && processor && circuit) {
     if (listed.league !== league) throw new Error("Kickoff's server is set up for a different league from the one this wallet holds");
     const sender = await castSender({ node, key: walletKey });
     const chain = createChain({ node, league, processor, circuit, sender });
-    chainRound = (fixtures) => chainTick({ now: clock(), league, fixtures, server: kickoff, chain, memory });
+    chainRound = async (fixtures) => {
+      const out = await chainTick({ now: clock(), league, fixtures, server: kickoff, chain, memory, since: LIVE_SINCE });
+      unnoted = await noteMissed({ missed: [...unnoted, ...out.missed], notes, say });
+      return out;
+    };
+    const rpc = connect(node);
+    walletLook = walletWatch({ balance: async () => BigInt(await rpc("eth_getBalance", [sender.address, "latest"])), wallet: sender.address, notes, say });
     say(`Working on X Layer as league 0x${league}.`);
   } catch (error) {
     say(`PROBLEM: the X Layer work is switched off for this run (${error.message}). The list of matches is still kept up to date.`);
@@ -111,7 +128,12 @@ const tally = await watch({
   until: clock() + minutes * 60,
   now: clock,
   sleep: (seconds) => new Promise((done) => setTimeout(done, seconds * 1000)),
-  sync: () => fixturesRound({ dry: !canChange, hush: true }),
+  // Every half hour, after the list of matches: is the wallet still holding enough?
+  sync: async () => {
+    const report = await fixturesRound({ dry: !canChange, hush: true });
+    if (walletLook) await walletLook();
+    return report;
+  },
   list: async () => (await kickoff.list()).fixtures,
   chain: chainRound,
   memory,

@@ -170,7 +170,7 @@ test("two devices that were separate players in a group become one seat when the
   assert.equal((await s.post(await device(), `/api/groups/${group.code}/join`, { playerName: "Ada laptop" })).status, 200);
 });
 
-test("one player, one pick: a pick from a wallet's other device is replaced, not added", async () => {
+test("one player, one pick: a prediction from a wallet's other device is replaced, not added", async () => {
   const s = await serverWithFixtures();
   const [oldPhone, newPhone, bola] = [await device(), await device(), await device()];
   const wallet = testWallet("ada");

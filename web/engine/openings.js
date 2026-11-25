@@ -10,12 +10,20 @@
 //   {
 //     "v": 1,
 //     "match": "0x…",
-//     "entries":  [ { "player": "0x…", "fingerprint": "0x…" }, … ],
+//     "entries":  [ { "player": "0x…", "fingerprint": "0x…", "joined": 1764000000 }, … ],
 //     "openings": [ { "player": "0x…", "pickByte": 18, "salt": "0x…", "index": 1, "path": ["0x…", …] }, … ]
 //   }
 //
-// Nothing in the file is taken on trust. The entries are only used if they produce the root on
+// Nothing about a pick is taken on trust. The entries are only used if they produce the root on
 // chain, and each opening is checked by open.js.
+//
+// "joined" is when the player joined Kickoff, in seconds. It is there for one thing: two players
+// level on points are put in the order they joined. Joining happens on Kickoff, not on chain, so
+// this is the league's word, published where anyone can read it and see if it ever changes. It may
+// be left out.
+//
+// A file can be any size. The league's site stores it in pieces of 24,000 bytes, and a reader
+// checks the whole file against the fingerprint stored with it before using any of it.
 
 import { equal, fromHex, id32, toHex } from "./bytes.js";
 import { fingerprintOf } from "./seal.js";
@@ -26,17 +34,25 @@ const id = (value, name) => {
   return fromHex(value);
 };
 
+const when = (value) => {
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error("joined must be a time in whole seconds");
+  return value;
+};
+
 /** Where a match's file is kept on the league's on-chain site. */
 export function openingsPath(match) {
   return `openings/${toHex(id32(match, "match"))}.json`;
 }
 
-/** Write the file. `openings` are { pickByte, player, salt, receipt } as the engine makes them. */
+/**
+ * Write the file. `openings` are { pickByte, player, salt, receipt } as the engine makes them.
+ * An entry may carry `joined`: when that player joined Kickoff, in seconds.
+ */
 export function writeOpenings({ match, entries, openings }) {
   return JSON.stringify({
     v: 1,
     match: hex(id32(match, "match")),
-    entries: entries.map((e) => ({ player: hex(e.player), fingerprint: hex(e.fingerprint) })),
+    entries: entries.map((e) => ({ player: hex(e.player), fingerprint: hex(e.fingerprint), ...(e.joined === undefined || e.joined === null ? {} : { joined: when(e.joined) }) })),
     openings: openings.map((o) => ({
       player: hex(o.player),
       pickByte: o.pickByte,
@@ -55,7 +71,11 @@ export function parseOpenings(fileText) {
   }
   return {
     match: id(d.match, "match"),
-    entries: d.entries.map((e) => ({ player: id(e.player, "player"), fingerprint: id(e.fingerprint, "fingerprint") })),
+    entries: d.entries.map((e) => ({
+      player: id(e.player, "player"),
+      fingerprint: id(e.fingerprint, "fingerprint"),
+      ...(e.joined === undefined ? {} : { joined: when(e.joined) }),
+    })),
     openings: d.openings.map((o) => {
       if (!Number.isInteger(o.pickByte) || o.pickByte < 0 || o.pickByte > 255) throw new Error("pickByte must be one byte");
       if (!Number.isInteger(o.index) || o.index < 0 || !Array.isArray(o.path)) throw new Error("bad receipt");

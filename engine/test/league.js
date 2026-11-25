@@ -14,6 +14,7 @@ export const CHECK_RESULTS = JSON.parse(readFileSync(new URL("check.json", out),
 /**
  * @param picks  { name: pick } for every player who seals a pick
  * @param open   the names of the players who open theirs (everyone, unless told otherwise)
+ * @param joined { name: when they joined Kickoff, in seconds }, for the players the league says so for
  */
 export async function playMatch({
   label,
@@ -25,13 +26,14 @@ export async function playMatch({
   kickoff = KICKOFF,
   lockedAt = kickoff - 600,
   open = Object.keys(picks),
+  joined = {},
 }) {
   const matchId = id(`match: ${label}`);
   const sealed = {};
   for (const [name, pick] of Object.entries(picks)) {
     sealed[name] = await sealPick({ league: LEAGUE, match: matchId, sport, pick, player: id(name), matchInfo });
   }
-  const entries = Object.keys(picks).map((name) => ({ player: id(name), fingerprint: sealed[name].fingerprint }));
+  const entries = Object.keys(picks).map((name) => ({ player: id(name), fingerprint: sealed[name].fingerprint, ...(name in joined ? { joined: joined[name] } : {}) }));
   const bundle = await buildBundle({ league: LEAGUE, match: matchId, entries });
   const openings = [];
   for (const name of open) {

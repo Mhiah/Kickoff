@@ -5,7 +5,8 @@
 //   the mailbox (TapeSend)   announcements, locks and results go to the league's own inbox, sent
 //                            from the league's own account. Only the holder of the league's
 //                            circuit can send as the league.
-//   the site store (DeWEB)   the opened picks are published as a file on the league's site.
+//   the site store (DeWEB)   the opened picks are published as a file on the league's site, in as
+//                            many pieces as the file needs.
 //
 // Two ways of sending are offered:
 //   castSender   signs with a private key, using Foundry's `cast`. This is the real one. The key is
@@ -82,6 +83,27 @@ export async function castSender({ node, key, exec = run }) {
   };
 }
 
+/** The most the league's site takes in one piece, in bytes. */
+export const PIECE = 24000;
+
+/**
+ * What has to be sent to put a file on an account's site (TapeOut's DeWEB site store).
+ *
+ * The first call replaces whatever was at that path and carries the fingerprint of the WHOLE file.
+ * Each call after it adds the next piece. Until the last piece is in, the file on chain does not
+ * match its fingerprint, and readers leave it alone. If the robot stops half way, the next try
+ * starts again from the first piece.
+ * @returns [{ signature, values }], to be sent in this order
+ */
+export function publishCalls({ account, path, bytes, contentType = "application/json" }) {
+  const sha = new Uint8Array(createHash("sha256").update(bytes).digest());
+  const calls = [{ signature: "putFile(address,string,string,bytes32,bytes)", values: [account, path, contentType, sha, bytes.subarray(0, PIECE)] }];
+  for (let at = PIECE; at < bytes.length; at += PIECE) {
+    calls.push({ signature: "appendChunk(address,string,uint256,bytes)", values: [account, path, BigInt(calls.length), bytes.subarray(at, at + PIECE)] });
+  }
+  return calls;
+}
+
 /** Ask a contract a question. */
 export async function ask(rpc, to, signature, values, types) {
   return decode(types, fromHex(await rpc("eth_call", [{ to, data: callData(signature, values) }, "latest"])));
@@ -138,11 +160,15 @@ export function createChain({ node, league, processor, circuit, sender, mailbox 
     send(message) {
       return sender.transact({ to: mailbox, signature: "send(address,uint256,bytes32,bytes32,bytes)", values: [processor, BigInt(circuit), id, message.ref, message.payload] });
     },
-    /** Publish a match's file of opened picks on the league's site. */
-    publish(match, fileText) {
-      const bytes = new TextEncoder().encode(fileText);
-      const sha = new Uint8Array(createHash("sha256").update(bytes).digest());
-      return sender.transact({ to: sites, signature: "putFile(address,string,string,bytes32,bytes)", values: [account, openingsPath(fromHex(match)), "application/json", sha, bytes] });
+    /**
+     * Publish a match's file of opened picks on the league's site, whatever its size. The site
+     * takes a file in pieces, so each piece is one transaction, sent in order.
+     * @returns how many pieces it took
+     */
+    async publish(match, fileText) {
+      const calls = publishCalls({ account, path: openingsPath(fromHex(match)), bytes: new TextEncoder().encode(fileText) });
+      for (const call of calls) await sender.transact({ to: sites, ...call });
+      return calls.length;
     },
     /** How many opened picks are in the file already published for a match. */
     async publishedCount(match) {

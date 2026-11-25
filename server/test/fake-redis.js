@@ -28,6 +28,8 @@ export function fakeRedis() {
       }
       case "HDEL":
         return hashes.get(args[0])?.delete(args[1]) ? 1 : 0;
+      case "HLEN":
+        return hashes.get(args[0])?.size ?? 0;
       case "HGETALL":
         return [...(hashes.get(args[0]) ?? [])].flat();
       default:

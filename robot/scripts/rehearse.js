@@ -13,9 +13,12 @@
 //   4. CHEAT: after kickoff, a changed bundle is locked with the league's own key.
 //   5. The phones open their picks (one never does), the results come in, and the robot records
 //      the results and publishes the opened picks.
+//   5b. A CROWD: a hundred more phones pick a fourth match. Their opened picks are far too many
+//      for one piece of the league's site, so the robot publishes the file in pieces.
 //   6. A second robot starts with no memory. It must write nothing.
 //   7. Everything is thrown away except the league's id. The table is rebuilt from the copy of
-//      X Layer alone. It has to come out as ada 6, bola 2, chidi 0.
+//      X Layer alone. It has to come out as ada 6, bola 2, chidi 0, with all hundred of the crowd
+//      scored, and players level on points in the order they joined.
 //
 // Usage:
 //   node robot/scripts/rehearse.js --node http://127.0.0.1:8545 [--cast-key <a throwaway key>]
@@ -28,13 +31,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import {
   BASKETBALL, FOOTBALL, XLAYER, basketballResult, buildBundle, connect, encodePick, fetchLeague, lockMessage, matchId, newDeviceKey, playerIdOf, sealPick,
-  signRequest, tableFromXLayer, toHex, fromHex, loadCircuits,
+  signRequest, tableFromXLayer, toHex, fromHex, loadCircuits, openingsPath,
 } from "../../engine/src/index.js";
 import { createHandler } from "../../server/src/http.js";
 import { createKickoff } from "../../server/src/kickoff.js";
 import { MemoryStore } from "../../server/src/store.js";
 import { CLOSES_BEFORE, chainTick, lockTime, newMemory } from "../src/chain.js";
-import { becomeALeague, castSender, createChain, nodeSender } from "../src/xlayer.js";
+import { PIECE, ask, becomeALeague, castSender, createChain, nodeSender } from "../src/xlayer.js";
 
 const DEFAULTS = {
   node: "http://127.0.0.1:8545",
@@ -124,6 +127,7 @@ const facts = {
   football: { comp: "pl", sport: FOOTBALL, home: "Arsenal", away: "Chelsea", kickoff: start + 2 * HOUR, label: "Premier League: Arsenal v Chelsea" },
   basketball: { comp: "nba", sport: BASKETBALL, home: "Knicks", away: "Bucks", kickoff: start + 3 * HOUR, label: "NBA: Knicks v Bucks" },
   nobody: { comp: "cl", sport: FOOTBALL, home: "Inter", away: "Barcelona", kickoff: start + 2 * HOUR, label: "Champions League: Inter v Barcelona" },
+  crowd: { comp: "wnba", sport: BASKETBALL, home: "Liberty", away: "Aces", kickoff: start + 4 * HOUR, label: "WNBA: Liberty v Aces" },
 };
 const f = {};
 for (const [name, x] of Object.entries(facts)) f[name] = { id: toHex(await matchId(LEAGUE, { sport: x.sport, kickoff: x.kickoff, bestOf: 0, label: x.label })), feedId: `rehearsal:${name}`, state: "scheduled", ...x };
@@ -134,7 +138,11 @@ const PICKS = {
   football: { ada: { home: 2, away: 1 }, bola: { home: 1, away: 0 }, chidi: { home: 0, away: 3 } },
   basketball: { ada: { winner: "home", band: "A" }, bola: { winner: "home", band: "B" }, chidi: { winner: "away", band: "B" } },
 };
-const RESULTS = { football: { home: 2, away: 1 }, basketball: basketballResult({ home: 104, away: 101 }) };
+const RESULTS = { football: { home: 2, away: 1 }, basketball: basketballResult({ home: 104, away: 101 }), crowd: basketballResult({ home: 104, away: 101 }) };
+// The crowd's picks, turn and turn about: 3 points, 1 point, none.
+const CROWD = 100;
+const CROWD_PICKS = [{ winner: "home", band: "A" }, { winner: "home", band: "B" }, { winner: "away", band: "B" }];
+const CROWD_POINTS = [3, 1, 0];
 const phones = {};
 for (const name of ["ada", "bola", "chidi"]) {
   const key = await newDeviceKey();
@@ -150,7 +158,17 @@ for (const which of ["football", "basketball"]) {
     if (answer.status !== 200) throw new Error(`a sealed pick was refused: ${answer.body.error}`);
   }
 }
-say(` 2. three matches are on Kickoff's list. Ada, Bola and Chidi entered sealed picks for two of them.`);
+const crowd = [];
+for (let i = 0; i < CROWD; i++) {
+  clock.now = start + 700 + i; // each joins Kickoff a second after the one before
+  const key = await newDeviceKey();
+  const phone = { key, id: toHex(await playerIdOf(key.publicKey)) };
+  phone.sealed = await sealPick({ league: LEAGUE, match: f.crowd.id, sport: BASKETBALL, pick: CROWD_PICKS[i % 3], player: phone.id });
+  const answer = await post(phone, "/api/picks", { match: f.crowd.id, fingerprint: toHex(phone.sealed.fingerprint) });
+  if (answer.status !== 200) throw new Error(`a sealed pick from the crowd was refused: ${answer.body.error}`);
+  crowd.push(phone);
+}
+say(` 2. four matches are on Kickoff's list. Ada, Bola and Chidi entered sealed picks for two of them, and a crowd of ${CROWD} for a third.`);
 
 // ------------------------------------------------------------------ the robot
 
@@ -163,6 +181,11 @@ const server = {
   openings: async (match) => {
     const answer = await handle({ method: "GET", path: `/api/matches/${match}/openings`, headers: {}, body: null });
     return answer.status === 200 ? JSON.stringify(answer.body) : null;
+  },
+  report: async (locks) => {
+    const answer = await admin("/api/admin/locks", { locks });
+    if (answer.status !== 200) throw new Error(answer.body.error);
+    return answer.body;
   },
 };
 const chain = createChain({ node: set.node, league: LEAGUE, processor: set.processor, circuit: made.circuit, sender, mailbox: set.mailbox, sites: set.sites });
@@ -186,8 +209,11 @@ const lockedFootball = await tick();
 clock.now = lockTime(f.basketball);
 say(`    and for the basketball:`);
 const lockedBasketball = await tick();
+clock.now = lockTime(f.crowd);
+say(`    and for the match the crowd picked:`);
+const lockedCrowd = await tick();
 const afterLocks = await balance();
-say(`    announcing and locking two matches cost ${okb(afterSetup - afterLocks)}`);
+say(`    announcing and locking three matches cost ${okb(afterSetup - afterLocks)}`);
 
 // ------------------------------------------------------------------ 4. the cheat
 
@@ -218,8 +244,25 @@ for (const name of ["ada", "bola", "chidi"]) await open(name, "basketball");
 await admin("/api/admin/fixtures", { fixtures: [{ ...f.basketball, state: "final", score: "104 – 101", resultByte: encodePick(BASKETBALL, RESULTS.basketball) }] });
 say(`    all three opened their basketball picks, and the feed says Knicks 104 – 101 Bucks:`);
 const afterBasketball = await tick();
+const afterTwo = await balance();
+say(`    recording two results and publishing two files cost ${okb(afterLocks - afterTwo)}`);
+
+// ------------------------------------------------------------------ 5b. the crowd
+
+clock.now = f.crowd.kickoff + 2 * HOUR;
+for (const phone of crowd) {
+  const answer = await post(phone, "/api/opened", { match: f.crowd.id, pickByte: phone.sealed.pickByte, salt: toHex(phone.sealed.salt) });
+  if (answer.status !== 200) throw new Error(`an opened pick from the crowd was refused: ${answer.body.error}`);
+}
+await admin("/api/admin/fixtures", { fixtures: [{ ...f.crowd, state: "final", score: "104 – 101", resultByte: encodePick(BASKETBALL, RESULTS.crowd) }] });
+const crowdFile = await server.openings(f.crowd.id);
+const crowdBytes = new TextEncoder().encode(crowdFile).length;
+say(` 5b. all ${CROWD} of the crowd opened their picks. The file of them is ${crowdBytes.toLocaleString("en-GB")} bytes, and one piece of the site takes ${PIECE.toLocaleString("en-GB")}:`);
+const afterCrowd = await tick();
 const afterAll = await balance();
-say(`    recording two results and publishing two files cost ${okb(afterLocks - afterAll)}`);
+const crowdOnChain = await ask(rpc, set.sites, "fileInfo(address,string)", [made.account, openingsPath(fromHex(f.crowd.id))], ["uint256", "string", "bytes32", "uint256", "uint256"]);
+say(`    on the copy of X Layer the file is ${Number(crowdOnChain[0]).toLocaleString("en-GB")} bytes in ${crowdOnChain[4]} pieces`);
+say(`    recording that result and publishing that file cost ${okb(afterTwo - afterAll)}`);
 
 // ------------------------------------------------------------------ 6. a second robot, with no memory
 
@@ -236,9 +279,21 @@ const circuit = (name) => readFileSync(new URL(`../../circuits/out/${name}.hex`,
 const circuits = loadCircuits({ football: circuit("football"), basketball: circuit("basketball"), tennis: circuit("tennis") });
 const read = await tableFromXLayer({ node: set.node, mailbox: set.mailbox, sites: set.sites, league: fromHex(LEAGUE), circuits });
 const names = Object.fromEntries(Object.entries(phones).map(([name, p]) => [p.id, name]));
-const points = Object.fromEntries(read.table.map((row) => [names[toHex(row.player)] ?? "?", row.points]));
+const points = Object.fromEntries(read.table.filter((row) => names[toHex(row.player)]).map((row) => [names[toHex(row.player)], row.points]));
 say(` 7. the league was fetched back from the copy of X Layer, and the table rebuilt from that alone:`);
 for (const [name, p] of Object.entries(points)) say(`      ${name.padEnd(6)} ${p}`);
+const crowdIndex = new Map(crowd.map((p, i) => [p.id, i]));
+const crowdRows = read.table.filter((row) => crowdIndex.has(toHex(row.player)));
+const crowdScored = crowdRows.filter((row) => row.points === CROWD_POINTS[crowdIndex.get(toHex(row.player)) % 3]).length;
+// Among the crowd: most points first, and between players level on points, whoever joined first.
+const crowdOrder = crowdRows.map((row) => crowdIndex.get(toHex(row.player)));
+const crowdExpected = crowd.map((_, i) => i).sort((a, b) => CROWD_POINTS[b % 3] - CROWD_POINTS[a % 3] || a - b);
+say(`      and ${crowdScored} of the crowd of ${CROWD} with the points their picks earned`);
+// Kickoff's own server: it was told how each lock went, and gives points only for locked matches.
+const toldLocks = Object.fromEntries((await kickoff.fixtures()).map((x) => [x.label, x.lock ?? "nothing"]));
+const onKickoff = {};
+for (const name of ["ada", "bola", "chidi"]) onKickoff[name] = (await post(phones[name], "/api/me/table", { group: null })).body.you.points;
+say(`    Kickoff's own server says: ${Object.entries(onKickoff).map(([name, p]) => `${name} ${p}`).join(", ")}`);
 say(`    messages a reader did not believe: ${read.ignored.length}${read.ignored.length ? ` (${read.ignored.map((i) => i.why).join("; ")})` : ""}`);
 say();
 
@@ -248,13 +303,21 @@ const checks = [
   ["the robot wrote nothing while picks were open", done[0]],
   ["the football was announced and locked before kickoff", lockedFootball.did.length === 2 && lockedFootball.problems.length === 0],
   ["the basketball was announced and locked before kickoff", lockedBasketball.did.length === 2 && lockedBasketball.problems.length === 0],
+  [`the crowd's match was announced and locked before kickoff, with ${CROWD} sealed picks`, lockedCrowd.did.length === 2 && lockedCrowd.problems.length === 0 && lockedCrowd.did[1].includes(`locked ${CROWD} sealed picks`)],
   ["the match nobody picked was never written to X Layer", read.matches.every((m) => m.label !== facts.nobody.label)],
   ["the server refused Chidi's swapped pick", chidiCheats.status === 409],
   ["the football result and its opened picks were written", afterFootball.did.length === 2 && afterFootball.problems.length === 0],
   ["the basketball result and its opened picks were written", afterBasketball.did.length === 2 && afterBasketball.problems.length === 0],
+  [`the crowd's file is too big for one piece (${crowdBytes.toLocaleString("en-GB")} bytes), and the robot published it in ${Math.ceil(crowdBytes / PIECE)} pieces`, crowdBytes > PIECE && afterCrowd.problems.length === 0 && afterCrowd.did.length === 2 && afterCrowd.did[1].endsWith(`published ${CROWD} opened picks, in ${Math.ceil(crowdBytes / PIECE)} pieces`)],
+  ["on X Layer that file is whole: every byte, in that many pieces", Number(crowdOnChain[0]) === crowdBytes && Number(crowdOnChain[4]) === Math.ceil(crowdBytes / PIECE)],
   ["a second robot with no memory wrote nothing", second.did.length === 0 && second.problems.length === 0 && countAfter === countBefore],
   ["the lock in force for the football is the one made before kickoff, not the changed one", (() => { const m = read.matches.find((x) => x.label === facts.football.label); return m && toHex(m.lock.root) === honest.root && m.locks.length === 2; })()],
   ["the table read back from X Layer is ada 6, bola 2, chidi 0", JSON.stringify(points) === JSON.stringify({ ada: 6, bola: 2, chidi: 0 })],
+  [`all ${CROWD} of the crowd are on that table, each with the points their pick earned`, crowdRows.length === CROWD && crowdScored === CROWD],
+  ["Kickoff's server was told the three matches with picks were locked, and nothing about the match nobody picked", toldLocks[facts.football.label] === "locked" && toldLocks[facts.basketball.label] === "locked" && toldLocks[facts.crowd.label] === "locked" && toldLocks[facts.nobody.label] === "nothing"],
+  ["Kickoff's own points are the same as the ones rebuilt from X Layer", JSON.stringify(onKickoff) === JSON.stringify(points)],
+  ["nobody on that table shares a place", read.table.every((row, i) => row.position === i + 1)],
+  ["players level on points are in the order they joined Kickoff", JSON.stringify(crowdOrder) === JSON.stringify(crowdExpected)],
   ["the whole run cost less than 0.2 OKB", before - afterAll < OKB / 5n],
 ];
 let failed = 0;

@@ -96,7 +96,7 @@ export const match = {
 /** What X Layer has on record, for the proof screen. */
 export const check = {
   sealed: [
-    { comp: "pl", title: "Man City 2 – 1 Liverpool", lock: "17:20", kickoff: "17:30", late: { time: "17:31", note: "One minute after kickoff, a different set of picks was sent in. It arrived too late, so it does not count. The set sealed at 17:20 is the one that stands." } },
+    { comp: "pl", title: "Man City 2 – 1 Liverpool", lock: "17:20", kickoff: "17:30", late: { time: "17:31", note: "One minute after kickoff, a different set of predictions was sent in. It arrived too late, so it does not count. The set sealed at 17:20 is the one that stands." } },
     { comp: "nba", title: "Lakers beat Celtics by 7", lock: "01:20", kickoff: "01:30" },
     { comp: "cl", title: "PSG 0 – 2 Arsenal", lock: "20:50", kickoff: "21:00" },
   ],

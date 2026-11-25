@@ -1,0 +1,76 @@
+# Putting Kickoff's website on X Layer itself (TapeOut's DeWEB), in the league's own account.
+#
+# The copy on X Layer is the website's own files. A browser opens it at the address the look
+# prints, and nobody can change it without the wallet that holds the league's circuit.
+#
+# This never runs by itself. Somebody has to press "Run workflow", and there are three choices:
+#
+#   look    reads X Layer and says which files are still to send and what the gas will cost. It
+#           sends nothing and pays nothing. Run it as often as you like.
+#   go      sends them, paying gas in real OKB from the robot's wallet. It only runs if the words
+#           PUBLISH SITE are typed in the box. Files already on X Layer and the same are left
+#           alone, so it is safe to run again after a failure, and it is how the copy is brought
+#           up to date after the website changes.
+#   check   reads every file back from X Layer, whole, and compares it with the files here.
+#
+# The robot uses the same wallet. Run "go" when no match is about to start, so the two do not
+# send at the same moment. If they do, the file that failed is tried again.
+#
+# The wallet's private key is the repository secret KICKOFF_WALLET_KEY. It is handed to the signing
+# tool and to nothing else, and is never printed.
+name: Website on X Layer
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: "look = only look and say the cost. go = send it (spends real OKB on gas). check = read it all back"
+        type: choice
+        options:
+          - look
+          - go
+          - check
+        default: look
+      confirm:
+        description: "Only for go: type PUBLISH SITE"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+# Never two at once.
+concurrency:
+  group: site-on-x-layer
+  cancel-in-progress: false
+
+jobs:
+  site:
+    name: "Website on X Layer: ${{ inputs.step }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      KICKOFF_SERVER: https://kickoff-two-xi.vercel.app
+      KICKOFF_WALLET_KEY: ${{ secrets.KICKOFF_WALLET_KEY }}
+      KICKOFF_PROCESSOR: ${{ vars.KICKOFF_PROCESSOR }}
+      KICKOFF_CIRCUIT: ${{ vars.KICKOFF_CIRCUIT }}
+      STEP: ${{ inputs.step }}
+      CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Look
+        if: inputs.step == 'look'
+        run: node robot/bin/site.js look
+
+      - name: Send it
+        if: inputs.step == 'go'
+        run: node robot/bin/site.js go --confirm "$CONFIRM"
+
+      - name: Check
+        if: inputs.step == 'check'
+        run: node robot/bin/site.js check

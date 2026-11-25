@@ -34,7 +34,7 @@ const asStarter = { ...ctx, mine: { ...ctx.mine, groups: [{ ...realGroup, starte
 
 test("every screen draws, with nothing missing in it", () => {
   const screens = { home: home(), league: league(null, ctx), record: recordScreen(), check: checkScreen(), group: groupScreen(undefined, ctx), "group start": groupScreen("start", ctx), "group join": groupScreen("join", ctx), "group, in one": groupScreen(undefined, inGroup), match: matchScreen(), frame: { html: frame(), title: "frame" } };
-  for (const id of Object.keys(fixtures)) screens[`pick ${id}`] = pick(id, ctx);
+  for (const id of Object.keys(fixtures)) screens[`prediction ${id}`] = pick(id, ctx);
   for (const [name, screen] of Object.entries(screens)) {
     assert.ok(screen.html.length > 200, `${name} is empty`);
     assert.ok(screen.title, `${name} has no title`);
@@ -43,7 +43,7 @@ test("every screen draws, with nothing missing in it", () => {
   }
 });
 
-test("a pick for a match that does not exist falls back to the league", () => {
+test("a prediction for a match that does not exist falls back to the league", () => {
   assert.equal(pick("no-such-match", ctx).tab, "league");
   assert.match(pick("no-such-match", ctx).html, /This week/);
 });
@@ -72,7 +72,7 @@ test("the table is in order, and players level on everything share a place", () 
   assert.equal(placeName(5), "5th");
 });
 
-test("the table's tie-breaks: more 3-point picks first, then more 1-point picks", () => {
+test("the table's tie-breaks: more 3-point predictions first, then more 1-point picks", () => {
   const t = standings([{ name: "A", threes: 1, ones: 3 }, { name: "B", threes: 2, ones: 0 }, { name: "C", threes: 2, ones: 0 }, { name: "D", threes: 0, ones: 6 }]);
   assert.deepEqual(t.map((r) => `${r.position} ${r.name}`), ["1 B", "1 C", "3 A", "4 D"]);
 });
@@ -96,10 +96,10 @@ test("the made-up data agrees with itself", () => {
   assert.equal(scores.length, group.players.length);
 });
 
-test("the league screen counts the picks sealed on this device", async () => {
-  assert.match(league(null, ctx).html, new RegExp(`You have picked 0 of ${week.total} matches`));
+test("the league screen counts the predictions sealed on this device", async () => {
+  assert.match(league(null, ctx).html, new RegExp(`You have predicted 0 of ${week.total} matches`));
   const after = await sealOn(ctx, "ars-che", { home: 2, away: 1 });
-  assert.match(league(null, after).html, new RegExp(`You have picked 1 of ${week.total} matches`));
+  assert.match(league(null, after).html, new RegExp(`You have predicted 1 of ${week.total} matches`));
 });
 
 test("names are made safe before they go on the page", () => {

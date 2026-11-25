@@ -11,7 +11,7 @@ import { createStore, seal } from "../lib/picks.js";
 import { createClient } from "../lib/server.js";
 import { syncPicks } from "../lib/sync.js";
 import { EMPTY, createTable } from "../lib/table.js";
-import { league, recordScreen } from "../screens.js";
+import { groupScreen, league, recordScreen } from "../screens.js";
 import { FakeStorage, NOW } from "./helpers.js";
 
 import { BASKETBALL, FOOTBALL, encodePick, matchId, toHex } from "../../engine/src/index.js";
@@ -42,9 +42,14 @@ async function kickoffOnline() {
   const f = {};
   for (const [name, x] of Object.entries(facts)) f[name] = { id: toHex(await matchId(LEAGUE, { sport: x.sport, kickoff: x.kickoff, bestOf: 0, label: x.label })), feedId: `test:${name}`, state: "scheduled", ...x };
   await kickoff.putFixtures({ fixtures: Object.values(f) });
-  /** The robot records a result from the sports feed. */
-  const result = (fixture, score, res) => kickoff.putFixtures({ fixtures: [{ ...fixture, state: "final", score, resultByte: encodePick(fixture.sport, res) }] });
-  return { fetch, net, clock, kickoff, f, result };
+  /** The robot says how locking a match's picks on X Layer went. */
+  const lock = (fixture, state = "locked") => kickoff.putLocks({ locks: [{ match: fixture.id, state }] });
+  /** The robot records a result from the sports feed, for a match it locked in time unless told otherwise. */
+  const result = async (fixture, score, res, { locked = true } = {}) => {
+    if (locked) await lock(fixture);
+    return kickoff.putFixtures({ fixtures: [{ ...fixture, state: "final", score, resultByte: encodePick(fixture.sport, res) }] });
+  };
+  return { fetch, net, clock, kickoff, f, result, lock };
 }
 
 /** A phone. `carry()` does what the website does every few seconds: matches, picks, then the tables. */
@@ -95,7 +100,7 @@ test("the first person on Kickoff is 1st, with no points, and nothing on the scr
   assert.deepEqual(rowsOf(html, "group"), ["1 mya 0 (you)"]);
   assert.deepEqual(tile(html, "Your place"), ["1st", "of 1 player"]);
   assert.deepEqual(tile(html, "Your points"), ["0", "0 spot on, 0 right winner"]);
-  assert.deepEqual(tile(html, "Picked this week"), ["0 of 2", "pick as many as you like"]);
+  assert.deepEqual(tile(html, "Predicted this week"), ["0 of 2", "predict as many as you like"]);
   assert.match(html, /Nothing played yet\./);
   assert.match(html, /<h1[^>]*>League<\/h1>/);
   for (const made of ["made up", "Funke", "Tunde", "Real Madrid", "Nothing here is live yet"]) assert.ok(!html.includes(made), `no "${made}"`);
@@ -123,7 +128,7 @@ test("before the server has answered, the League screen shows an empty table, no
   const html = league(null, c).html;
   assert.deepEqual(rowsOf(html, "everyone"), []);
   assert.match(html, /Nobody has played yet\./);
-  assert.deepEqual(tile(html, "Your place"), ["–", "after your first pick"]);
+  assert.deepEqual(tile(html, "Your place"), ["–", "after your first prediction"]);
   assert.ok(!html.includes("Funke") && !html.includes("made up"));
   assert.deepEqual(EMPTY.you, { place: null, points: 0, threes: 0, ones: 0, wrong: 0 });
 });
@@ -170,7 +175,7 @@ test("whoever joins next is 2nd; whoever scores more goes above; My group is onl
   assert.match(record, /<b>0<\/b><span class="word">Points<\/span>/);
   assert.ok(!record.includes("3rd of 3"), "the place is on the League screen, not here");
   const box = (html, label) => html.match(new RegExp(`<small>${label}</small><b>([^<]*)</b><span>([^<]*)</span>`))?.slice(1, 3);
-  assert.deepEqual(box(record, "Total picks"), ["1", "0 to play"]);
+  assert.deepEqual(box(record, "Total predictions"), ["1", "0 to play"]);
   assert.deepEqual(box(record, "Total won"), ["0", "0 spot on"]);
   assert.deepEqual(box(record, "Win rate"), ["0%", "of 1 played"]);
   assert.ok(!record.includes("right winner") && !record.includes("no points"), "the old breakdown is gone");
@@ -187,16 +192,101 @@ test("whoever joins next is 2nd; whoever scores more goes above; My group is onl
   await fresh.seal(online.f.basketball, { winner: "home", band: "A" });
   await fresh.carry();
   record = await fresh.record();
-  assert.deepEqual(box(record, "Total picks"), ["1", "1 to play"]);
+  assert.deepEqual(box(record, "Total predictions"), ["1", "1 to play"]);
   assert.deepEqual(box(record, "Win rate"), ["–", "of 0 played"]);
+});
+
+test("a match that was not locked on X Layer in time: the prediction says so plainly, gives nothing, and is not counted as lost", async () => {
+  const online = await kickoffOnline();
+  const mya = phone(online);
+  await mya.groups.start({ name: "Sunday Ballers", playerName: "mya", plays: ["pl", "nba"] });
+  await mya.carry();
+  await mya.seal(online.f.football, { home: 2, away: 1 });
+  await mya.carry(); // sent
+  online.clock.now = KICKOFF - CLOSES_BEFORE + SETTLE;
+  await mya.carry(); // Kickoff has it, and her phone has the receipt
+  assert.match(await mya.record(), /<div class="state ">Locked in<\/div>/);
+
+  // The robot was too late: nothing was locked on X Layer before kickoff. Then the match ends 2–1, just as she said.
+  await online.lock(online.f.football, "missed");
+  online.clock.now = KICKOFF + 2 * HOUR;
+  await mya.carry(); // opened
+  await online.result(online.f.football, "2 – 1", { home: 2, away: 1 }, { locked: false });
+  await mya.carry();
+
+  const said = '<div class="state bad">Not locked in time</div><div class="small muted state-line">Nobody scores for this match.</div>';
+  let record = await mya.record();
+  assert.ok(record.includes(`<div class="title">Arsenal 2 – 1 Chelsea</div><div class="sub">You said 2 – 1</div>${said}</div></div>`), "said plainly, with no points beside it");
+  assert.ok(!record.includes("Locked in") && !record.includes("Revealed"));
+  assert.match(record, /<b>0<\/b><span class="word">Points<\/span>/);
+  const box = (html, label) => html.match(new RegExp(`<small>${label}</small><b>([^<]*)</b><span>([^<]*)</span>`))?.slice(1, 3);
+  assert.deepEqual(box(record, "Total predictions"), ["1", "0 to play"], "a prediction she made, but not one still to play");
+  assert.deepEqual(box(record, "Total won"), ["0", "0 spot on"]);
+  assert.deepEqual(box(record, "Win rate"), ["–", "of 0 played"]);
+  const html = await mya.league();
+  assert.deepEqual(tile(html, "Your points"), ["0", "0 spot on, 0 right winner"]);
+  assert.ok(html.includes(said), "the League screen's list of finished predictions says it too");
+
+  // Later the match has dropped off the website's list of matches. It is still there, and still explained.
+  online.clock.now = KICKOFF + 4 * HOUR;
+  await mya.carry();
+  assert.equal(Object.values((await mya.ctx()).fixtures).some((f) => f.home === "Arsenal"), false);
+  record = await mya.record();
+  assert.ok(record.includes(said));
+  assert.ok(!/class="points/.test(record));
+});
+
+test("a group run by a brand: who runs it, the prize, how many play, and a leaderboard instead of a list of names", async () => {
+  const online = await kickoffOnline();
+  const made = await online.kickoff.createBrandGroup({ now: online.clock.now, name: "World Cup Predictions", brand: "OKX", prize: "100 USDT for 1st place", plays: ["pl", "nba"] });
+  // Twenty-four fans join, then mya, one after another.
+  const fans = [];
+  for (let i = 0; i < 24; i++) {
+    online.clock.now += 60;
+    fans.push(phone(online));
+    await fans[i].groups.join({ code: made.code, playerName: `Fan ${i + 1}` });
+  }
+  online.clock.now += 60;
+  const mya = phone(online);
+  await mya.groups.join({ code: made.code, playerName: "mya" });
+  await mya.carry();
+
+  const group = groupScreen(undefined, await mya.ctx()).html;
+  assert.match(group, /<p class="sub">Run by OKX\. 25 players\.<\/p>/);
+  assert.match(group, /<p class="sub prize"><b>Prize:<\/b> 100 USDT for 1st place<\/p>/);
+  assert.match(group, /Anyone with this code can join\./);
+  assert.match(group, /OKX chose these\./);
+  assert.ok(!group.includes('role="switch"'), "nobody in it can change what it plays");
+  // Only her own row is listed, with the wallet link. Nobody else's name is on the screen.
+  assert.match(group, /<h2>You<\/h2>/);
+  assert.match(group, /mya<span class="tag">you<\/span>/);
+  assert.match(group, /data-link-wallet/);
+  assert.ok(!group.includes("Fan 1") && !group.includes("started this group"));
+  assert.match(group, /This group is too big to list\./);
+
+  // The group's leaderboard: the top twenty, then her own row, 25th.
+  const html = await mya.league();
+  const rows = rowsOf(html, "group");
+  assert.equal(rows.length, 21);
+  assert.deepEqual([rows[0], rows[19], rows[20]], ["1 Fan 1 0", "20 Fan 20 0", "25 mya 0 (you)"]);
+  assert.match(html, /<tr class="gap">/);
+
+  // A group with no prize line shows none.
+  const plain = await online.kickoff.createBrandGroup({ now: online.clock.now, name: "Derby Day", brand: "Blokyz" });
+  await mya.groups.join({ code: plain.code, playerName: "mya" });
+  await mya.carry();
+  const second = groupScreen(undefined, await mya.ctx()).html;
+  assert.match(second, /Run by Blokyz\. 1 player\./);
+  assert.ok(!second.includes("Prize:"));
+  assert.match(second, /World Cup Predictions<\/div><div class="sub">Run by OKX · 25 players<\/div>/, "her other group says who runs it too");
 });
 
 test("a name somebody already has is refused, in plain words, when starting or joining", async () => {
   const online = await kickoffOnline();
   const [mya, other] = [phone(online), phone(online)];
   const group = await mya.groups.start({ name: "Sunday Ballers", playerName: "mya", plays: ["pl"] });
-  await assert.rejects(other.groups.join({ code: group.code, playerName: "MYA" }), /That name is taken\. Pick another\./);
-  await assert.rejects(other.groups.start({ name: "Another", playerName: "Mya", plays: ["pl"] }), /That name is taken\. Pick another\./);
+  await assert.rejects(other.groups.join({ code: group.code, playerName: "MYA" }), /That name is taken\. Choose another\./);
+  await assert.rejects(other.groups.start({ name: "Another", playerName: "Mya", plays: ["pl"] }), /That name is taken\. Choose another\./);
   assert.equal((await other.groups.view()).group, null);
   await other.groups.join({ code: group.code, playerName: "mya 2" });
 });
@@ -209,7 +299,7 @@ test("the League screen lists only matches from competitions the group plays", a
   const html = await mya.league();
   assert.match(html, /Arsenal v Chelsea/);
   assert.ok(!html.includes("Knicks"));
-  assert.deepEqual(tile(html, "Picked this week"), ["0 of 1", "pick as many as you like"]);
+  assert.deepEqual(tile(html, "Predicted this week"), ["0 of 1", "predict as many as you like"]);
 });
 
 test("someone with no group sees the table of everyone, and is pointed to starting a group", async () => {
@@ -219,7 +309,7 @@ test("someone with no group sees the table of everyone, and is pointed to starti
   await guest.carry();
   const html = await guest.league();
   assert.deepEqual(rowsOf(html, "everyone"), ["1 mya 0"]);
-  assert.deepEqual(tile(html, "Your place"), ["–", "after your first pick"]);
+  assert.deepEqual(tile(html, "Your place"), ["–", "after your first prediction"]);
   assert.match(html, /You are not in a group yet\. <a class="link" href="#\/group">Start or join one<\/a>\./);
   assert.match(html, /href="#\/group">Start a group</);
 });

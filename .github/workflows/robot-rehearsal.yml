@@ -68,9 +68,9 @@ jobs:
         run: tail -n 60 anvil.log
 
   golive:
-    name: Going live, rehearsed on a copy of X Layer
+    name: Going live and publishing the website, rehearsed on a copy of X Layer
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       XLAYER_RPC_URL: http://127.0.0.1:8545
       # Only read, to check that the league this makes is the one Kickoff's server is set up for.
@@ -134,6 +134,38 @@ jobs:
           echo "== Going live a second time sends nothing and pays nothing"
           node robot/bin/golive.js go --confirm "GO LIVE" --new-league | tee again.txt
           grep -q "There was nothing left to do, so nothing was sent." again.txt
+          test "$(cast balance "$wallet" --rpc-url "$XLAYER_RPC_URL")" = "$left"
+
+          # The website itself, put on the copy of X Layer in that league's account by the same
+          # wallet: TapeOut's real site store and its real contract for names.
+          echo "== The website: a look, with test money for the gas"
+          export KICKOFF_CIRCUIT=$(grep -oE 'KICKOFF_CIRCUIT +[0-9]+' go.txt | grep -oE '[0-9]+$')
+          cast rpc anvil_setBalance "$wallet" 0x8ac7230489e80000 --rpc-url "$XLAYER_RPC_URL" > /dev/null
+          node robot/bin/site.js look | tee site-look.txt
+          grep -q "The wallet holds enough." site-look.txt
+          name=$(grep -oE '[0-9]+\.2\.[0-9]+\.tape' site-look.txt | head -n 1)
+          account=$(grep -oE "league's account, 0x[0-9a-f]{40}" site-look.txt | grep -oE '0x[0-9a-f]{40}')
+          sent=$(cast nonce "$wallet" --rpc-url "$XLAYER_RPC_URL")
+
+          echo "== Without the words PUBLISH SITE, nothing is sent"
+          if node robot/bin/site.js go --confirm "yes"; then echo "it published without being asked properly"; exit 1; fi
+          test "$(cast nonce "$wallet" --rpc-url "$XLAYER_RPC_URL")" = "$sent"
+
+          echo "== Publishing the site"
+          node robot/bin/site.js go --confirm "PUBLISH SITE" | tee site-go.txt
+          grep -q "The site is on X Layer." site-go.txt
+
+          echo "== Every file read back whole from the copy of X Layer"
+          node robot/bin/site.js check | tee site-check.txt
+          grep -q "files on X Layer are the same as the files here." site-check.txt
+
+          echo "== TapeOut's own contract says the name $name is switched on"
+          test "$(cast call 0x68809fd2fb343aa57d0aeb7f33defe477c9666f9 'isLive(string,address)(bool)' "$name" "$account" --rpc-url "$XLAYER_RPC_URL")" = "true"
+
+          echo "== Publishing a second time sends nothing and pays nothing"
+          left=$(cast balance "$wallet" --rpc-url "$XLAYER_RPC_URL")
+          node robot/bin/site.js go --confirm "PUBLISH SITE" | tee site-again.txt
+          grep -q "There was nothing left to do, so nothing was sent." site-again.txt
           test "$(cast balance "$wallet" --rpc-url "$XLAYER_RPC_URL")" = "$left"
 
       - name: Show the copy's log if something went wrong

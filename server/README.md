@@ -51,8 +51,12 @@ Every player has one name, the same in every group, and no two players have the 
 the capitals. A name is claimed in one step, so two people asking for it at the same moment cannot
 both get it. Changing a name frees the old one.
 
-A pick scores once its match has a result and the pick has been opened; whichever happens second
-does the scoring. The points come from Kickoff's three scoring circuits, the same ones that are
+A pick only counts if its match's sealed picks were locked on X Layer before kickoff. The robot
+does the locking and tells the server how it went for each match: locked, or missed. So a pick
+scores once three things are true: the match was locked, it has a result, and the pick has been
+opened. Whichever happens last does the scoring. A match whose lock was missed never scores for
+anyone, any points already given for it are taken back, and each player who picked it is shown
+why. This keeps Kickoff's own tables the same as the ones anyone can rebuild from X Layer. The points come from Kickoff's three scoring circuits, the same ones that are
 published on X Layer, which the server carries as text in `src/circuits.js`. A test fails if that
 copy ever differs from the published files.
 
@@ -60,6 +64,20 @@ There are two tables, both numbered from 1 with nobody sharing a place: everyone
 one group. Most points first, and between players level on points, whoever joined Kickoff first.
 Only the top twenty of the table of everyone is sent, with the asking player's own row added if
 they are further down. A row carries a name and numbers and nothing else about the player.
+
+## Groups run by a brand
+
+A group of friends holds 30 players and anyone can start one. A group run by a brand holds up to
+5,000, and only Kickoff can start one, with its own key. It carries the brand's name, which players
+see as "Run by …", and an optional line about the prize. Nobody in it started it, so nobody in it
+can change which competitions it plays.
+
+A group that size is never listed member by member. Anyone with the code is told what the group is
+and how many are in it. A player in it is also given their own seat, and nobody else's. Its
+leaderboard is the top twenty and the asking player's own row, found from a mark kept on each
+person, so the list of members is never fetched whole. A test with 300 players checks that.
+
+The **Make a brand group** workflow on GitHub starts one and shows its code.
 
 ## Linking a wallet
 
@@ -112,6 +130,8 @@ Only Kickoff's robot may use these, with a key of its own:
 | --- | --- |
 | `POST /api/admin/fixtures` | Put the feed's matches on the list, and update their state |
 | `POST /api/admin/freeze/<match>` | A match's bundle, once picks have closed. The server makes the bundle by itself; this is how the robot asks for it |
+| `POST /api/admin/brand-groups` | Start a group run by a brand: its name, the brand, an optional prize line and which competitions it plays |
+| `POST /api/admin/locks` | How locking on X Layer went for some matches: `locked` or `missed`. Only locked matches give points |
 
 When the server will not do something, it says why in plain words, for example "Picks for this
 match have closed."
@@ -177,6 +197,12 @@ pretends to keep things it would forget.
 
 `vercel.json` at the top of the repo tells Vercel to serve the website from `web/` and to pass
 every `/api/...` address to `api/index.mjs`, which starts the server.
+
+**A browser on any site may ask this server.** That is what lets the copy of the website kept on
+X Layer, which a browser opens at another address, play the same game. It gives nothing away: a
+player is known by a signature made with a key their own browser holds, never by a cookie, so a
+page on another site has nothing of theirs to use. The robot's key travels in a header a browser
+is not allowed to send from another site.
 
 ## What is in this folder
 

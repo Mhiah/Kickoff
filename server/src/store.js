@@ -12,6 +12,7 @@
 //   tableSet(table, name, value)
 //   tableDelete(table, name) take one value out of a table
 //   tableAll(table)          every value in a table, as { name: value }
+//   tableSize(table)         how many values a table holds, without fetching them
 
 export class MemoryStore {
   values = new Map();
@@ -44,5 +45,8 @@ export class MemoryStore {
   }
   async tableAll(table) {
     return Object.fromEntries([...(this.tables.get(table) ?? [])].map(([name, value]) => [name, structuredClone(value)]));
+  }
+  async tableSize(table) {
+    return this.tables.get(table)?.size ?? 0;
   }
 }

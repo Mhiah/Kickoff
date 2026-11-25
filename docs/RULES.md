@@ -6,24 +6,28 @@ and published again as a new circuit. A circuit that is already published can ne
 
 ## Rules that are the same for every sport
 
-**Making a pick**
+**Making a prediction**
 
-- One pick per player per match.
-- You can change your pick as many times as you like before the match starts. The last one you
+- One prediction per player per match.
+- You can change your predict as many times as you like before the match starts. The last one you
   made before kickoff is the one that counts.
-- Picks are sealed. Nobody can see anyone else's pick before the match starts, including the league
+- Predictions are sealed. Nobody can see anyone else's prediction before the match starts, including the league
   host.
 
 **Locking**
 
-- Picks lock at the start time written down for the match in the league.
-- After that moment no pick can be added or changed.
+- Predictions lock at the start time written down for the match in the league.
+- After that moment no prediction can be added or changed.
+- A prediction only counts if it was locked on X Layer before kickoff. Kickoff's robot locks every
+  match's sealed predictions there a few minutes before the start. If a match's predictions are not locked in
+  time, nobody scores for that match: it gives no points and is not counted as a prediction anyone got
+  wrong. The website says "Not locked in time" beside it.
 
 **Opening**
 
-- After the match starts, picks are opened so everyone can see them.
-- A sealed pick that is never opened scores 0 and shows on the player's record as "not opened".
-- No pick at all scores 0.
+- After the match starts, predictions are opened so everyone can see them.
+- A sealed prediction that is never opened scores 0 and shows on the player's record as "not opened".
+- No prediction at all scores 0.
 
 **Scoring**
 
@@ -35,7 +39,7 @@ and published again as a new circuit. A circuit that is already published can ne
 
 - A match that is postponed, abandoned or ends in a walkover or a retirement is void. Nobody scores
   from it.
-- If the match is played later, it is added to the league as a new match with new picks.
+- If the match is played later, it is added to the league as a new match with new predictions.
 
 ## Football
 
@@ -47,7 +51,7 @@ time. Extra time and penalty shootouts do not count. A cup match that is 1-1 aft
 
 **Points**
 
-| Your pick | Points |
+| Your prediction | Points |
 | --- | --- |
 | The exact score | 3 |
 | The right result (home win, draw or away win) but the wrong score | 1 |
@@ -55,13 +59,13 @@ time. Extra time and penalty shootouts do not count. A cup match that is 1-1 aft
 
 **Examples.** The match ends 2-1 to the home team.
 
-| You picked | Points | Why |
+| You predicted | Points | Why |
 | --- | --- | --- |
 | 2-1 | 3 | Exact score |
 | 1-0 | 1 | Home win, wrong score |
 | 3-1 | 1 | Home win, wrong score |
-| 1-1 | 0 | You picked a draw |
-| 0-2 | 0 | You picked an away win |
+| 1-1 | 0 | You predicted a draw |
+| 0-2 | 0 | You predicted an away win |
 
 **The limit:** each side's goals run from 0 to 15. A side that scores more than 15 is recorded
 as 15.
@@ -84,7 +88,7 @@ winner.
 
 **Points**
 
-| Your pick | Points |
+| Your prediction | Points |
 | --- | --- |
 | The right winner and the right band | 3 |
 | The right winner, the wrong band | 1 |
@@ -92,7 +96,7 @@ winner.
 
 **Examples.** The home team wins 104-97, a margin of 7, which is band B.
 
-| You picked | Points | Why |
+| You predicted | Points | Why |
 | --- | --- | --- |
 | Home, band B | 3 | Right winner, right band |
 | Home, band A | 1 | Right winner, wrong band |
@@ -102,9 +106,9 @@ winner.
 
 **What you predict:** the winner, and how many sets the match takes.
 
-**The number of sets you can pick**
+**The number of sets you can prediction**
 
-| Match type | Sets you can pick |
+| Match type | Sets you can prediction |
 | --- | --- |
 | Best of 3 | 2 or 3 |
 | Best of 5 | 3, 4 or 5 |
@@ -114,7 +118,7 @@ A number of sets that cannot happen in that kind of match, such as 2 sets in a b
 
 **Points**
 
-| Your pick | Points |
+| Your prediction | Points |
 | --- | --- |
 | The right winner and the right number of sets | 3 |
 | The right winner, the wrong number of sets | 1 |
@@ -122,30 +126,30 @@ A number of sets that cannot happen in that kind of match, such as 2 sets in a b
 
 **Examples.** Player A wins a best-of-3 match in 3 sets.
 
-| You picked | Points | Why |
+| You predicted | Points | Why |
 | --- | --- | --- |
 | Player A in 3 | 3 | Right winner, right number of sets |
 | Player A in 2 | 1 | Right winner, wrong number of sets |
 | Player B in 3 | 0 | Wrong winner, so the sets do not count |
 
-## The table
+## The leaderboard
 
-Everyone who plays is on the table, numbered from 1. Nobody shares a place.
+Everyone who plays is on the leaderboard, numbered from 1. Nobody shares a place.
 
 1. Most points first.
 2. Between players level on points, whoever joined Kickoff first is ahead.
 
 So the first person to join is 1st, the next is 2nd, and a player moves up by scoring more points
-than the player above them. A group's table follows the same two rules, with only the group in it.
+than the player above them. A group's leaderboard follows the same two rules, with only the group in it.
 
 Every player has one name, and no two players have the same name, whatever the capitals.
 
-The table is not stored anywhere. It is worked out from the opened picks and the results, so
-anyone can work it out again and get the same table.
+The leaderboard is not stored anywhere. It is worked out from the opened predictions and the results, so
+anyone can work it out again and get the same leaderboard.
 
 ## Your record
 
-Every pick you have ever opened stays on your record with the points it scored, the misses as
+Every prediction you have ever opened stays on your record with the points it scored, the misses as
 well as the hits. It cannot be edited or deleted, and it is the same record in every league you
 play in.
 
@@ -164,5 +168,5 @@ replace host-entered results later, without changing anything else in these rule
 
 ## Free to play
 
-Kickoff is a prediction game. Players predict, and it costs nothing to make a pick. Prizes, where a
+Kickoff is a prediction game. Players predict, and it costs nothing to make a prediction. Prizes, where a
 league has them, are paid for by the brand or community running the league.

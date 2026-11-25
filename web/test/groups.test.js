@@ -103,7 +103,7 @@ test("what the server refuses comes back in its own plain words", async () => {
   const online = kickoffOnline();
   const [ada, bola] = [phone(online), phone(online)];
   await ada.groups.start({ name: "Sunday Ballers", playerName: "Ada" });
-  await assert.rejects(bola.groups.join({ code: "SUNDAYB-4821", playerName: "ada" }), /That name is taken\. Pick another\./);
+  await assert.rejects(bola.groups.join({ code: "SUNDAYB-4821", playerName: "ada" }), /That name is taken\. Choose another\./);
   await assert.rejects(bola.groups.join({ code: "NOBODY-0000", playerName: "Bola" }), /no group with that code/);
   await assert.rejects(bola.groups.join({ code: "hello", playerName: "Bola" }), /A code looks like BALLERS-4821/);
   await assert.rejects(bola.groups.join({ code: "SUNDAYB-4821", playerName: "" }), /Your name is missing/);
@@ -197,30 +197,30 @@ test("damaged group records on the device are treated as none, not as a crash", 
   }
 });
 
-test("the group screen says what to do next: the next match this group plays, and a button to pick it", async () => {
+test("the group screen says what to do next: the next match this group plays, and a button to predict it", async () => {
   const online = kickoffOnline();
   const ada = phone(online);
   await ada.groups.start({ name: "Hoops only", playerName: "Ada", plays: ["nba"] });
   let ctx = { ...(await contextAt(NOW, ada.store)), mine: await ada.groups.view() };
   let html = groupScreen(undefined, ctx).html;
-  const [, first] = html.match(/href="#\/pick\/([a-z-]+)">Make your pick</);
+  const [, first] = html.match(/href="#\/pick\/([a-z-]+)">Make your prediction</);
   assert.equal(ctx.fixtures[first].comp, "nba", "a match from a competition this group plays");
   const nbaInOrder = Object.keys(ctx.fixtures).filter((id) => ctx.fixtures[id].comp === "nba").sort((a, b) => ctx.fixtures[a].kickoff - ctx.fixtures[b].kickoff);
   assert.equal(first, nbaInOrder[0], "the one that closes soonest");
-  assert.match(html, /Picks close in /);
+  assert.match(html, /Predictions close in /);
   assert.match(html, /href="#\/league">See every match</);
-  assert.ok(html.indexOf("Make your pick") < html.indexOf("Invite code"), "it comes before everything else on the screen");
+  assert.ok(html.indexOf("Make your prediction") < html.indexOf("Invite code"), "it comes before everything else on the screen");
 
   // Once that one is picked, the card moves on to the next one not picked yet.
   ctx = await sealOn(ctx, first, { winner: "home", band: "A" }, { mine: await ada.groups.view() });
   html = groupScreen(undefined, ctx).html;
-  const [, second] = html.match(/href="#\/pick\/([a-z-]+)">Make your pick</);
+  const [, second] = html.match(/href="#\/pick\/([a-z-]+)">Make your prediction</);
   assert.notEqual(second, first);
   assert.equal(ctx.fixtures[second].comp, "nba");
 
   // With nothing open, it says so instead of leaving a gap.
   const later = { ...(await contextAt(NOW + 30 * 86400, ada.store)), mine: await ada.groups.view() };
   html = groupScreen(undefined, later).html;
-  assert.doesNotMatch(html, /Make your pick|See your pick/);
+  assert.doesNotMatch(html, /Make your prediction|See your prediction/);
   assert.match(html, /No matches are open for this group right now\./);
 });

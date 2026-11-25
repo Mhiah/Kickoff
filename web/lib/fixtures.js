@@ -47,6 +47,8 @@ export function createFixtures({ store, client, competitions, sample }) {
         if (typeof f.home !== "string" || typeof f.away !== "string" || typeof f.id !== "string") continue;
         if (f.kickoff < now - 3 * HOUR || f.kickoff > now + 8 * 24 * HOUR) continue;
         const fixture = { comp: f.comp, home: f.home, away: f.away, kickoff: f.kickoff, state: f.state, real: true };
+        // How locking this match's picks on X Layer went, once Kickoff's robot has said.
+        if (f.lock === "locked" || f.lock === "missed") fixture.lock = f.lock;
         let id;
         try {
           id = await matchIdOf(d.league, fixture, competitions);

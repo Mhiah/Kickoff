@@ -6,10 +6,9 @@ Kickoff's robot: the program that does by itself what nobody should have to do b
 > **Running live:** the robot's first job. Every half hour it makes Kickoff's list of matches agree
 > with the two sports feeds. Its first real run, on 24 November 2026, put 74 matches on the list
 > ([the run](https://github.com/Mhiah/Kickoff/actions/runs/45319717010)).
-> **Built and rehearsed, not switched on:** its work on X Layer. It locks each match's sealed picks
-> before kickoff, records each result, and publishes the opened picks, through TapeOut's mailbox
-> and site store. It is rehearsed on a private copy of X Layer on every change. It is switched on
-> when the robot is given a wallet. 42 tests.
+> **Also running live, since 24 November 2026:** its work on X Layer. It locks each match's sealed
+> picks before kickoff, records each result, and publishes the opened picks, through TapeOut's
+> mailbox and site store. It is rehearsed on a private copy of X Layer on every change. 65 tests.
 
 ## What it does now
 
@@ -106,6 +105,60 @@ wallet is short, or if the league it would make is not the one Kickoff's server 
 The **Robot rehearsal** check goes live on a private copy of X Layer on every change, with a
 throwaway wallet and test money.
 
+## The website on X Layer
+
+The league's account already has a site on chain: it is where each match's opened picks are
+published. The website's own files can be put beside them, so Kickoff can be opened from X Layer
+itself. This is TapeOut's DeWEB: the files live in TapeOut's site store, and a gateway reads them
+from X Layer in the visitor's browser and checks each one against the fingerprint stored with it.
+
+- **Its name is not chosen.** It is the league's circuit number, X Layer's area code and the
+  processor's number: `5.2.409.tape`. A browser opens it at `https://5-2-409.tapekit.org/`.
+- **It is the same site.** Every file is byte for byte the website's own, except one line of
+  `config.js`, which is told the full address of Kickoff's server.
+- **It still needs Kickoff's server to play.** Groups, sealed picks and the leaderboards are kept
+  there. So the gateway will list Kickoff's server as something off chain the site talks to, and
+  will not mark the site "100% on chain". The Check tab needs only X Layer.
+- **Only the wallet that holds the league's circuit can change it.**
+
+It is done from the **Website on X Layer** workflow, by hand, with the robot's wallet:
+
+| | |
+| --- | --- |
+| `look` | Reads X Layer and says which files are still to send, what the gas will cost, and whether the wallet holds enough. Sends nothing. |
+| `go` | Sends them. Runs only if the words `PUBLISH SITE` are typed in the box. |
+| `check` | Reads every file back from X Layer, whole, and compares it with the files here. |
+
+Files already on X Layer and the same are left alone, so `go` is safe to run again after a
+failure, and running it after the website changes sends only what changed. The copy on X Layer
+does not follow the website by itself: it changes when `go` is run.
+
+The site's name has to be switched on with TapeOut, twelve months at a time. That was free on
+X Layer when this was written. If it ever costs more than 0.01 OKB, `go` stops and says so.
+
+The robot uses the same wallet, so `go` is best run when no match is about to start. If the two do
+send at the same moment, the file that failed is started again.
+
+## When the robot needs you
+
+The robot works where nobody is watching, so two things are never left to pass in silence. For
+each it opens a note under this repository's **Issues**, which GitHub sends on by email:
+
+- **Its wallet is running low.** Every half hour it looks at what its wallet holds. Under
+  0.01 OKB it opens one note saying how much is left, about how many matches that covers, and the
+  wallet's address to send more OKB to. It does not repeat itself, and it closes the note when it
+  sees the wallet topped up.
+- **A match's picks were not locked in time.** If the robot was too late for a lock, or was not
+  awake for it at all, it opens one note naming the match and how many sealed picks were
+  affected. There is only ever one note for a match.
+
+The robot also tells Kickoff's server how every lock went. The server gives points only for a
+match it has been told was locked, so a match whose lock was missed scores for nobody, on Kickoff
+as on X Layer. A robot that starts afresh reads X Layer and tells the server about any lock the
+server has not heard of.
+
+If GitHub cannot be reached the robot says so on its own page, carries on, and tries again.
+
 ## Closing picks is not the robot's job
 
 Picks close ten minutes before kickoff. The server refuses any pick after that moment by itself,
@@ -154,22 +207,24 @@ Every run's report is on its own page.
 | `src/xlayer.js` | Reads the league's record and writes to it, through TapeOut's mailbox and site store. Also how a wallet becomes a league. |
 | `src/server.js` | What the robot asks Kickoff's server for |
 | `src/watch.js` | Staying awake: the half-hourly rhythm, and being on time for each lock |
+| `src/notes.js` | The notes it leaves on GitHub when its wallet runs low or a lock was missed |
 | `src/golive.js` | Going live: works out what is still to do on X Layer and what it costs, and does it |
+| `src/site.js` | The website on X Layer: which files are still to send, sending them, and reading them back |
 | `scripts/rehearse.js` | The rehearsal on a private copy of X Layer |
 | `bin/robot.js` | The commands: `fixtures` for one round on the list, `watch` to stay awake |
 | `bin/golive.js` | The commands for going live: `look` and `go` |
+| `bin/brand.js` | Starts a group run by a brand, and prints its code |
+| `bin/site.js` | The commands for the website on X Layer: `look`, `go` and `check` |
 | `test/` | The tests, run against the server's own code and stand-ins for the two feeds |
 
 ## Honest limits
 
-- **Nothing is on X Layer yet.** The X Layer work is built and rehearsed but not switched on,
-  because the robot has no wallet yet. Until it is, a match's picks are bundled on Kickoff's server
-  and "Locked in" is Kickoff's word.
-- **More than 32 players on one match will not fit in one file.** The league's site takes files
-  of up to 24,000 bytes, and measured with the picks engine that is 32 opened picks for a match.
-  That is every player who picked the match, across all groups, not one group. Past that the
-  robot says so and does not publish. Splitting the file is still to do, and has to be done
-  before Kickoff is opened to more than a handful of groups.
+- **Nothing stands in for the robot.** If it is late for a lock, or its wallet has run dry, that
+  match's picks are not locked and nobody scores for it. It warns before its wallet runs low.
+- **A big match costs more to publish.** The league's site takes a file in pieces of 24,000
+  bytes, about 32 opened picks to a piece, and each piece is one transaction. The robot sends as
+  many pieces as the file needs, so any number of players can pick the same match. The whole file
+  is sent again each time more phones have opened their picks, at most every ten minutes.
 - **Announcing only matches that were picked** saves money, but it means a match appears on
   X Layer ten minutes before kickoff, not days before.
 - **A result is the feed's word.** The robot checks it is a result that can happen, not that it is

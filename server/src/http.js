@@ -21,6 +21,8 @@
 //   Only the robot may use these, with the admin key
 //     POST /api/admin/fixtures        { fixtures }              put matches on the list
 //     POST /api/admin/freeze/<match>                            a match's bundle, once picks have closed
+//     POST /api/admin/brand-groups    { name, brand, prize, plays }   start a group run by a brand, of up to 5,000 players
+//     POST /api/admin/locks           { locks: [{ match, state }] }   how locking on X Layer went: "locked" or "missed"
 //
 // This file knows nothing about any particular web host. It takes a request as plain values and
 // returns { status, body }, so the same code runs in the tests, on a laptop, and when hosted.
@@ -110,6 +112,14 @@ export function createHandler({ kickoff, now, adminKey = null }) {
     ["POST", /^\/api\/admin\/freeze\/([0-9a-f]{64})$/, async (r, match) => {
       admin(r);
       return kickoff.freeze({ now: now(), match });
+    }],
+    ["POST", /^\/api\/admin\/brand-groups$/, async (r) => {
+      admin(r);
+      return kickoff.createBrandGroup({ now: now(), name: r.body?.name, brand: r.body?.brand, prize: r.body?.prize, plays: r.body?.plays });
+    }],
+    ["POST", /^\/api\/admin\/locks$/, async (r) => {
+      admin(r);
+      return kickoff.putLocks({ locks: r.body?.locks });
     }],
   ];
 

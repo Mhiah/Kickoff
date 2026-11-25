@@ -60,7 +60,7 @@ test("two players in a group cannot have the same name, but one can change their
   const { body: group } = await s.post(ada, "/api/groups", { name: "Sunday Ballers", playerName: "Ada" });
   const clash = await s.post(other, `/api/groups/${group.code}/join`, { playerName: "ada" });
   assert.equal(clash.status, 409);
-  assert.equal(clash.body.error, "That name is taken. Pick another.");
+  assert.equal(clash.body.error, "That name is taken. Choose another.");
   const renamed = await s.post(ada, `/api/groups/${group.code}/join`, { playerName: "Ada the Great" });
   assert.deepEqual(renamed.body.members.map((m) => m.name), ["Ada the Great"]);
   assert.equal(renamed.body.members.length, 1, "joining again does not add a second copy of you");

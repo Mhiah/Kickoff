@@ -32,13 +32,17 @@ import { buildBundle } from "./bundle.js";
 import { checkOpening } from "./open.js";
 import { scorePick } from "./score.js";
 
-/** Does the published list of sealed picks really produce the root that is on chain? */
+/**
+ * Does the published list of sealed picks really produce the root that is on chain? If it does,
+ * the list is given back as it was published, with each player's `joined` if the file gave one.
+ */
 async function listedPlayers(league, match) {
   if (!match.lock || !match.entries) return null;
   try {
     const bundle = await buildBundle({ league, match: match.id, entries: match.entries });
     if (bundle.count !== match.lock.count || !equal(bundle.root, id32(match.lock.root, "root"))) return null;
-    return bundle.entries.map((e) => e.player);
+    const joined = new Map(match.entries.filter((e) => Number.isSafeInteger(e.joined)).map((e) => [toHex(id32(e.player, "player")), e.joined]));
+    return bundle.entries.map((e) => ({ player: e.player, joined: joined.get(toHex(e.player)) ?? null }));
   } catch {
     return null;
   }
@@ -50,13 +54,17 @@ async function listedPlayers(league, match) {
  * @param circuits  from loadCircuits() in score.js
  * @param players   optional: players to list even if they never made a pick
  * @returns { table, records }
- *   table    rows of { player, position, points, threes, ones, scored }, best first
+ *   table    rows of { player, position, points, threes, ones, scored, joined }, best first.
+ *            `joined` is when the player joined Kickoff as the league published it, or null
  *   records  for each player (by hex id), one line for each match, in the order the matches were given
  */
 export async function buildTable({ league, matches, circuits, players = [] }) {
   const leagueId = id32(league, "league");
   const everyone = new Map(); // hex id -> bytes
   const note = (player) => everyone.set(toHex(player), player);
+  // When each player joined Kickoff, as the league published it. If two files disagree, the
+  // earlier time is the one used, so nothing published later can move a player back.
+  const joinedAt = new Map();
   players.forEach((p) => note(id32(p, "player")));
 
   // First pass: decide what happened to each player who appears in each match.
@@ -65,7 +73,11 @@ export async function buildTable({ league, matches, circuits, players = [] }) {
     const matchId = id32(match.id, "match");
     const byPlayer = new Map();
     const listed = await listedPlayers(leagueId, match);
-    (listed ?? []).forEach(note);
+    for (const { player, joined } of listed ?? []) {
+      note(player);
+      const key = toHex(player);
+      if (joined !== null && joined < (joinedAt.get(key) ?? Infinity)) joinedAt.set(key, joined);
+    }
 
     for (const o of match.openings ?? []) {
       const player = id32(o.player, "player");
@@ -98,7 +110,7 @@ export async function buildTable({ league, matches, circuits, players = [] }) {
         byPlayer.set(key, { state: "refused", points: 0, reason: checked.reason });
       }
     }
-    outcomes.push({ match, matchId, byPlayer, listed: new Set((listed ?? []).map(toHex)) });
+    outcomes.push({ match, matchId, byPlayer, listed: new Set((listed ?? []).map((l) => toHex(l.player))) });
   }
 
   // Second pass: one line for every player in every match.
@@ -106,7 +118,7 @@ export async function buildTable({ league, matches, circuits, players = [] }) {
   const totals = new Map();
   for (const [key, player] of everyone) {
     records[key] = [];
-    totals.set(key, { player, points: 0, threes: 0, ones: 0, scored: 0 });
+    totals.set(key, { player, points: 0, threes: 0, ones: 0, scored: 0, joined: joinedAt.get(key) ?? null });
   }
   for (const { match, matchId, byPlayer, listed } of outcomes) {
     for (const key of everyone.keys()) {
@@ -127,16 +139,12 @@ export async function buildTable({ league, matches, circuits, players = [] }) {
     }
   }
 
-  // The table: most points, then most 3-point picks, then most 1-point picks. Level on all three
-  // means a shared position. Players who share a position are listed in order of id, which decides
-  // nothing but keeps the list the same for everyone who builds it.
-  const level = (x, y) => x.points === y.points && x.threes === y.threes && x.ones === y.ones;
-  const rows = [...totals.values()].sort(
-    (x, y) => y.points - x.points || y.threes - x.threes || y.ones - x.ones || compare(x.player, y.player),
-  );
+  // The table: most points first. Between players level on points, whoever joined Kickoff first is
+  // ahead, so nobody shares a position. A player the league published no joining time for comes
+  // after those it did. Level even on that, players are listed in order of id, which keeps the list
+  // the same for everyone who builds it.
+  const since = (row) => row.joined ?? Infinity;
+  const rows = [...totals.values()].sort((x, y) => y.points - x.points || (since(x) === since(y) ? 0 : since(x) < since(y) ? -1 : 1) || compare(x.player, y.player));
   const table = rows.map((row, i) => ({ ...row, position: i + 1 }));
-  for (let i = 1; i < table.length; i++) {
-    if (level(table[i], table[i - 1])) table[i].position = table[i - 1].position;
-  }
   return { table, records };
 }

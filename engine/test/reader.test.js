@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   FOOTBALL, TENNIS,
-  challengeMessage, encodePick, lockMessage, matchId, matchMessage, parseMessage, readLeague, resultMessage,
-  tableFromChain, toHex,
+  challengeMessage, encodePick, lockMessage, matchId, matchMessage, parseMessage, parseOpenings, readLeague, resultMessage,
+  tableFromChain, toHex, writeOpenings,
 } from "../src/index.js";
 import { id, nodeSha256 } from "./helpers.js";
 import { CIRCUITS } from "./league.js";
@@ -284,8 +284,37 @@ test("a match with no openings file yet: sealed picks are not shown as opened", 
   const { inbox, files, parts } = await honestSeason();
   delete files[toHex(parts.tennis.match)];
   const { table, records } = await fromChain(inbox, files);
-  // Without tennis: ada 3 + 1, bola 1 + 3, chidi 0 + 0. Ada and Bola are level on everything, so
-  // they share first place.
-  assert.deepEqual(lines(table).sort(), ["1 ada 4", "1 bola 4", "3 chidi 0"]);
+  // Without tennis: ada 3 + 1, bola 1 + 3, chidi 0 + 0. Ada and Bola are level on points. Nobody
+  // shares a place, so they are first and second.
+  assert.deepEqual(lines(table).map((l) => l.replace(/^\d+ /, "")).sort(), ["ada 4", "bola 4", "chidi 0"]);
+  assert.deepEqual(table.map((row) => row.position), [1, 2, 3]);
   assert.equal(records[toHex(id("ada"))][2].state, "no-pick", "with no file, the chain alone cannot show who sealed a pick");
+});
+
+test("joining times published with the opened picks decide who is ahead when points are level", async () => {
+  const { inbox, files, parts } = await honestSeason();
+  delete files[toHex(parts.tennis.match)];
+  // Without tennis ada and bola are level on 4. The league publishes that bola joined first.
+  const joined = { ada: 5000, bola: 4000, chidi: 3000 };
+  const withJoined = (part) =>
+    writeOpenings({ match: part.match, openings: part.openings, entries: part.entries.map((e) => ({ ...e, joined: joined[["ada", "bola", "chidi"].find((n) => toHex(id(n)) === toHex(e.player))] })) });
+  files[toHex(parts.football.match)] = withJoined(parts.football);
+  const { table } = await fromChain(inbox, files);
+  assert.deepEqual(lines(table), ["1 bola 4", "2 ada 4", "3 chidi 0"]);
+});
+
+test("the file of opened picks: a joining time survives writing and reading, and a bad one is refused", async () => {
+  const { parts } = await honestSeason();
+  const part = parts.football;
+  const text = writeOpenings({ match: part.match, openings: part.openings, entries: part.entries.map((e, i) => (i === 0 ? { ...e, joined: 1764000000 } : e)) });
+  const read = parseOpenings(text);
+  assert.equal(read.entries[0].joined, 1764000000);
+  assert.equal("joined" in read.entries[1], false, "a player with no joining time has none in the file");
+  assert.equal(parseOpenings(part.file).entries.every((e) => !("joined" in e)), true, "a file written before joining times were kept still reads");
+  for (const bad of [-1, 1.5, "1764000000", null]) {
+    const damaged = JSON.parse(text);
+    damaged.entries[0].joined = bad;
+    assert.throws(() => parseOpenings(JSON.stringify(damaged)), /joined/);
+  }
+  assert.throws(() => writeOpenings({ match: part.match, openings: [], entries: [{ ...part.entries[0], joined: 1.5 }] }), /joined/);
 });

@@ -19,6 +19,9 @@
 # and two settings that are not secret (repository variables):
 #   KICKOFF_PROCESSOR, KICKOFF_CIRCUIT   which TapeOut circuit is the league
 # Until KICKOFF_ADMIN_KEY is set it only looks. Until the wallet is set it writes nothing to X Layer.
+#
+# When its wallet runs low (under 0.01 OKB), or a match's sealed picks were not locked before
+# kickoff, it opens a note under this repository's Issues, which GitHub sends on by email.
 name: Robot
 
 on:
@@ -46,6 +49,7 @@ on:
 permissions:
   contents: read
   actions: write # only to start its own next run
+  issues: write # only to leave a note when its wallet runs low or a lock was missed
 
 jobs:
   test:

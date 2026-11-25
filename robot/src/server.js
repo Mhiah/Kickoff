@@ -25,6 +25,18 @@ export function createServer({ server, adminKey, fetch = globalThis.fetch }) {
       if (status !== 200) throw new Error(`Kickoff's server would not hand over the bundle (status ${status}): ${body?.error ?? "no reason given"}`);
       return body;
     },
+    /** Start a group run by a brand: { name, brand, prize, plays }. Gives back the group, with its code. */
+    async brandGroup(group) {
+      const { status, body } = await get("/api/admin/brand-groups", { method: "POST", headers: { "x-kickoff-admin": adminKey, "content-type": "application/json" }, body: JSON.stringify(group) });
+      if (status !== 200) throw new Error(body?.error ?? `status ${status}`);
+      return body;
+    },
+    /** Say how locking on X Layer went for some matches: [{ match, state }], state "locked" or "missed". */
+    async report(locks) {
+      const { status, body } = await get("/api/admin/locks", { method: "POST", headers: { "x-kickoff-admin": adminKey, "content-type": "application/json" }, body: JSON.stringify({ locks }) });
+      if (status !== 200) throw new Error(`status ${status}: ${body?.error ?? "no reason given"}`);
+      return body;
+    },
     /** A match's file of opened picks, as text, or null if there is none yet. */
     async openings(match) {
       const response = await fetch(`${server}/api/matches/${match}/openings`);

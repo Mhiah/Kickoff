@@ -1,0 +1,55 @@
+# Start a group run by a brand.
+#
+# A group of friends holds 30 players and anyone can start one on the website. A brand's group
+# holds up to 5,000, and only Kickoff can start one: that is what this is for.
+#
+# This never runs by itself. Somebody has to press "Run workflow" and fill in the boxes. The
+# group's code is shown on the run's page when it finishes. Give that code to the brand.
+#
+# Kickoff's key is the repository secret KICKOFF_ADMIN_KEY. It is sent only to Kickoff's server and
+# is never printed.
+name: Make a brand group
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "The group's name, as players will see it. For example: World Cup Picks"
+        type: string
+        required: true
+      brand:
+        description: "The brand that runs it. Players see: Run by ..."
+        type: string
+        required: true
+      prize:
+        description: "One line about the prize (leave empty for none). For example: 100 USDT for 1st place"
+        type: string
+        default: ""
+      plays:
+        description: "Which competitions, with commas between: pl, cl, nba, wnba. Leave empty for all four"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  make:
+    name: Make a brand group
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      KICKOFF_SERVER: https://kickoff-two-xi.vercel.app
+      KICKOFF_ADMIN_KEY: ${{ secrets.KICKOFF_ADMIN_KEY }}
+      # What was typed is handed over as settings, never pasted into the command itself.
+      GROUP_NAME: ${{ inputs.name }}
+      GROUP_BRAND: ${{ inputs.brand }}
+      GROUP_PRIZE: ${{ inputs.prize }}
+      GROUP_PLAYS: ${{ inputs.plays }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Make the group
+        run: node robot/bin/brand.js --name "$GROUP_NAME" --brand "$GROUP_BRAND" --prize "$GROUP_PRIZE" --plays "$GROUP_PLAYS"

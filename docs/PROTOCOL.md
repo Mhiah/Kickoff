@@ -97,7 +97,7 @@ into the bundle and the picks that have been opened:
 {
   "v": 1,
   "match": "0x…",
-  "entries":  [ { "player": "0x…", "fingerprint": "0x…" }, … ],
+  "entries":  [ { "player": "0x…", "fingerprint": "0x…", "joined": 1764000000 }, … ],
   "openings": [ { "player": "0x…", "pickByte": 18, "salt": "0x…", "index": 1, "path": ["0x…", …] }, … ]
 }
 ```
@@ -109,10 +109,20 @@ This file is not in the mailbox, and does not need to be. Nothing in it is taken
 - Each opened pick must produce a fingerprint that its `index` and `path` prove is in that root.
 - Then the pick must be one that can happen in that kind of match.
 
+`joined` is the one thing in the file that is the league's word: when that player joined Kickoff,
+in seconds. Joining happens on Kickoff, not on chain, so it cannot prove itself. It is published so
+that anyone building the table can put players who are level on points in the same order Kickoff
+does, and so that it is on the public record if it ever changes. It decides nothing about points.
+It may be left out, and it is used only from a list of entries that produces the root on chain. If
+two files give one player different times, the earlier is used.
+
 So the file can be kept anywhere. Kickoff keeps it on the league's on-chain site (TapeOut's site
 store, under the league's own account), at the path `openings/<match id>.json`, where the match id
-is 64 lowercase hex digits with no `0x`. The site store keeps a SHA-256 with every file, so a
-reader can tell a whole file from a half-uploaded one. A player who holds their own pick, salt and
+is 64 lowercase hex digits with no `0x`. The site store takes a file in pieces of up to 24,000
+bytes (`putFile` for the first, `appendChunk` for each one after), so the file can be any size: a
+match picked by a hundred players is about 85,000 bytes, in four pieces. The store keeps a SHA-256
+of the whole file from the first piece on, so a reader can tell a whole file from a half-uploaded
+one, and uses nothing from a file that does not match it. A player who holds their own pick, salt and
 receipt can also publish their own opening, and it proves itself in the same way.
 
 ## Fetching a league from a node
@@ -142,8 +152,9 @@ Kickoff's code for this is [`engine/src/xlayer.js`](../engine/src/xlayer.js), an
 2. For each match with a final result, check each opened pick against the lock in force.
 3. Score each pick that passes with the sport's scoring circuit: `eval` on the circuit, with the
    pick byte and the result byte as inputs, gives 0, 1 or 3 points.
-4. Add up each player's points. Order by points, then 3-point picks, then 1-point picks. Players
-   level on all three share a position.
+4. Add up each player's points. Most points first. Between players level on points, whoever has
+   the earlier `joined` time is ahead, a player with none comes after those who have one, and
+   players level even on that go in order of player id. Nobody shares a position.
 
 Anyone who does this gets the same table. The rules of the game are in [RULES.md](RULES.md).
 

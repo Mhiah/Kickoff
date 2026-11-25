@@ -46,38 +46,37 @@ test("a league across all three sports: points add up and the table is in order"
   assert.equal(table[0].scored, 3);
 });
 
-test("level on points: more 3-point picks comes first, then more 1-point picks", async () => {
+test("level on points: whoever joined Kickoff first is ahead, whatever mix of picks got them there", async () => {
   // Three matches, all ending 1-0.
   const real = { home: 1, away: 0 };
   const exact = { home: 1, away: 0 };
   const rightResult = { home: 2, away: 0 };
   const wrong = { home: 0, away: 1 };
+  // bola joined first, then chidi, then ada.
+  const joined = { ada: 300, bola: 100, chidi: 200 };
   const matches = [
-    await playMatch({ label: "m1", sport: FOOTBALL, result: real, picks: { ada: exact, bola: rightResult, chidi: exact } }),
-    await playMatch({ label: "m2", sport: FOOTBALL, result: real, picks: { ada: wrong, bola: rightResult, chidi: wrong } }),
-    await playMatch({ label: "m3", sport: FOOTBALL, result: real, picks: { ada: wrong, bola: rightResult, chidi: wrong } }),
+    await playMatch({ label: "m1", sport: FOOTBALL, result: real, joined, picks: { ada: exact, bola: rightResult, chidi: exact } }),
+    await playMatch({ label: "m2", sport: FOOTBALL, result: real, joined, picks: { ada: wrong, bola: rightResult, chidi: wrong } }),
+    await playMatch({ label: "m3", sport: FOOTBALL, result: real, joined, picks: { ada: wrong, bola: rightResult, chidi: wrong } }),
   ];
   const { table } = await build(matches);
-  // ada and chidi: one exact, 3 points. bola: three right results, 3 points.
-  // All three are level on points. ada and chidi have a 3-point pick, bola has none.
-  assert.equal(table.every((row) => row.points === 3), true);
-  assert.equal(name(table[2].player), "bola", "no 3-point picks, so last of the three");
-  assert.equal(table[2].position, 3);
-  // ada and chidi are level on everything, so they share first place.
-  assert.deepEqual(table.slice(0, 2).map((row) => row.position), [1, 1]);
+  // ada and chidi: one exact, 3 points. bola: three right results, 3 points. All level on points.
+  assert.deepEqual(lines(table), ["1 bola 3", "2 chidi 3", "3 ada 3"]);
+  assert.deepEqual(table.map((row) => row.joined), [100, 200, 300]);
 });
 
-test("level on points and 3-point picks: more 1-point picks comes first", async () => {
+test("more points always comes first, however early anyone joined", async () => {
   const real = { home: 1, away: 0 };
+  const joined = { ada: 900, bola: 1 };
   const matches = [
-    await playMatch({ label: "m1", sport: FOOTBALL, result: real, picks: { ada: { home: 1, away: 0 }, bola: { home: 1, away: 0 } } }),
-    await playMatch({ label: "m2", sport: FOOTBALL, result: real, picks: { ada: { home: 3, away: 0 }, bola: { home: 0, away: 1 } } }),
+    await playMatch({ label: "m1", sport: FOOTBALL, result: real, joined, picks: { ada: { home: 1, away: 0 }, bola: { home: 1, away: 0 } } }),
+    await playMatch({ label: "m2", sport: FOOTBALL, result: real, joined, picks: { ada: { home: 3, away: 0 }, bola: { home: 0, away: 1 } } }),
   ];
   const { table } = await build(matches);
   assert.deepEqual(lines(table), ["1 ada 4", "2 bola 3"]);
 });
 
-test("players who are level on everything share a position, and the next position is skipped", async () => {
+test("nobody shares a position: players level on points are numbered one after another", async () => {
   const real = { home: 1, away: 0 };
   const exact = { home: 1, away: 0 };
   const matches = [
@@ -85,12 +84,46 @@ test("players who are level on everything share a position, and the next positio
       label: "m1",
       sport: FOOTBALL,
       result: real,
+      joined: { ada: 50, bola: 40, chidi: 30, dayo: 20 },
       picks: { ada: exact, bola: exact, chidi: { home: 2, away: 0 }, dayo: { home: 0, away: 3 } },
     }),
   ];
   const { table } = await build(matches);
-  assert.deepEqual(table.map((row) => row.position), [1, 1, 3, 4]);
-  assert.deepEqual(table.map((row) => row.points), [3, 3, 1, 0]);
+  assert.deepEqual(lines(table), ["1 bola 3", "2 ada 3", "3 chidi 1", "4 dayo 0"]);
+});
+
+test("a player the league gave no joining time for comes after those level with them who have one", async () => {
+  const real = { home: 1, away: 0 };
+  const exact = { home: 1, away: 0 };
+  const matches = [
+    await playMatch({ label: "m1", sport: FOOTBALL, result: real, joined: { chidi: 700 }, picks: { ada: exact, bola: exact, chidi: exact } }),
+  ];
+  const { table } = await build(matches);
+  assert.equal(name(table[0].player), "chidi");
+  assert.deepEqual(table.map((row) => row.position), [1, 2, 3]);
+  assert.deepEqual(table.map((row) => row.joined), [700, null, null]);
+});
+
+test("if two files give a player different joining times, the earlier one is used", async () => {
+  const real = { home: 1, away: 0 };
+  const exact = { home: 1, away: 0 };
+  const wrong = { home: 0, away: 1 };
+  const matches = [
+    await playMatch({ label: "m1", sport: FOOTBALL, result: real, joined: { ada: 100, bola: 200 }, picks: { ada: exact, bola: exact } }),
+    // A later file tries to move bola ahead of ada, and ada back.
+    await playMatch({ label: "m2", sport: FOOTBALL, result: real, joined: { ada: 500, bola: 150 }, picks: { ada: wrong, bola: wrong } }),
+  ];
+  const { table } = await build(matches);
+  assert.deepEqual(table.map((row) => [name(row.player), row.joined]), [["ada", 100], ["bola", 150]]);
+});
+
+test("a joining time in a list that does not match the lock on chain is not used", async () => {
+  const real = { home: 1, away: 0 };
+  const exact = { home: 1, away: 0 };
+  const m1 = await playMatch({ label: "m1", sport: FOOTBALL, result: real, joined: { ada: 100, bola: 200 }, picks: { ada: exact, bola: exact } });
+  const other = await playMatch({ label: "other", sport: FOOTBALL, result: real, picks: { ada: exact } });
+  const { table } = await build([{ ...m1, entries: [{ ...m1.entries[0], fingerprint: other.entries[0].fingerprint, joined: 1 }, m1.entries[1]] }]);
+  assert.deepEqual(table.map((row) => row.joined), [null, null]);
 });
 
 test("a void match scores nobody, and shows as void on every record", async () => {
@@ -231,5 +264,5 @@ test("anyone who builds the table from the same facts gets the same table, whate
   // m1 ends 2-2: ada and dayo exact (3), bola and efe right result (1), chidi wrong (0).
   // m2 ends 0-3: chidi exact (3), everyone else picked a draw (0).
   assert.deepEqual(lines(forward.table).map((l) => l.replace(/^\d+ /, "")).sort(), ["ada 3", "bola 1", "chidi 3", "dayo 3", "efe 1"]);
-  assert.deepEqual(forward.table.map((row) => row.position), [1, 1, 1, 4, 4]);
+  assert.deepEqual(forward.table.map((row) => row.position), [1, 2, 3, 4, 5]);
 });

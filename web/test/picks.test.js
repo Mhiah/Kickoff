@@ -44,7 +44,7 @@ test("a sealed pick's fingerprint is the one the engine works out from the same 
   assert.equal(entry.sealedAt, NOW);
 });
 
-test("a basketball pick seals as a winner and a margin", async () => {
+test("a basketball prediction seals as a winner and a margin", async () => {
   const ctx = await contextAt(NOW);
   const fixture = ctx.fixtures["nyk-mil"];
   const entry = await seal({ store: ctx.store, league: SAMPLE_LEAGUE, fixture, competitions: COMPETITIONS, pick: { winner: "away", band: "C" }, now: NOW, player: ctx.mine.player });
@@ -54,7 +54,7 @@ test("a basketball pick seals as a winner and a margin", async () => {
   assert.equal(fixtureFacts(fixture, COMPETITIONS).label, "NBA: Knicks v Bucks");
 });
 
-test("a pick that cannot happen is refused, and nothing is kept", async () => {
+test("a prediction that cannot happen is refused, and nothing is kept", async () => {
   const ctx = await contextAt(NOW);
   const football = { store: ctx.store, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["ars-che"], competitions: COMPETITIONS, now: NOW, player: ctx.mine.player };
   await assert.rejects(seal({ ...football, pick: { home: 16, away: 0 } }), /0 to 15/);
@@ -63,7 +63,7 @@ test("a pick that cannot happen is refused, and nothing is kept", async () => {
   assert.deepEqual(ctx.store.all(), {});
 });
 
-test("picks close ten minutes before the start, to the second", async () => {
+test("predictions close ten minutes before the start, to the second", async () => {
   assert.equal(CLOSES_BEFORE, 600);
   const ctx = await contextAt(NOW);
   const fixture = ctx.fixtures["rma-bay"];
@@ -75,19 +75,19 @@ test("picks close ten minutes before the start, to the second", async () => {
   assert.equal(hasClosed(fixture.kickoff - 600, fixture.kickoff), true);
 });
 
-test("changing a pick replaces it, with a new secret and a new fingerprint", async () => {
+test("changing a prediction replaces it, with a new secret and a new fingerprint", async () => {
   const ctx = await contextAt(NOW);
   const args = { store: ctx.store, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["ars-che"], competitions: COMPETITIONS, now: NOW, player: ctx.mine.player };
   const first = await seal({ ...args, pick: { home: 2, away: 1 } });
   const second = await seal({ ...args, pick: { home: 2, away: 1 }, now: NOW + 60 });
   assert.equal(second.match, first.match);
   assert.notEqual(second.salt, first.salt);
-  assert.notEqual(second.fingerprint, first.fingerprint, "the same pick sealed twice does not look the same from outside");
+  assert.notEqual(second.fingerprint, first.fingerprint, "the same prediction sealed twice does not look the same from outside");
   assert.equal(Object.keys(ctx.store.all()).length, 1);
   assert.equal(ctx.store.get(first.match).sealedAt, NOW + 60);
 });
 
-test("picks and the device's key are still there when the browser is opened again", async () => {
+test("predictions and the device's key are still there when the browser is opened again", async () => {
   const storage = new FakeStorage();
   const before = createStore(storage);
   const ctx = await contextAt(NOW, before);
@@ -105,7 +105,7 @@ test("picks and the device's key are still there when the browser is opened agai
   assert.notEqual(await createDevice(createStore(new FakeStorage())).player(), again);
 });
 
-test("a pick sealed for another player id is not shown as yours", async () => {
+test("a prediction sealed for another player id is not shown as yours", async () => {
   const ctx = await contextAt(NOW);
   const entry = await seal({ store: ctx.store, league: SAMPLE_LEAGUE, fixture: ctx.fixtures["ars-che"], competitions: COMPETITIONS, pick: { home: 1, away: 1 }, now: NOW, player: ctx.mine.player });
   // A pick left over from before this device had its own key: no player, or someone else's.
@@ -125,7 +125,7 @@ test("a browser that refuses to store anything still works for the visit, and sa
     assert.deepEqual(store.get(entry.match), entry);
     assert.equal(store.lasting, false);
     const screen = pick("ars-che", await contextAt(NOW, store));
-    assert.match(screen.html, /<b>Private window\.<\/b> This pick will be lost when you close it\./);
+    assert.match(screen.html, /<b>Private window\.<\/b> This prediction will be lost when you close it\./);
   }
 });
 
@@ -140,34 +140,34 @@ test("damaged storage is treated as empty, not as a crash", async () => {
   }
 });
 
-test("the pick screen shows your own pick back to you once it is sealed", async () => {
+test("the prediction screen shows your own prediction back to you once it is sealed", async () => {
   const ctx = await contextAt(NOW);
   const before = pick("ars-che", ctx).html;
   assert.match(before, /data-seal="ars-che"/);
-  assert.match(before, />Seal my pick</);
+  assert.match(before, />Seal my prediction</);
   assert.ok(!before.includes('class="glass sealed"'));
-  assert.match(before, /Nobody can see it before kickoff\. You can change it until picks close\.</);
+  assert.match(before, /Nobody can see it before kickoff\. You can change it until predictions close\.</);
 
   const after = await sealOn(ctx, "ars-che", { home: 2, away: 1 });
   const html = pick("ars-che", after).html;
-  assert.match(html, /<div class="small muted">Your pick<\/div>/);
+  assert.match(html, /<div class="small muted">Your prediction<\/div>/);
   assert.match(html, /Sealed at \d\d:\d\d on [A-Z][a-z]+ \d+ [A-Z][a-z]+\. Only you can see it\.</);
   // The screen is the pick and one button. No explanations.
-  for (const gone of ["fingerprint", "Why this phone", "kept in this browser", "goes no further", "0x"]) assert.ok(!html.includes(gone), `"${gone}" is back on the pick screen`);
+  for (const gone of ["fingerprint", "Why this phone", "kept in this browser", "goes no further", "0x"]) assert.ok(!html.includes(gone), `"${gone}" is back on the prediction screen`);
   const words = html.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
-  assert.ok(words < 75, `the sealed pick screen has ${words} words on it`);
+  assert.ok(words < 75, `the sealed prediction screen has ${words} words on it`);
   assert.match(html, /<div class="yours">2 – 1<\/div>/);
-  assert.match(html, /Change my pick/);
-  assert.ok(!html.includes("data-seal="), "the seal button is gone until you choose to change the pick");
+  assert.match(html, /Change my prediction/);
+  assert.ok(!html.includes("data-seal="), "the seal button is gone until you choose to change the prediction");
   const kept = after.picks[after.matchIds["ars-che"]];
   assert.ok(!html.includes(kept.salt), "the secret is never put on the page");
 });
 
-test("changing a pick brings the controls back, set to what you had", async () => {
+test("changing a prediction brings the controls back, set to what you had", async () => {
   const ctx = await contextAt(NOW);
   const sealed = await sealOn(ctx, "ars-che", { home: 3, away: 2 });
   const editing = pick("ars-che", { ...sealed, editing: "ars-che" }).html;
-  assert.match(editing, /Seal my new pick/);
+  assert.match(editing, /Seal my new prediction/);
   assert.deepEqual([...editing.matchAll(/<output[^>]*>(\d+)<\/output>/g)].map((m) => m[1]), ["3", "2"]);
 
   const hoops = await sealOn(ctx, "nyk-mil", { winner: "away", band: "D" });
@@ -177,27 +177,27 @@ test("changing a pick brings the controls back, set to what you had", async () =
   assert.match(again, /data-winner="home" aria-pressed="false"/);
 });
 
-test("once picks have closed, a match cannot be picked and a sealed pick cannot be changed", async () => {
+test("once predictions have closed, a match cannot be predicted and a sealed prediction cannot be changed", async () => {
   const ctx = await contextAt(NOW);
   const sealed = await sealOn(ctx, "rma-bay", { home: 1, away: 1 });
   const late = closesAt(ctx.fixtures["rma-bay"].kickoff) + 1;
   const after = await contextAt(late, sealed.store);
 
   const yours = pick("rma-bay", after).html;
-  assert.match(yours, /Picks have closed/);
+  assert.match(yours, /Predictions have closed/);
   assert.ok(!yours.includes("data-change"));
   assert.ok(!yours.includes("data-seal="));
 
-  const other = pick("int-bar", after).html; // same kickoff, never picked
-  assert.match(other, /Picks for this match have closed/);
+  const other = pick("int-bar", after).html; // same kickoff, never predicted
+  assert.match(other, /Predictions for this match have closed/);
   assert.ok(!other.includes("data-seal="));
 
   const list = league(null, after).html;
   assert.match(list, />Closed</);
-  assert.equal(nextUp(after), "nyk-mil", "the next match to pick skips the ones that have closed");
+  assert.equal(nextUp(after), "nyk-mil", "the next match to predict skips the ones that have closed");
 });
 
-test("the next match to pick is the soonest one you have not picked", async () => {
+test("the next match to predict is the soonest one you have not picked", async () => {
   const ctx = await contextAt(NOW);
   assert.equal(nextUp(ctx), "rma-bay"); // two matches start together; they keep the order they were listed in
   const one = await sealOn(ctx, "rma-bay", { home: 1, away: 0 });
@@ -205,18 +205,18 @@ test("the next match to pick is the soonest one you have not picked", async () =
   let all = one;
   for (const id of ["int-bar", "ars-che"]) all = await sealOn(all, id, { home: 0, away: 0 });
   for (const id of ["nyk-mil", "gsw-den"]) all = await sealOn(all, id, { winner: "home", band: "A" });
-  assert.ok(nextUp(all), "with everything picked, it still points at a match that is open");
-  assert.match(league(null, all).html, /You have picked 5 of 80 matches/);
+  assert.ok(nextUp(all), "with everything predicted, it still points at a match that is open");
+  assert.match(league(null, all).html, /You have predicted 5 of 80 matches/);
 });
 
-test("a pick sealed for a match that has since moved is not counted for the new one", async () => {
+test("a prediction sealed for a match that has since moved is not counted for the new one", async () => {
   const ctx = await contextAt(NOW);
   const sealed = await sealOn(ctx, "ars-che", { home: 2, away: 1 });
   // The same teams, kicking off an hour later: a different match, with a different id.
   const moved = { ...sealed.fixtures, "ars-che": { ...sealed.fixtures["ars-che"], kickoff: sealed.fixtures["ars-che"].kickoff + 3600 } };
   const matchIds = { ...sealed.matchIds, "ars-che": await matchIdOf(SAMPLE_LEAGUE, moved["ars-che"], COMPETITIONS) };
   const html = pick("ars-che", { ...sealed, fixtures: moved, matchIds }).html;
-  assert.match(html, />Seal my pick</);
+  assert.match(html, />Seal my prediction</);
   assert.ok(!html.includes('class="glass sealed"'));
 });
 

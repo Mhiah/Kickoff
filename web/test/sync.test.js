@@ -92,9 +92,9 @@ test("until real matches are on Kickoff's list, the made-up ones are shown and s
   assert.equal(c.real, false);
   assert.deepEqual(Object.keys(c.fixtures).sort(), Object.keys(sampleFixtures(NOW)).sort());
   await ada.seal("ars-che", { home: 2, away: 1 });
-  assert.equal(await ada.carry(), false, "a pick for a made-up match is not sent anywhere");
+  assert.equal(await ada.carry(), false, "a prediction for a made-up match is not sent anywhere");
   assert.ok(!online.net.sent.some((s) => s.url === "/api/picks"));
-  assert.ok(!(await ada.screen("ars-che")).includes('class="state'), "a made-up pick has no sent or locked mark");
+  assert.ok(!(await ada.screen("ars-che")).includes('class="state'), "a made-up prediction has no sent or locked mark");
   assert.match(await ada.screen("ars-che"), /Nothing here is live yet/);
 });
 
@@ -116,7 +116,7 @@ test("real matches replace the made-up ones, and each is only shown if its id ch
   assert.ok(!JSON.stringify(c.fixtures).includes("Spurs"), "the match whose id does not fit is not shown");
   const html = league(null, c).html;
   assert.match(html, /Arsenal v Chelsea/);
-  assert.match(html, /You have picked 0 of 2 matches/);
+  assert.match(html, /You have predicted 0 of 2 matches/);
   assert.ok(!html.includes("Real Madrid"), "the made-up matches are gone");
   assert.ok(!html.includes("made up"), "nothing on the screen is made up any more");
   assert.ok(!html.includes("Nothing here is live yet"));
@@ -143,7 +143,7 @@ test("the whole journey: sealed, sent, locked, receipt checked, opened after kic
   const everythingSent = online.net.sent.map((s) => s.body).join("\n");
   assert.ok(everythingSent.includes(sealed.fingerprint));
   assert.ok(!everythingSent.includes(sealed.salt), "the secret has not left the phone");
-  assert.equal(await ada.carry(), false, "nothing more to do until picks close");
+  assert.equal(await ada.carry(), false, "nothing more to do until predictions close");
 
   await bola.seal(online.football, { home: 0, away: 0 });
   await bola.carry();
@@ -153,8 +153,8 @@ test("the whole journey: sealed, sent, locked, receipt checked, opened after kic
   await ada.carry();
   assert.equal(await ada.stands(online.football), "closed");
   assert.match(await ada.screen(online.football), /<div class="state ">Entered<\/div>/);
-  assert.match(await ada.screen(online.football), /Picks have closed/);
-  assert.ok(!(await ada.screen(online.football)).includes("Change my pick"));
+  assert.match(await ada.screen(online.football), /Predictions have closed/);
+  assert.ok(!(await ada.screen(online.football)).includes("Change my prediction"));
 
   // The robot freezes the bundle. Each phone fetches its receipt and checks it.
   online.clock.now = CLOSES + SETTLE;
@@ -177,7 +177,7 @@ test("the whole journey: sealed, sent, locked, receipt checked, opened after kic
   assert.equal(await ada.carry(), false, "and then there is nothing left to do");
 });
 
-test("a pick changed before picks close is the one that gets locked", async () => {
+test("a prediction changed before predictions close is the one that gets locked", async () => {
   const online = await kickoffOnline();
   const ada = await phone(online);
   await ada.carry();
@@ -185,10 +185,10 @@ test("a pick changed before picks close is the one that gets locked", async () =
   await ada.carry();
   online.clock.now += 600;
   const second = await ada.seal(online.football, { home: 0, away: 3 });
-  assert.equal(await ada.stands(online.football), "waiting", "the new pick has not been sent yet");
+  assert.equal(await ada.stands(online.football), "waiting", "the new prediction has not been sent yet");
   await ada.carry();
   assert.equal(await ada.stands(online.football), "sent");
-  assert.equal(ada.store.get(online.football).fallback, undefined, "the earlier pick is let go once the new one is in");
+  assert.equal(ada.store.get(online.football).fallback, undefined, "the earlier prediction is let go once the new one is in");
   online.clock.now = CLOSES + SETTLE;
   const frozen = await online.robotFreezes(online.football);
   assert.deepEqual(frozen.entries, [{ player: ada.player, fingerprint: second.fingerprint }]);
@@ -197,7 +197,7 @@ test("a pick changed before picks close is the one that gets locked", async () =
   assert.match(await ada.screen(online.football), /<div class="state ">Locked in<\/div>/);
 });
 
-test("offline, a pick waits and says so; back online in time, it is sent", async () => {
+test("offline, a prediction waits and says so; back online in time, it is sent", async () => {
   const online = await kickoffOnline();
   const ada = await phone(online);
   await ada.carry();
@@ -213,7 +213,7 @@ test("offline, a pick waits and says so; back online in time, it is sent", async
   assert.match(league(null, await ada.ctx()).html, />Sealed</);
 });
 
-test("a pick that never got through before picks closed does not count, and the screen says so", async () => {
+test("a prediction that never got through before predictions closed does not count, and the screen says so", async () => {
   const online = await kickoffOnline();
   const ada = await phone(online);
   await ada.carry();
@@ -228,7 +228,7 @@ test("a pick that never got through before picks closed does not count, and the 
   assert.ok(!online.net.sent.some((s) => s.url === "/api/picks"), "it is not sent late");
 });
 
-test("if a changed pick never gets through, the earlier one that did is kept and can still be opened", async () => {
+test("if a changed prediction never gets through, the earlier one that did is kept and can still be opened", async () => {
   const online = await kickoffOnline();
   const ada = await phone(online);
   await ada.carry();
@@ -241,7 +241,7 @@ test("if a changed pick never gets through, the earlier one that did is kept and
   await ada.seal(online.football, { home: 4, away: 4 });
   await ada.carry();
   assert.equal(await ada.stands(online.football), "waiting");
-  assert.equal(ada.store.get(online.football).fallback.fingerprint, first.fingerprint, "the pick Kickoff holds is not thrown away");
+  assert.equal(ada.store.get(online.football).fallback.fingerprint, first.fingerprint, "the prediction Kickoff holds is not thrown away");
   // Signal comes back only after picks have closed and the bundle is made.
   online.clock.now = CLOSES + SETTLE;
   online.net.down = false;
@@ -252,14 +252,14 @@ test("if a changed pick never gets through, the earlier one that did is kept and
   assert.deepEqual(kept.pick, { home: 2, away: 1 });
   assert.equal(await ada.stands(online.football), "locked");
   const html = await ada.screen(online.football);
-  assert.match(html, /Your later pick was not sent in time, so this one counts\./);
+  assert.match(html, /Your later prediction was not sent in time, so this one counts\./);
   assert.match(html, /<div class="yours">2 – 1<\/div>/);
   online.clock.now = KICKOFF + 5;
   await ada.carry();
   assert.equal(await ada.stands(online.football), "opened", "and it opens, because its secret was kept");
 });
 
-test("CHEAT: if Kickoff leaves a pick out of the bundle, the phone finds out and says so", async () => {
+test("CHEAT: if Kickoff leaves a prediction out of the bundle, the phone finds out and says so", async () => {
   const online = await kickoffOnline();
   const ada = await phone(online);
   await ada.carry();
@@ -268,15 +268,15 @@ test("CHEAT: if Kickoff leaves a pick out of the bundle, the phone finds out and
   // The server bundles without her pick, so it has no receipt for her.
   online.clock.now = CLOSES + SETTLE;
   ada.client.receipt = async () => {
-    throw Object.assign(new Error("There is no sealed pick from this player in the bundle."), { status: 404 });
+    throw Object.assign(new Error("There is no sealed prediction from this player in the bundle."), { status: 404 });
   };
   await online.robotFreezes(online.football);
   await ada.carry();
   assert.equal(await ada.stands(online.football), "problem");
-  assert.match(await ada.screen(online.football), /<div class="state bad">Problem<\/div><div class="small muted state-line">Kickoff left this pick out of the locked bundle\.</);
+  assert.match(await ada.screen(online.football), /<div class="state bad">Problem<\/div><div class="small muted state-line">Kickoff left this prediction out of the locked bundle\.</);
 });
 
-test("CHEAT: a receipt that does not prove the pick is not accepted", async () => {
+test("CHEAT: a receipt that does not prove the prediction is not accepted", async () => {
   const online = await kickoffOnline();
   const [ada, bola] = [await phone(online), await phone(online)];
   for (const p of [ada, bola]) await p.carry();
@@ -300,7 +300,7 @@ test("CHEAT: a receipt that does not prove the pick is not accepted", async () =
     await ada.carry();
     assert.equal(await ada.stands(online.football), "problem");
     assert.equal(ada.store.get(online.football).receipt, undefined);
-    assert.match(await ada.screen(online.football), /receipt does not prove this pick was locked/);
+    assert.match(await ada.screen(online.football), /receipt does not prove this prediction was locked/);
   }
   // Asked again at once, the phone leaves the server alone for a few minutes.
   await ada.carry();
@@ -317,7 +317,7 @@ test("CHEAT: a receipt that does not prove the pick is not accepted", async () =
   assert.equal(await ada.stands(online.football), "opened");
 });
 
-test("a pick is never opened before the match starts, even if the phone's clock runs fast", async () => {
+test("a prediction is never opened before the match starts, even if the phone's clock runs fast", async () => {
   const online = await kickoffOnline();
   const ada = await phone(online);
   await ada.carry();
@@ -341,7 +341,7 @@ test("a pick is never opened before the match starts, even if the phone's clock 
   assert.equal(ada.store.get(online.football).problem, undefined);
 });
 
-test("a basketball pick reads back in words at every step", async () => {
+test("a basketball prediction reads back in words at every step", async () => {
   const online = await kickoffOnline();
   const ada = await phone(online);
   await ada.carry();

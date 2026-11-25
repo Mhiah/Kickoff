@@ -250,8 +250,8 @@ for opening the league's account.
 
 What this rehearsal does not cover: the real network, a wallet holding real OKB, and time passing
 at its real pace. On the copy the rehearsal sets the clock itself. The robot's timing is checked
-separately, in its tests. It also covers three players. A match picked by more than 32 will not
-fit in one file on the league's site yet.
+separately, in its tests. It also covers three players. Since then the robot publishes a
+match's file in as many pieces as it needs, and its rehearsal includes a match picked by a hundred.
 
 ## The fees report
 

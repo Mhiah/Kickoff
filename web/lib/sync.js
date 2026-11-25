@@ -70,11 +70,11 @@ export async function syncPicks({ store, client, player, league, fixtures, now }
           const { problem, triedAt, ...rest } = entry;
           entry = { ...rest, receipt: { index: r.index, count: r.count, path: r.path, root: r.root } };
         } else {
-          Object.assign(entry, { problem: "Kickoff's receipt does not prove this pick was locked.", triedAt: now });
+          Object.assign(entry, { problem: "Kickoff's receipt does not prove this prediction was locked.", triedAt: now });
         }
       } catch (error) {
         // 409: the bundle has not been made yet. Anything else unreachable: try again later.
-        if (error.status === 404) Object.assign(entry, { problem: "Kickoff left this pick out of the locked bundle.", triedAt: now });
+        if (error.status === 404) Object.assign(entry, { problem: "Kickoff left this prediction out of the locked bundle.", triedAt: now });
       }
     }
 
@@ -107,9 +107,12 @@ export async function syncPicks({ store, client, player, league, fixtures, now }
  *   "closed"    picks have closed; waiting for the bundle to be locked
  *   "locked"    the receipt is in hand
  *   "opened"    handed over after the start
+ *   "unlocked"  the pick reached Kickoff, but the match's picks were not locked on X Layer before
+ *               kickoff, so nobody scores for it
  */
 export function standing(entry, fixture, now) {
   if (!fixture.real) return "made-up";
+  if (fixture.lock === "missed" && (entry.opened || entry.receipt || entry.sent?.fingerprint === entry.fingerprint)) return "unlocked";
   if (entry.opened) return "opened";
   if (entry.problem) return "problem";
   if (entry.receipt) return "locked";

@@ -45,7 +45,7 @@ for (const [name, make] of Object.entries(stores)) {
     assert.deepEqual(await store.get("group:X-0001"), { first: true });
   });
 
-  test(`${name}: a group, sealed picks, a frozen bundle and receipts all work on it`, async () => {
+  test(`${name}: a group, sealed predictions, a frozen bundle and receipts all work on it`, async () => {
     const s = await serverWithFixtures({ store: make() });
     const [ada, bola] = [await device(), await device()];
     const { body: group } = await s.post(ada, "/api/groups", { name: "Sunday Ballers", playerName: "Ada" });

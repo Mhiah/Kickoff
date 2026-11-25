@@ -9,8 +9,12 @@
 //   lock       a few seconds after picks close, the fingerprint of the match's bundle of sealed
 //              picks is written. It must be on X Layer before kickoff, or it never counts.
 //   result     once the feed says a match is finished (or is off), its result is written.
+//   report     Kickoff's server is told how each lock went: "locked" or "missed". The server only
+//              gives points for a match once it has been told it was locked, so a pick counts
+//              only if it was locked on X Layer before kickoff.
 //   openings   the opened picks are published on the league's on-chain site, so anyone can rebuild
-//              the table. Published again whenever more phones have opened their picks.
+//              the table. Published again whenever more phones have opened their picks. However
+//              many players picked a match, the file goes up whole, in pieces.
 //
 // Nothing here signs or sends anything itself. It is handed a `chain` that can read the league and
 // send to it, and a `server` that can be asked for bundles, so every rule can be checked with
@@ -26,11 +30,8 @@ export const SETTLE = 5;
 export const TOO_LATE = 30;
 /** How long after kickoff results and newly opened picks are still looked for, in seconds. */
 export const LOOK_BACK = 2 * 24 * 3600;
-/** The most one file on the league's site can hold, in bytes. */
-export const MAX_FILE = 24000;
-
 /** What the robot remembers between ticks, so it does not ask about things it has already settled. */
-export const newMemory = () => ({ locked: new Set(), nobody: new Set(), missed: new Set(), resulted: new Set(), published: new Map(), tooBig: new Set(), lookedAt: new Map() });
+export const newMemory = () => ({ locked: new Set(), nobody: new Set(), missed: new Set(), resulted: new Set(), published: new Map(), lookedAt: new Map(), told: new Map() });
 /** Opened picks for a match are looked for at most this often, in seconds. */
 export const OPENINGS_EVERY = 10 * 60;
 
@@ -51,14 +52,20 @@ export function nextLock(fixtures, now, memory) {
  * @param now       the time in seconds
  * @param league    Kickoff's id on X Layer, as hex
  * @param fixtures  the server's list of matches
- * @param server    { bundle(match) -> { count, root, entries }, openings(match) -> text or null }
- * @param chain     { read() -> Map(match id -> { announced, lock, resulted }), send(message), publish(path, text) }
+ * @param server    { bundle(match) -> { count, root, entries }, openings(match) -> text or null,
+ *                    report([{ match, state }]) } where state is "locked" or "missed"
+ * @param chain     { read() -> Map(match id -> { announced, lock, resulted }), send(message), publish(match, text) -> pieces, publishedCount(match) }
  * @param memory    from newMemory(), kept between ticks
- * @returns { did: [plain sentences], problems: [plain sentences] }
+ * @param since     when Kickoff went live on X Layer, in seconds. A match that started before then
+ *                  could not have been locked, so it is never reported as a lock that was missed
+ * @returns { did: [plain sentences], problems: [plain sentences], missed }
+ *   missed  the matches found this time whose sealed picks were not locked on X Layer before
+ *           kickoff: [{ id, label, kickoff, count }]. Each is reported once.
  */
-export async function chainTick({ now, league, fixtures, server, chain, memory }) {
+export async function chainTick({ now, league, fixtures, server, chain, memory, since = 0 }) {
   const did = [];
   const problems = [];
+  const missed = [];
   let record = null; // what is on X Layer, read once, only if something is due
   const onChain = async (id) => ((record ??= await chain.read()).get(id) ?? { announced: false, lock: null, resulted: false });
   const reread = () => (record = null);
@@ -78,6 +85,7 @@ export async function chainTick({ now, league, fixtures, server, chain, memory }
             memory.locked.add(f.id);
           } else if (now >= f.kickoff - TOO_LATE) {
             memory.missed.add(f.id);
+            missed.push({ id: f.id, label: f.label, kickoff: f.kickoff, count: bundle.count });
             problems.push(`${f.label}: there was not enough time left to lock ${bundle.count} sealed ${bundle.count === 1 ? "pick" : "picks"} before kickoff. They do not count.`);
           } else {
             if (!there.announced) {
@@ -115,9 +123,30 @@ export async function chainTick({ now, league, fixtures, server, chain, memory }
         problems.push(`X Layer could not be read (${error.message}). It will be tried again.`);
         break;
       }
+      if (!there.lock && f.lock === "missed") {
+        memory.missed.add(f.id); // known already, and Kickoff's server has been told
+        continue;
+      }
+      if (!there.lock && f.kickoff < since) {
+        memory.nobody.add(f.id); // from before Kickoff was on X Layer: nothing to lock, nothing missed
+        continue;
+      }
       if (!there.lock) {
-        // Nobody picked it, or its picks were never locked in time. Either way there is nothing to score.
-        memory.nobody.add(f.id);
+        // Nobody picked it, or its picks were never locked in time. Either way there is nothing to
+        // score from X Layer. If picks were sealed, that is a missed lock, and it is said once: the
+        // robot was not awake for it, or could not reach X Layer until it was too late.
+        let sealed;
+        try {
+          sealed = (await server.bundle(f.id)).count;
+        } catch (error) {
+          problems.push(`${f.label}: Kickoff's server could not say whether anyone picked it (${error.message}). It will be asked again.`);
+          continue;
+        }
+        if (sealed > 0) {
+          memory.missed.add(f.id);
+          missed.push({ id: f.id, label: f.label, kickoff: f.kickoff, count: sealed });
+          problems.push(`${f.label}: its ${sealed} sealed ${sealed === 1 ? "pick was" : "picks were"} never locked on X Layer before kickoff. They cannot be checked there.`);
+        } else memory.nobody.add(f.id);
         continue;
       }
       memory.locked.add(f.id);
@@ -138,7 +167,6 @@ export async function chainTick({ now, league, fixtures, server, chain, memory }
     }
 
     // ---- opened picks, published whenever there are more of them than last time
-    if (memory.tooBig.has(f.id)) continue;
     if (now - (memory.lookedAt.get(f.id) ?? -Infinity) < OPENINGS_EVERY) continue;
     memory.lookedAt.set(f.id, now);
     try {
@@ -146,21 +174,33 @@ export async function chainTick({ now, league, fixtures, server, chain, memory }
       if (file === null) continue;
       const count = JSON.parse(file).openings.length;
       if (count === 0 || memory.published.get(f.id) === count) continue;
-      if (new TextEncoder().encode(file).length > MAX_FILE) {
-        memory.tooBig.add(f.id);
-        problems.push(`${f.label}: the file of ${count} opened picks is too big to publish in one piece. This needs fixing before a group this large can be scored from X Layer.`);
-        continue;
-      }
       if (memory.published.get(f.id) === undefined && (await chain.publishedCount(f.id)) === count) {
         memory.published.set(f.id, count);
         continue;
       }
-      await chain.publish(f.id, file);
+      const pieces = await chain.publish(f.id, file);
       memory.published.set(f.id, count);
-      did.push(`${f.label}: published ${count} opened ${count === 1 ? "pick" : "picks"}`);
+      did.push(`${f.label}: published ${count} opened ${count === 1 ? "pick" : "picks"}${pieces > 1 ? `, in ${pieces} pieces` : ""}`);
     } catch (error) {
       problems.push(`${f.label}: its opened picks could not be published this time (${error.message}). It will be tried again.`);
     }
   }
-  return { did, problems };
+
+  // ---- tell Kickoff's server how each lock went. It gives points only for matches it has been
+  // told were locked. What the server's own list already says is not sent again.
+  const news = [];
+  for (const f of fixtures) {
+    if (f.kickoff < now - LOOK_BACK) continue;
+    const state = memory.locked.has(f.id) ? "locked" : memory.missed.has(f.id) ? "missed" : null;
+    if (state && f.lock !== state && memory.told.get(f.id) !== state) news.push({ match: f.id, state });
+  }
+  if (news.length > 0) {
+    try {
+      await server.report(news);
+      for (const n of news) memory.told.set(n.match, n.state);
+    } catch (error) {
+      problems.push(`Kickoff's server could not be told how ${news.length === 1 ? "a lock" : `${news.length} locks`} went (${error.message}). It will be told again.`);
+    }
+  }
+  return { did, problems, missed };
 }

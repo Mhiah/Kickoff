@@ -18,8 +18,24 @@ export const PREVIEW_LEAGUE = "0000000000000000000000c424ad6fe8a46a34fa9b0610959
 /** The most a request may carry, in bytes. Everything the website sends is far smaller. */
 export const MAX_BODY = 64 * 1024;
 
+/**
+ * Any site may ask this server, from a browser. That is what lets the copy of the website kept on
+ * X Layer (which a browser opens at another address) play the same game as the main site.
+ *
+ * It gives nothing away. A player is known by a signature made with a key their own browser
+ * holds, never by a cookie, so a page on another site has nothing of theirs to ride on. The
+ * robot's key travels in a header that is not on the list below, so a browser will not send it
+ * from another site at all.
+ */
+export const OPEN_TO_BROWSERS = Object.freeze({
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "content-type",
+  "access-control-max-age": "86400",
+});
+
 const json = (status, body) =>
-  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...OPEN_TO_BROWSERS } });
 
 /**
  * Work out which address was asked for. Some hosts pass every /api/... request to one function
@@ -40,6 +56,8 @@ export function pathOf(requestUrl) {
  */
 export function createFetchHandler({ handle, log = console.error }) {
   return async function fetchHandler(request) {
+    // A browser on another site asks first whether it may ask. It may.
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: OPEN_TO_BROWSERS });
     let body = null;
     if (request.method !== "GET" && request.method !== "HEAD") {
       const declared = Number(request.headers.get("content-length") ?? 0);

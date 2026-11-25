@@ -43,12 +43,16 @@ export const MAX_GROUP_NAME = 40;
 export const MAX_PLAYER_NAME = 24;
 /** A group is for friends, so it is kept small. When it is full, nobody else can join it. */
 export const MAX_MEMBERS = 30;
+/** The most players in a group run by a brand. Only Kickoff's own key can start one. */
+export const BRAND_MAX = 5000;
+export const MAX_BRAND_NAME = 30;
+export const MAX_PRIZE = 80;
 export const COMPETITIONS = ["pl", "cl", "nba", "wnba"];
 /** How many rows of the table of everyone are sent. A player further down is sent their own row as well. */
 export const TABLE_TOP = 20;
 /** How many of a player's finished matches are sent. */
 export const PLAYED_SHOWN = 20;
-export const NAME_TAKEN = "That name is taken. Pick another.";
+export const NAME_TAKEN = "That name is taken. Choose another.";
 
 /** Something the server will not do, with the reason to show the player. */
 export class Refusal extends Error {
@@ -93,7 +97,7 @@ function codeFor(name, digits) {
  * @param league  Kickoff's id on X Layer, as hex
  * @param random  a function giving a whole number from 0 up to (not including) its argument
  */
-export function createKickoff({ store, league, random = (n) => Math.floor(Math.random() * n) }) {
+export function createKickoff({ store, league, random = (n) => Math.floor(Math.random() * n), brandMax = BRAND_MAX }) {
   if (!isId(league)) throw new Error("the league id must be 64 hex digits");
 
   const fixture = async (match) => {
@@ -212,8 +216,12 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
 
   // ------------------------------------------------------------------ points
   //
-  // A pick scores once its match is final and it has been opened. Whichever of those happens
-  // second does the scoring. Scoring the same pick twice writes the same thing twice.
+  // A pick only counts if its match's sealed picks were locked on X Layer before kickoff. The robot
+  // does the locking and tells this server how it went (putLocks below): "locked", or "missed".
+  //
+  // So a pick scores once three things are true: its match was locked, the match is final, and the
+  // pick has been opened. Whichever happens last does the scoring. A match whose lock was missed
+  // never scores for anyone. Scoring the same pick twice writes the same thing twice.
 
   const scoreOne = async (f, player, pickByte) => {
     const points = scorePick({ circuits: CIRCUITS, sport: f.sport, pickByte, result: decodePick(f.sport, f.resultByte) });
@@ -221,7 +229,9 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     await store.tableSet(`played:${player}`, f.id, { pickByte, points });
   };
   const isFinal = (f) => f.state === "final" && Number.isInteger(f.resultByte);
-  /** Score every opened pick of a match that has just been given its result. */
+  /** A match whose picks can be given points now. */
+  const counts = (f) => isFinal(f) && f.lock === "locked";
+  /** Score every opened pick of a match that has just been given its result, or just been confirmed as locked. */
   const scoreMatch = async (f) => {
     const frozen = await store.get(`frozen:${f.id}`);
     if (!frozen) return;
@@ -230,11 +240,23 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     await store.tableSet("scored", f.id, { kickoff: f.kickoff });
     await stale();
   };
+  /**
+   * A match whose lock was missed: nobody scores. Any points already given for it are taken back,
+   * and each player with a sealed pick in it is left a line saying what happened.
+   */
+  const voidMatch = async (f) => {
+    for (const player of Object.keys(await store.tableAll(`points:${f.id}`))) await store.tableDelete(`points:${f.id}`, player);
+    await store.tableDelete("scored", f.id);
+    const frozen = await store.get(`frozen:${f.id}`);
+    for (const e of frozen?.entries ?? []) await store.tableSet(`played:${e.player}`, f.id, { missed: true });
+    await stale();
+  };
 
   /**
    * Everyone on Kickoff, in order: most points first, and between players level on points, whoever
    * joined first. Kept until something changes it.
-   * @returns [{ key, name, joinedAt, threes, ones, points, place }]
+   * @returns [{ key, name, joinedAt, threes, ones, points, place, brands }]: `brands` is the codes
+   *          of the brand groups the person is in, if any
    */
   const everyone = async () => {
     const stamp = (await store.get("table-stamp")) ?? "start";
@@ -252,7 +274,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       }
     }
     const rows = [...tally]
-      .map(([key, t]) => ({ key, name: people[key].name, joinedAt: people[key].joinedAt, ...t, points: 3 * t.threes + t.ones }))
+      .map(([key, t]) => ({ key, name: people[key].name, joinedAt: people[key].joinedAt, ...t, points: 3 * t.threes + t.ones, ...(people[key].brands ? { brands: people[key].brands } : {}) }))
       .sort((a, b) => b.points - a.points || a.joinedAt - b.joinedAt || a.key.localeCompare(b.key));
     rows.forEach((row, i) => (row.place = i + 1));
     await store.set("table-kept", { stamp, rows });
@@ -316,10 +338,50 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       return this.group({ code });
     },
 
+    /**
+     * Start a group run by a brand. Only Kickoff does this, with its own key: it is how a group
+     * can be far bigger than a group of friends. Nobody is in it until they join with its code.
+     * @param brand  who runs it, shown to players as "Run by …"
+     * @param prize  one line about the prize, or nothing
+     */
+    async createBrandGroup({ now, name, brand, prize, plays }) {
+      const groupName = tidyName(name, MAX_GROUP_NAME, "The group's name");
+      const runBy = tidyName(brand, MAX_BRAND_NAME, "The brand's name");
+      const prizeLine = prize === undefined || prize === null || String(prize).trim() === "" ? null : tidyName(prize, MAX_PRIZE, "The prize");
+      const chosen = plays === undefined || plays === null ? [...COMPETITIONS] : tidyPlays(plays);
+      let code = null;
+      for (let tries = 0; tries < 30 && code === null; tries++) {
+        const candidate = codeFor(groupName, String(random(10000)).padStart(4, "0"));
+        const record = { code: candidate, name: groupName, startedBy: null, startedAt: now, plays: chosen, brand: runBy, ...(prizeLine ? { prize: prizeLine } : {}) };
+        if (await store.setIfAbsent(`group:${candidate}`, record)) code = candidate;
+      }
+      if (code === null) refuse(503, "Could not make a code for the group. Try again.");
+      return this.group({ code });
+    },
+
     /** Join a group with its code. A player has one name everywhere: giving another one here changes it everywhere. */
     async joinGroup({ player, now, code, playerName }) {
-      const group = await this.group({ code });
+      const group = await this.group({ code, player });
       const who = tidyName(playerName, MAX_PLAYER_NAME, "Your name");
+      if (group.brand) {
+        // A brand's group can hold thousands, so its members are never fetched all at once. Names
+        // are already one per player across Kickoff, so there is nothing to compare here.
+        const before = await store.tableGet(`members:${group.code}`, player);
+        if (!before && (await store.tableSize(`members:${group.code}`)) >= brandMax) refuse(409, `This group is full. It can have ${brandMax.toLocaleString("en-GB")} players.`);
+        const person = await ensurePerson(player, now);
+        await named(player, who, now);
+        await store.tableSet(`members:${group.code}`, player, { ...before, name: who, joinedAt: before?.joinedAt ?? now, since: now });
+        await store.tableSet(`groups-of:${player}`, group.code, { joinedAt: before?.joinedAt ?? now });
+        await bringDevices(group.code, player, now);
+        // The person is marked as in this group, which is how its leaderboard finds them.
+        const key = (await personOf(player)) ?? person;
+        const record = await store.tableGet("people", key);
+        if (record && !(record.brands ?? []).includes(group.code)) {
+          await store.tableSet("people", key, { ...record, brands: [...(record.brands ?? []), group.code] });
+          await stale();
+        }
+        return this.group({ code: group.code, player });
+      }
       const sits = (m) => m.player === player || (m.players ?? []).includes(player);
       const already = group.members.some(sits);
       if (!already && group.members.length >= MAX_MEMBERS) refuse(409, `This group is full. A group can have ${MAX_MEMBERS} players.`);
@@ -336,12 +398,23 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       return this.group({ code: group.code });
     },
 
-    /** A group and its members: whoever started it, then the rest in the order they joined. Anyone with the code can see this. */
-    async group({ code }) {
+    /**
+     * A group and its members: whoever started it, then the rest in the order they joined. Anyone
+     * with the code can see this.
+     *
+     * A group run by a brand is told apart by `brand`. It says how many `players` it has, and its
+     * `members` are never listed: only the seat of the player asking, if they are in it.
+     */
+    async group({ code, player = null }) {
       if (typeof code !== "string") refuse(400, "That is not a group code.");
       const tidy = code.trim().toUpperCase();
       if (!/^[A-Z]{1,7}-\d{4}$/.test(tidy)) refuse(400, "That is not a group code. A code looks like BALLERS-4821.");
       const group = (await store.get(`group:${tidy}`)) ?? refuse(404, "There is no group with that code.");
+      if (group.brand) {
+        const mine = player ? await store.tableGet(`members:${tidy}`, player) : null;
+        const seat = mine ? { player, name: mine.name, joinedAt: mine.joinedAt, ...(mine.wallet ? { linked: true, players: (await devicesOf(mine.wallet)).sort() } : {}) } : null;
+        return { ...group, players: await store.tableSize(`members:${tidy}`), members: seat ? [seat] : [] };
+      }
       // One seat for each player. The devices of one wallet share a seat: it is listed once, under
       // the device used most recently, with `linked` and the ids of all its devices. Which wallet
       // it is stays out of what anyone else can see.
@@ -366,13 +439,14 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       await ensurePerson(player, now);
       const codes = Object.keys(await store.tableAll(`groups-of:${player}`));
       const groups = [];
-      for (const code of codes) groups.push(await this.group({ code }));
+      for (const code of codes) groups.push(await this.group({ code, player }));
       return groups.sort((a, b) => a.startedAt - b.startedAt);
     },
 
     /** Choose which competitions a group plays. Only the player who started it may. */
     async setPlays({ player, code, plays }) {
       const group = await this.group({ code });
+      if (group.brand) refuse(403, "This group's competitions were chosen by whoever runs it.");
       const starter = group.members.find((m) => (m.players ?? [m.player]).includes(group.startedBy));
       if (!(starter?.players ?? [group.startedBy]).includes(player)) refuse(403, "Only the person who started the group can change what it plays.");
       const chosen = tidyPlays(plays);
@@ -416,7 +490,12 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
           await store.set(nameKey(mine.name), address);
         } else if (mine && theirs) {
           if (mine.name.toLowerCase() !== theirs.name.toLowerCase()) await store.remove(nameKey(mine.name));
-          if (mine.joinedAt < theirs.joinedAt) await store.tableSet("people", address, { ...theirs, joinedAt: mine.joinedAt });
+          // Whichever joined first is when the person joined, and the person is in every brand
+          // group either of them was in.
+          const brands = [...new Set([...(theirs.brands ?? []), ...(mine.brands ?? [])])];
+          if (mine.joinedAt < theirs.joinedAt || brands.length !== (theirs.brands ?? []).length) {
+            await store.tableSet("people", address, { ...theirs, joinedAt: Math.min(mine.joinedAt, theirs.joinedAt), ...(brands.length > 0 ? { brands } : {}) });
+          }
         }
         if (mine) await store.tableDelete("people", player);
         await store.tableSet("owner-of", player, address);
@@ -446,7 +525,9 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
      * @returns {
      *   everyone  { players, rows }: the top of the table of everybody, and this player's own row
      *             (marked `below`) if they are further down
-     *   group     { players, rows }: the same for the group, in full, or null
+     *   group     { players, rows }: the same for the group, in full, or null. For a group run by
+     *             a brand it is the top of the group with this player's own row, like `everyone`,
+     *             and each row also carries `players`, the ids that player picks with
      *   you       { place, points, threes, ones, wrong } among everybody. `place` is null for
      *             someone with no name yet, who is not on the table. `wrong` counts their picks
      *             that scored nothing.
@@ -460,8 +541,10 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       const me = await ensurePerson(player, now);
       let all = await everyone();
       let members = null;
-      if (code !== null && code !== undefined) {
-        const group = await this.group({ code });
+      let brand = null;
+      const group = code !== null && code !== undefined ? await this.group({ code }) : null;
+      if (group?.brand) brand = group.code;
+      else if (group) {
         const owner = await store.tableAll("owner-of");
         const known = new Set(all.map((row) => row.key));
         members = new Set();
@@ -481,7 +564,20 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       const show = (row, place, extra = {}) => ({ place, name: row.name, threes: row.threes, ones: row.ones, points: row.points, you: row.key === me, ...extra });
       const top = all.slice(0, TABLE_TOP).map((row) => show(row, row.place));
       if (mine && mine.place > TABLE_TOP) top.push(show(mine, mine.place, { below: true }));
-      const inGroup = members ? all.filter((row) => members.has(row.key)) : null;
+      let inGroup = members ? all.filter((row) => members.has(row.key)) : null;
+      let groupRows = inGroup ? inGroup.map((row, i) => show(row, i + 1)) : null;
+      if (brand) {
+        // A brand's group is found by the mark on each person, never by fetching its members. Only
+        // its top is sent, with the asking player's own row if they are further down. Each row
+        // carries the player's ids, so the website's Check screen can look them up on X Layer.
+        inGroup = all.filter((row) => row.brands?.includes(brand));
+        const devices = new Map();
+        for (const [device, key] of Object.entries(await store.tableAll("owner-of"))) devices.set(key, [...(devices.get(key) ?? []), device]);
+        const withIds = (row, place, extra) => show(row, place, { players: (devices.get(row.key) ?? [row.key]).sort(), ...extra });
+        groupRows = inGroup.slice(0, TABLE_TOP).map((row, i) => withIds(row, i + 1));
+        const at = inGroup.findIndex((row) => row.key === me);
+        if (at >= TABLE_TOP) groupRows.push(withIds(inGroup[at], at + 1, { below: true }));
+      }
 
       const mineByMatch = new Map();
       if (me) for (const device of await devicesOfPerson(me)) for (const [match, p] of Object.entries(await store.tableAll(`played:${device}`))) mineByMatch.set(match, p);
@@ -489,14 +585,18 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       const fixtures = mineByMatch.size > 0 ? await store.tableAll("fixtures") : {};
       for (const [match, p] of mineByMatch) {
         const f = fixtures[match];
-        if (f && isFinal(f)) played.push({ match, comp: f.comp, sport: f.sport, home: f.home, away: f.away, score: f.score ?? "", kickoff: f.kickoff, pickByte: p.pickByte, points: p.points });
+        if (!f) continue;
+        const about = { match, comp: f.comp, sport: f.sport, home: f.home, away: f.away, score: f.score ?? "", kickoff: f.kickoff };
+        // A match that was not locked in time is listed, so the player can see why it gave nothing.
+        if (p.missed) played.push({ ...about, missed: true, points: 0 });
+        else if (counts(f)) played.push({ ...about, pickByte: p.pickByte, points: p.points });
       }
       played.sort((a, b) => b.kickoff - a.kickoff || a.match.localeCompare(b.match));
 
       return {
         everyone: { players: all.length, rows: top },
-        group: inGroup ? { players: inGroup.length, rows: inGroup.map((row, i) => show(row, i + 1)) } : null,
-        you: { place: mine?.place ?? null, points: mine?.points ?? 0, threes: mine?.threes ?? 0, ones: mine?.ones ?? 0, wrong: played.filter((p) => p.points === 0).length },
+        group: inGroup ? { players: inGroup.length, rows: groupRows } : null,
+        you: { place: mine?.place ?? null, points: mine?.points ?? 0, threes: mine?.threes ?? 0, ones: mine?.ones ?? 0, wrong: played.filter((p) => p.points === 0 && !p.missed).length },
         played: played.slice(0, PLAYED_SHOWN),
       };
     },
@@ -517,11 +617,11 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
      */
     async sealPick({ player, now, at, match, fingerprint }) {
       const f = await fixture(match);
-      if (!isId(fingerprint)) refuse(400, "That is not a sealed pick.");
-      if (f.state !== "scheduled") refuse(409, "This match is no longer open for picks.");
-      if (now >= f.kickoff - CLOSES_BEFORE) refuse(409, "Picks for this match have closed.");
+      if (!isId(fingerprint)) refuse(400, "That is not a sealed prediction.");
+      if (f.state !== "scheduled") refuse(409, "This match is no longer open for predictions.");
+      if (now >= f.kickoff - CLOSES_BEFORE) refuse(409, "Predictions for this match have closed.");
       const before = await store.tableGet(`sealed:${match}`, player);
-      if (before && at <= before.signedAt) refuse(409, "A newer pick from this device is already in.");
+      if (before && at <= before.signedAt) refuse(409, "A newer prediction from this device is already in.");
       // Everyone who plays is on the table, so everyone has a name. Someone who picks before
       // choosing one is called "Player" and four characters of their id until they do.
       await ensurePerson(player, now, `Player ${player.slice(0, 4).toUpperCase()}`);
@@ -553,15 +653,15 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
      */
     async freeze({ now, match }) {
       const f = await fixture(match);
-      const frozen = (await settle(f, now)) ?? refuse(409, "Picks for this match are still open, or closed a moment ago. A bundle is made a few seconds after they close.");
+      const frozen = (await settle(f, now)) ?? refuse(409, "Predictions for this match are still open, or closed a moment ago. A bundle is made a few seconds after they close.");
       return { match, count: frozen.entries.length, root: frozen.root, entries: frozen.entries, frozenAt: frozen.frozenAt };
     },
 
     /** A player's receipt: the proof their sealed pick is in the bundle. Available once picks are frozen. */
     async receipt({ player, now, match }) {
       const f = await fixture(match);
-      const frozen = (await settle(f, now)) ?? refuse(409, "Picks for this match have not been locked yet.");
-      if (!frozen.entries.some((e) => e.player === player)) refuse(404, "There is no sealed pick from this player in the bundle.");
+      const frozen = (await settle(f, now)) ?? refuse(409, "Predictions for this match have not been locked yet.");
+      if (!frozen.entries.some((e) => e.player === player)) refuse(404, "There is no sealed prediction from this player in the bundle.");
       const bundle = await buildBundle({ league, match, entries: frozen.entries.map((e) => ({ player: fromHex(e.player), fingerprint: fromHex(e.fingerprint) })) });
       const r = await receiptFor(bundle, fromHex(player));
       return { match, player, fingerprint: toHex(r.fingerprint), index: r.index, count: r.count, path: r.path.map(toHex), root: toHex(r.root) };
@@ -575,19 +675,19 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
      */
     async openPick({ player, now, match, pickByte, salt }) {
       const f = await fixture(match);
-      if (now < f.kickoff) refuse(409, "A pick cannot be opened before the match starts.");
+      if (now < f.kickoff) refuse(409, "A prediction cannot be opened before the match starts.");
       const frozen = await settle(f, now);
-      const entry = frozen.entries.find((e) => e.player === player) ?? refuse(404, "You have no sealed pick in this match's bundle.");
-      if (!Number.isInteger(pickByte) || pickByte < 0 || pickByte > 255 || !isId(salt)) refuse(400, "That is not an opened pick.");
+      const entry = frozen.entries.find((e) => e.player === player) ?? refuse(404, "You have no sealed prediction in this match's bundle.");
+      if (!Number.isInteger(pickByte) || pickByte < 0 || pickByte > 255 || !isId(salt)) refuse(400, "That is not an opened prediction.");
       const fingerprint = await fingerprintOf({ league, match, sport: f.sport, pickByte, player: fromHex(player), salt: fromHex(salt) });
-      if (toHex(fingerprint) !== entry.fingerprint) refuse(409, "That pick and secret do not produce the fingerprint you sealed.");
+      if (toHex(fingerprint) !== entry.fingerprint) refuse(409, "That prediction and secret do not produce the fingerprint you sealed.");
       try {
         decodePick(f.sport, pickByte);
       } catch {
-        refuse(409, "That is not a pick that can happen in this kind of match.");
+        refuse(409, "That is not a prediction that can happen in this kind of match.");
       }
       await store.tableSet(`opened:${match}`, player, { pickByte, salt, openedAt: now });
-      if (isFinal(f)) {
+      if (counts(f)) {
         await scoreOne(f, player, pickByte);
         await store.tableSet("scored", f.id, { kickoff: f.kickoff });
         await stale();
@@ -614,13 +714,21 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
 
     /**
      * The file of opened picks for a match, in the form the picks engine reads (docs/PROTOCOL.md).
-     * Every opening in it proves itself against the lock on X Layer.
+     * Every opening in it proves itself against the lock on X Layer. Each player's entry also says
+     * when they joined Kickoff, so that the leaderboard built from X Layer puts players who are
+     * level on points in the same order as the one here.
      */
     async openingsFile({ now, match }) {
       const f = await fixture(match);
-      if (now < f.kickoff) refuse(409, "Picks are not opened before the match starts.");
+      if (now < f.kickoff) refuse(409, "Predictions are not opened before the match starts.");
       const frozen = await settle(f, now);
-      const entries = frozen.entries.map((e) => ({ player: fromHex(e.player), fingerprint: fromHex(e.fingerprint) }));
+      const people = await store.tableAll("people");
+      const owner = await store.tableAll("owner-of");
+      const entries = [];
+      for (const e of frozen.entries) {
+        const person = people[owner[e.player] ?? e.player] ?? people[await personOf(e.player)];
+        entries.push({ player: fromHex(e.player), fingerprint: fromHex(e.fingerprint), ...(person ? { joined: person.joinedAt } : {}) });
+      }
       const bundle = await buildBundle({ league, match, entries });
       const opened = await store.tableAll(`opened:${match}`);
       const openings = [];
@@ -649,14 +757,39 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
         if (before && (before.kickoff !== f.kickoff || before.label !== f.label || before.sport !== f.sport)) {
           refuse(409, `The facts of ${before.label} cannot change. A moved match is a new match.`);
         }
-        const after = { ...before, ...f };
+        // Whether a match was locked on X Layer comes in only through putLocks.
+        const { lock: _notFromHere, ...facts } = f;
+        const after = { ...before, ...facts };
         await store.tableSet("fixtures", f.id, after);
-        // The result has just come in, or has been put right: every opened pick is scored.
-        if (isFinal(after) && !(before && isFinal(before) && before.resultByte === after.resultByte)) await scoreMatch(after);
+        // The result has just come in, or has been put right: every opened pick is scored, if the
+        // match was locked. If the robot has not said so yet, it is scored when it does.
+        if (counts(after) && !(before && isFinal(before) && before.resultByte === after.resultByte)) await scoreMatch(after);
         if (before) updated++;
         else added++;
       }
       return { added, updated };
+    },
+
+    /**
+     * The robot says how locking went for each match: "locked" if the match's sealed picks were
+     * locked on X Layer before kickoff, "missed" if they were not. Only matches that were locked
+     * give points. Saying the same thing again changes nothing.
+     * @param locks  [{ match, state }]
+     * @returns { changed }: how many matches this was news for
+     */
+    async putLocks({ locks }) {
+      if (!Array.isArray(locks) || locks.some((l) => !isId(l?.match) || !["locked", "missed"].includes(l.state))) refuse(400, "That is not a list of locks.");
+      let changed = 0;
+      for (const { match, state } of locks) {
+        const before = await fixture(match);
+        if (before.lock === state) continue;
+        const after = { ...before, lock: state };
+        await store.tableSet("fixtures", match, after);
+        if (state === "missed") await voidMatch(after);
+        else if (isFinal(after)) await scoreMatch(after);
+        changed++;
+      }
+      return { changed };
     },
   };
 }

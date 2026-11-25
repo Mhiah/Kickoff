@@ -97,9 +97,10 @@ What happens to a player in a match is one of:
 | `void` | The match was postponed, abandoned, or ended in a walkover or retirement | nobody scores |
 | `pending` | The match has no result yet | none yet |
 
-The table is ordered as [docs/RULES.md](../docs/RULES.md) says: most points, then most 3-point
-picks, then most 1-point picks. Players level on all three share a position, and the next position
-is skipped.
+The table is ordered as [docs/RULES.md](../docs/RULES.md) says: most points first, and between
+players level on points, whoever joined Kickoff first is ahead. Nobody shares a position. When each
+player joined is published with the opened picks (see [docs/PROTOCOL.md](../docs/PROTOCOL.md)). A
+player with no joining time published comes after those level with them who have one.
 
 ## Reading a league back from the chain
 

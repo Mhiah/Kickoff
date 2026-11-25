@@ -42,11 +42,13 @@ export function createChain({ store, node = XLAYER.node, read = tableFromXLayer,
      *   matches     { "<match id>": { kickoff, state, lock: { at, count, root, tx } or null } }
      *               `lock` is the lock in force: the last one stamped before kickoff
      *   points      { "<player id>": { points, threes, ones } }, from opened picks and results
+     *   joined      { "<player id>": when they joined Kickoff, in seconds }, as the league published
+     *               it with the opened picks. Players level on points are ordered by it.
      * }
      */
     view(league) {
       const d = kept();
-      return d && d.league === league ? d : null;
+      return d && d.league === league ? { ...d, joined: d.joined ?? {} } : null;
     },
     /**
      * Read X Layer again.
@@ -70,8 +72,12 @@ export function createChain({ store, node = XLAYER.node, read = tableFromXLayer,
           };
         }
         const points = {};
-        for (const row of built.table) points[hex(row.player)] = { points: row.points, threes: row.threes, ones: row.ones };
-        store.write(CHAIN_KEY, JSON.stringify({ league, at: now(), block: built.block, matches, points }));
+        const joined = {};
+        for (const row of built.table) {
+          points[hex(row.player)] = { points: row.points, threes: row.threes, ones: row.ones };
+          if (Number.isSafeInteger(row.joined)) joined[hex(row.player)] = row.joined;
+        }
+        store.write(CHAIN_KEY, JSON.stringify({ league, at: now(), block: built.block, matches, points, joined }));
         self.unreachable = false;
       } catch {
         self.unreachable = true;

@@ -293,7 +293,10 @@ async function carry() {
     // X Layer is read by this browser when a screen that shows it is open, at most every two minutes.
     if (ctx.real && !document.hidden && /^#\/(record|check)/.test(location.hash) && Date.now() - chainAskedAt >= 2 * 60_000) {
       chainAskedAt = Date.now();
-      const players = (ctx.mine.group?.members ?? []).flatMap((m) => m.players ?? [m.player]);
+      // A group of friends lists its members. A brand's group is too big to: the ids to look up
+      // are the ones on the top of its leaderboard.
+      const g = ctx.mine.group;
+      const players = g?.brand ? (ctx.standings?.group?.rows ?? []).flatMap((r) => r.players ?? []) : (g?.members ?? []).flatMap((m) => m.players ?? [m.player]);
       const was = chain.unreachable;
       changed = (await chain.refresh({ league: ctx.league, players: [...new Set([ctx.mine.player, ...players])] })) || chain.unreachable !== was || changed;
     }

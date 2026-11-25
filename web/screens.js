@@ -39,13 +39,13 @@ export function home() {
 <div class="hero">
   <div class="say">
     <h1>Say the score before kickoff. Prove it after.</h1>
-    <p class="lede">Pick the results of real matches with your friends. Every pick is sealed before the match starts, so nobody can change theirs once the result is in.</p>
+    <p class="lede">Predict the results of real matches with your friends. Every prediction is sealed before the match starts, so nobody can change theirs once the result is in.</p>
   </div>
   <div class="slip glass demo">
     <div class="body">
       ${comp("pl")}
       <div class="teams">Arsenal v Chelsea</div>
-      <div class="when">Ada's pick</div>
+      <div class="when">Ada's prediction</div>
       <div class="pick">2 – 1</div>
     </div>
     <div class="stub small"><b>Sealed 18:20.</b> Kickoff 18:30.<br><span class="muted">The time is stamped by X Layer, not by us.</span></div>
@@ -77,14 +77,14 @@ export function home() {
   <section>
     <h2>How a match goes</h2>
     <ol class="steps">
-      <li><b>Before kickoff, you pick.</b> Your pick is sealed on your phone. Nobody can see it, not even Kickoff.</li>
-      <li><b>Ten minutes before kickoff, picks close.</b> X Layer stamps the time. A pick that turns up later does not count.</li>
-      <li><b>After the match, every pick opens.</b> Everyone sees what everyone said, and the leaderboard updates.</li>
+      <li><b>Before kickoff, you predict.</b> Your prediction is sealed on your phone. Nobody can see it, not even Kickoff.</li>
+      <li><b>Ten minutes before kickoff, predictions close.</b> X Layer stamps the time. A prediction that turns up later does not count.</li>
+      <li><b>After the match, every prediction opens.</b> Everyone sees what everyone said, and the leaderboard updates.</li>
     </ol>
   </section>
   <section>
     <h2>You don't have to trust us</h2>
-    <p>Every pick's seal and every result is kept on X Layer through TapeOut. Anyone can read the record and rebuild the leaderboard themselves.</p>
+    <p>Every prediction's seal and every result is kept on X Layer through TapeOut. Anyone can read the record and rebuild the leaderboard themselves.</p>
     <a class="btn quiet" href="#/check" style="margin-top:14px">See how to check it</a>
   </section>
 </div>
@@ -99,11 +99,11 @@ function fixtureRow(ctx, id) {
   let action;
   const mine = yourPick(ctx, id);
   const stands = mine ? standing(mine, f, ctx.now) : null;
-  if (stands === "waiting" || stands === "missed" || stands === "problem") action = `<a class="sealed-box unsent" href="#/pick/${id}" aria-label="Your pick is sealed but has not reached Kickoff. See why.">Not entered</a>`;
-  else if (mine) action = `<a class="sealed-box" href="#/pick/${id}" aria-label="Your pick is sealed. See it or change it.">Sealed</a>`;
+  if (stands === "waiting" || stands === "missed" || stands === "problem") action = `<a class="sealed-box unsent" href="#/pick/${id}" aria-label="Your prediction is sealed but has not reached Kickoff. See why.">Not entered</a>`;
+  else if (mine) action = `<a class="sealed-box" href="#/pick/${id}" aria-label="Your prediction is sealed. See it or change it.">Sealed</a>`;
   else if (hasClosed(ctx.now, f.kickoff)) action = `<span class="small muted">Closed</span>`;
-  else action = `<a class="btn small go" href="#/pick/${id}">Pick</a>`;
-  return `<div class="row" data-comp="${f.comp}"><div class="grow">${comp(f.comp)}<div class="title">${teams(f)}</div><div class="sub">${clock(f.kickoff)}. Picks close ${clock(closesAt(f.kickoff))}.</div></div>${action}</div>`;
+  else action = `<a class="btn small go" href="#/pick/${id}">Predict</a>`;
+  return `<div class="row" data-comp="${f.comp}"><div class="grow">${comp(f.comp)}<div class="title">${teams(f)}</div><div class="sub">${clock(f.kickoff)}. Predictions close ${clock(closesAt(f.kickoff))}.</div></div>${action}</div>`;
 }
 
 function weekHtml(ctx) {
@@ -123,7 +123,7 @@ function weekHtml(ctx) {
   return `
   <h2>This week</h2>
   <div class="chips" role="group" aria-label="Show one competition"><button type="button" data-filter="all" aria-pressed="true">All</button>${chips}</div>
-  <p class="small muted" style="margin:10px 0 0">You have picked ${picked} of ${total} matches. Pick as many as you like.</p>
+  <p class="small muted" style="margin:10px 0 0">You have predicted ${picked} of ${total} matches. Predict as many as you like.</p>
   ${days}
   <p class="small muted" data-empty hidden style="margin-top:14px">No matches in this competition this week.</p>
   ${ctx.real ? "" : `<p class="say-so"><button type="button" class="link" data-preview-note="In this preview only five of the week's matches are shown.">Show all ${week.total} matches this week</button></p>`}
@@ -140,7 +140,7 @@ export function tableHtml() {
   const shared = you.sharedWith.length
     ? `<p class="small muted" style="margin-top:8px">${esc(group.you)} and ${esc(you.sharedWith.join(" and "))} are level on everything, so they share ${placeName(you.position)} place.</p>`
     : "";
-  return `<div class="glass clip"><table class="table"><thead><tr><th><span hidden>Place</span></th><th>Player</th><th>3-pt picks</th><th>1-pt picks</th><th>Points</th></tr></thead><tbody>${rows}</tbody></table></div>${shared}`;
+  return `<div class="glass clip"><table class="table"><thead><tr><th><span hidden>Place</span></th><th>Player</th><th>3-pt predictions</th><th>1-pt predictions</th><th>Points</th></tr></thead><tbody>${rows}</tbody></table></div>${shared}`;
 }
 
 function playedHtml(limit) {
@@ -168,9 +168,9 @@ function nextCard(ctx, nextId) {
     ${comp(next.comp)}
     <div class="teams">${teams(next)}</div>
     <div class="when">${esc(dayLabel(next.kickoff))}, ${clock(next.kickoff)}.</div>
-    <span class="clock">Picks close in ${esc(howLong(ctx.now, closesAt(next.kickoff)))}</span>
+    <span class="clock">Predictions close in ${esc(howLong(ctx.now, closesAt(next.kickoff)))}</span>
   </div>
-  <div class="stub"><a class="btn go" href="#/pick/${nextId}">${yourPick(ctx, nextId) ? "See your pick" : "Make your pick"}</a></div>
+  <div class="stub"><a class="btn go" href="#/pick/${nextId}">${yourPick(ctx, nextId) ? "See your prediction" : "Make your prediction"}</a></div>
 </div>`;
 }
 
@@ -186,7 +186,7 @@ function boardHtml(board, empty) {
   const line = (row) =>
     `<tr class="${row.you ? "you" : ""}"><td>${row.place ?? "–"}</td><td>${esc(row.name)}${row.you ? '<span class="tag">you</span>' : ""}</td><td>${row.threes}</td><td>${row.ones}</td><td class="pts">${row.points}</td></tr>`;
   const gap = below.length ? `<tr class="gap"><td colspan="5">…</td></tr>` : "";
-  return `<div class="glass clip"><table class="table"><thead><tr><th><span hidden>Place</span></th><th>Player</th><th>3-pt picks</th><th>1-pt picks</th><th>Points</th></tr></thead><tbody>${top.map(line).join("")}${gap}${below.map(line).join("")}</tbody></table></div>`;
+  return `<div class="glass clip"><table class="table"><thead><tr><th><span hidden>Place</span></th><th>Player</th><th>3-pt predictions</th><th>1-pt predictions</th><th>Points</th></tr></thead><tbody>${top.map(line).join("")}${gap}${below.map(line).join("")}</tbody></table></div>`;
 }
 
 /**
@@ -204,6 +204,8 @@ function playedRow(r, under = "") {
   } catch {
     // a pick this screen cannot put in words: the points still show
   }
+  // A match that was not locked on X Layer in time: no points to show, only why.
+  if (r.missed) return `<div class="row"><div class="grow">${comp(r.comp)}<div class="title">${r.score ? `${esc(r.home)} ${esc(r.score)} ${esc(r.away)}` : teams(r)}</div>${NOT_LOCKED}</div></div>`;
   return `<div class="row"><div class="grow">${comp(r.comp)}<div class="title">${esc(r.home)} ${esc(r.score)} ${esc(r.away)}</div><div class="sub">${esc(said)}</div>${under}</div>${pointsCell(r.points)}</div>`;
 }
 
@@ -222,20 +224,20 @@ function leagueReal(ctx) {
   const board = ctx.looking?.board === "group" ? "group" : "everyone";
   const played = s.played.length
     ? `<div class="glass">${s.played.slice(0, 3).map((r) => playedRow(r)).join("")}</div>
-    <p class="say-so"><a class="link" href="#/record">Every match you picked</a></p>`
+    <p class="say-so"><a class="link" href="#/record">Every match you predicted</a></p>`
     : `<p class="small muted" style="margin-top:10px">Nothing played yet.</p>`;
   const html = `
 ${titlebar({
   eyebrow: esc(todayLabel(ctx.now)),
   heading: "League",
-  actions: `<a class="btn small quiet" href="#/group">${g ? "Invite a friend" : "Start a group"}</a>${next ? `<a class="btn small go" href="#/pick/${nextId}">Make a pick</a>` : ""}`,
+  actions: `<a class="btn small quiet" href="#/group">${g ? "Invite a friend" : "Start a group"}</a>${next ? `<a class="btn small go" href="#/pick/${nextId}">Make a prediction</a>` : ""}`,
 })}
 <p class="sub phone-only">${people(s.everyone.players)}.${s.you.place ? ` You are ${ordinal(s.you.place)}.` : ""}</p>
 
 <div class="tiles">
-  <div class="glass tile"><small>Your place</small><b>${s.you.place ? ordinal(s.you.place) : "–"}</b><span>${s.you.place ? `of ${people(s.everyone.players)}` : "after your first pick"}</span></div>
+  <div class="glass tile"><small>Your place</small><b>${s.you.place ? ordinal(s.you.place) : "–"}</b><span>${s.you.place ? `of ${people(s.everyone.players)}` : "after your first prediction"}</span></div>
   <div class="glass tile"><small>Your points</small><b>${s.you.points}</b><span>${s.you.threes} spot on, ${s.you.ones} right winner</span></div>
-  <div class="glass tile"><small>Picked this week</small><b>${picked} of ${ids.length}</b><span>pick as many as you like</span></div>
+  <div class="glass tile"><small>Predicted this week</small><b>${picked} of ${ids.length}</b><span>predict as many as you like</span></div>
   <div class="glass tile"><small>Next to close</small><b>${next ? esc(closesIn) : "Nothing open"}</b><span>${next ? teams(next) : "new matches arrive each week"}</span></div>
 </div>
 
@@ -268,14 +270,14 @@ export function league(_, ctx) {
 ${titlebar({
   eyebrow: esc(todayLabel(ctx.now)),
   heading: esc(group.name),
-  actions: `<a class="btn small quiet" href="#/group">Invite a friend</a>${next ? `<a class="btn small go" href="#/pick/${nextId}">Make a pick</a>` : ""}`,
+  actions: `<a class="btn small quiet" href="#/group">Invite a friend</a>${next ? `<a class="btn small go" href="#/pick/${nextId}">Make a prediction</a>` : ""}`,
 })}
 <p class="sub phone-only">${group.players.length} players. You are ${ordinal(you.position)}.</p>
 
 <div class="tiles">
   <div class="glass tile"><small>Your place</small><b>${ordinal(you.position)}</b><span>${you.sharedWith.length ? `shared with ${esc(you.sharedWith.join(" and "))}` : `of ${group.players.length}`}</span></div>
   <div class="glass tile"><small>Your points</small><b>${you.points}</b><span>${you.threes} spot on, ${you.ones} right winner</span></div>
-  <div class="glass tile"><small>Picked this week</small><b>${picked} of ${ctx.real ? ids.length : week.total}</b><span>pick as many as you like</span></div>
+  <div class="glass tile"><small>Predicted this week</small><b>${picked} of ${ctx.real ? ids.length : week.total}</b><span>predict as many as you like</span></div>
   <div class="glass tile"><small>Next to close</small><b>${next ? esc(closesIn) : "Nothing open"}</b><span>${next ? teams(next) : "new matches arrive each week"}</span></div>
 </div>
 
@@ -286,9 +288,9 @@ ${
     ${comp(next.comp)}
     <div class="teams">${teams(next)}</div>
     <div class="when">${esc(dayLabel(next.kickoff))}, ${clock(next.kickoff)}.</div>
-    <span class="clock">Picks close in ${esc(closesIn)}</span>
+    <span class="clock">Predictions close in ${esc(closesIn)}</span>
   </div>
-  <div class="stub"><a class="btn go" href="#/pick/${nextId}">${yourPick(ctx, nextId) ? "See your pick" : "Make your pick"}</a></div>
+  <div class="stub"><a class="btn go" href="#/pick/${nextId}">${yourPick(ctx, nextId) ? "See your prediction" : "Make your prediction"}</a></div>
 </div>`
     : ""
 }
@@ -300,7 +302,7 @@ ${
     ${tableHtml()}
     <h2>Played</h2>
     ${playedHtml(3)}
-    <p class="say-so"><a class="link" href="#/record">Every match you picked</a></p>
+    <p class="say-so"><a class="link" href="#/record">Every match you predicted</a></p>
   </section>
 </div>
 ${SAMPLE_NOTE}`;
@@ -337,6 +339,8 @@ function pickControls(f, entry) {
  * Where a sealed pick stands: one or two words on the card, and a short line only when something
  * needs the player's attention. A made-up match gets nothing; the foot of the page covers it.
  */
+const NOT_LOCKED = `<div class="state bad">Not locked in time</div><div class="small muted state-line">Nobody scores for this match.</div>`;
+
 function standingMark(entry, f, ctx) {
   const mark = (kind, words, line = "") => `<div class="state ${kind}">${words}</div>${line ? `<div class="small muted state-line">${line}</div>` : ""}`;
   switch (standing(entry, f, ctx.now)) {
@@ -353,6 +357,8 @@ function standingMark(entry, f, ctx) {
       return mark("", "Revealed");
     case "missed":
       return mark("bad", "Not entered in time", "It does not count for this match.");
+    case "unlocked":
+      return NOT_LOCKED;
     default:
       return mark("bad", "Problem", esc(entry.problem));
   }
@@ -370,28 +376,28 @@ export function pick(id, ctx) {
     ? ["The exact score gets 3 points.", "The right winner, or calling a draw, gets 1 point.", "It is the score after 90 minutes. Extra time and penalties do not count."]
     : ["The right winner gets 1 point.", "Add 2 points if you also get how much they win by.", "Overtime counts."];
   // The one thing said out loud: a private window keeps nothing, so the pick would be lost.
-  const notKept = ctx.lasting ? "" : `<div class="note warn" style="margin-top:14px"><b>Private window.</b> This pick will be lost when you close it.</div>`;
+  const notKept = ctx.lasting ? "" : `<div class="note warn" style="margin-top:14px"><b>Private window.</b> This prediction will be lost when you close it.</div>`;
 
   let body;
   if (editing) {
     body = `
 <div class="glass picker" data-picker="${football ? "football" : "basketball"}">${pickControls(f, entry)}</div>
 <ul class="rules">${rules.map((r) => `<li>${r}</li>`).join("")}</ul>
-<button type="button" class="btn go" data-seal="${id}">${entry ? "Seal my new pick" : "Seal my pick"}</button>
-<p class="after" data-note-out role="status">Nobody can see it before ${start}. You can change it until picks close.</p>`;
+<button type="button" class="btn go" data-seal="${id}">${entry ? "Seal my new prediction" : "Seal my prediction"}</button>
+<p class="after" data-note-out role="status">Nobody can see it before ${start}. You can change it until predictions close.</p>`;
   } else if (entry) {
     body = `
 <div class="glass sealed" role="status">
-  <div class="small muted">Your pick</div>
+  <div class="small muted">Your prediction</div>
   <div class="yours${football ? "" : " words"}">${esc(pickWords(entry, f))}</div>
   <div class="small muted">Sealed at ${clock(entry.sealedAt)} on ${esc(dayLabel(entry.sealedAt))}. Only you can see it.</div>
   ${standingMark(entry, f, ctx)}
 </div>
-${closed ? "" : `<button type="button" class="btn quiet" data-change="${id}" style="margin-top:14px">Change my pick</button>`}
-${entry.replaced ? `<p class="after">Your later pick was not sent in time, so this one counts.</p>` : ""}
+${closed ? "" : `<button type="button" class="btn quiet" data-change="${id}" style="margin-top:14px">Change my prediction</button>`}
+${entry.replaced ? `<p class="after">Your later prediction was not sent in time, so this one counts.</p>` : ""}
 ${notKept}`;
   } else {
-    body = `<div class="note" style="margin-top:6px">Picks for this match have closed.</div>`;
+    body = `<div class="note" style="margin-top:6px">Predictions for this match have closed.</div>`;
   }
 
   const html = `
@@ -399,7 +405,7 @@ ${notKept}`;
 <div class="head">
   ${titlebar({ before: comp(f.comp), heading: teams(f), headingClass: "under" })}
   <div class="muted" style="margin-top:6px">${esc(dayLabel(f.kickoff))}, ${start} ${clock(f.kickoff)}</div>
-  <span class="clock">${closed ? "Picks have closed" : `Picks close at ${clock(closesAt(f.kickoff))}, in ${esc(howLong(ctx.now, closesAt(f.kickoff)))}`}</span>
+  <span class="clock">${closed ? "Predictions have closed" : `Predictions close at ${clock(closesAt(f.kickoff))}, in ${esc(howLong(ctx.now, closesAt(f.kickoff)))}`}</span>
 </div>
 ${body}
 ${f.real ? "" : SAMPLE_NOTE}`;
@@ -428,7 +434,7 @@ export function matchScreen() {
 
 <div class="glass proof">
   ${stamp(m.sealedAt, m.sealedDate, 92)}
-  <div><b>All ${m.sealedCount} picks were sealed at ${m.sealedAt},</b> ten minutes before kickoff. X Layer stamped the time.<br><a class="link" href="#/check">See the proof</a></div>
+  <div><b>All ${m.sealedCount} predictions were sealed at ${m.sealedAt},</b> ten minutes before kickoff. X Layer stamped the time.<br><a class="link" href="#/check">See the proof</a></div>
 </div>
 
 <h2>What everyone said</h2>
@@ -453,7 +459,7 @@ ${SAMPLE_NOTE}`;
 function lockLine(lock, kickoff, entry) {
   if (!lock) return "";
   const early = Math.max(1, Math.round((kickoff - lock.at) / 60));
-  const inside = entry?.receipt?.root === lock.root ? " Your pick is in it." : "";
+  const inside = entry?.receipt?.root === lock.root ? " Your prediction is in it." : "";
   const see = lock.tx ? ` <a class="link" href="${ON_CHAIN.explorer}/tx/${esc(lock.tx)}" target="_blank" rel="noopener">See it</a>` : "";
   return `<div class="small muted state-line">Locked on X Layer at ${clock(lock.at)}, ${early} ${early === 1 ? "minute" : "minutes"} before kickoff.${inside}${see}</div>`;
 }
@@ -473,24 +479,31 @@ function everyPick(ctx, s) {
     if (!f && !done) continue;
     scored.delete(match);
     const about = f ?? done;
+    // Not locked on X Layer in time: said plainly, with no points beside it.
+    const lost = done?.missed || (f && standing(entry, f, ctx.now) === "unlocked");
+    const under = lost ? NOT_LOCKED : f ? standingMark(entry, f, ctx) : "";
     rows.push({
       kickoff: about.kickoff,
-      html: `<div class="row"><div class="grow">${comp(about.comp)}<div class="title">${done ? `${esc(done.home)} ${esc(done.score)} ${esc(done.away)}` : teams(about)}</div><div class="sub">You said ${esc(pickWords(entry, about))}</div>${f ? standingMark(entry, f, ctx) : ""}</div>${done ? pointsCell(done.points) : ""}</div>`,
+      lost: Boolean(lost),
+      html: `<div class="row"><div class="grow">${comp(about.comp)}<div class="title">${done?.score ? `${esc(done.home)} ${esc(done.score)} ${esc(done.away)}` : teams(about)}</div><div class="sub">You said ${esc(pickWords(entry, about))}</div>${under}</div>${done && !lost ? pointsCell(done.points) : ""}</div>`,
     });
   }
-  for (const r of scored.values()) rows.push({ kickoff: r.kickoff, html: playedRow(r) });
-  return rows.sort((a, b) => b.kickoff - a.kickoff).map((r) => r.html);
+  for (const r of scored.values()) rows.push({ kickoff: r.kickoff, lost: Boolean(r.missed), html: playedRow(r) });
+  return rows.sort((a, b) => b.kickoff - a.kickoff);
 }
 
 /** My record, with real numbers: this player's points and place, and every pick. */
 function recordReal(ctx) {
   const s = ctx.standings ?? EMPTY;
   const name = ctx.mine.name;
-  const picks = everyPick(ctx, s);
-  // The totals: every pick made, the ones that scored, and how often a finished pick scored.
+  const every = everyPick(ctx, s);
+  const picks = every.map((r) => r.html);
+  // The totals: every pick made, the ones that scored, and how often a finished pick scored. A
+  // pick whose match was not locked in time is a pick made, but is neither played nor still to play.
   const won = s.you.threes + s.you.ones;
   const finished = won + s.you.wrong;
-  const total = Math.max(picks.length, finished);
+  const lost = every.filter((r) => r.lost).length;
+  const total = Math.max(picks.length, finished + lost);
   const rate = finished > 0 ? `${Math.round((100 * won) / finished)}%` : "–";
   const html = `
 ${titlebar({ heading: name ? `${esc(name)}'s record` : "My record" })}
@@ -498,12 +511,12 @@ ${titlebar({ heading: name ? `${esc(name)}'s record` : "My record" })}
   <div class="big"><b>${s.you.points}</b><span class="word">Points</span></div>
 </div>
 <div class="boxes">
-  <div class="glass box"><small>Total picks</small><b>${total}</b><span>${total - finished} to play</span></div>
+  <div class="glass box"><small>Total predictions</small><b>${total}</b><span>${total - finished - lost} to play</span></div>
   <div class="glass box"><small>Total won</small><b>${won}</b><span>${s.you.threes} spot on</span></div>
   <div class="glass box"><small>Win rate</small><b>${rate}</b><span>of ${finished} played</span></div>
 </div>
-<h2>Every pick</h2>
-${picks.length ? `<div class="glass">${picks.join("")}</div>` : `<p class="small muted" style="margin-top:10px">No picks yet.</p>`}`;
+<h2>Every prediction</h2>
+${picks.length ? `<div class="glass">${picks.join("")}</div>` : `<p class="small muted" style="margin-top:10px">No predictions yet.</p>`}`;
   return { html, title: "My record on Kickoff", tab: "record" };
 }
 
@@ -525,7 +538,7 @@ ${titlebar({ heading: `${esc(group.you)}'s record` })}
     <div><b>${wrong}</b> wrong<small>no points</small></div>
   </div>
 </div>
-<h2>Every pick</h2>
+<h2>Every prediction</h2>
 <div class="glass">${rows}${voids}</div>
 <button type="button" class="btn quiet" style="margin-top:18px" data-preview-note="Sharing is not switched on in this preview.">Share my record</button>
 <p class="say-so muted" data-note-out role="status"></p>
@@ -537,8 +550,8 @@ ${SAMPLE_NOTE}`;
 
 function timeline({ lock, kickoff, late }) {
   const lateHtml = late ? `<div class="dot late" style="left:86%"></div><div class="lab late" style="left:86%">${late.time}<small>refused</small></div>` : "";
-  return `<div class="tl" role="img" aria-label="Picks sealed at ${lock}. Kickoff at ${kickoff}.${late ? ` A set sent at ${late.time} was refused.` : ""}"><div class="bar"></div><div class="bar after"></div>
-  <div class="dot" style="left:22%"></div><div class="lab" style="left:22%">${lock}<small>picks sealed</small></div>
+  return `<div class="tl" role="img" aria-label="Predictions sealed at ${lock}. Kickoff at ${kickoff}.${late ? ` A set sent at ${late.time} was refused.` : ""}"><div class="bar"></div><div class="bar after"></div>
+  <div class="dot" style="left:22%"></div><div class="lab" style="left:22%">${lock}<small>predictions sealed</small></div>
   <div class="tick" style="left:62%"></div><div class="lab" style="left:62%">${kickoff}<small>kickoff</small></div>${lateHtml}</div>`;
 }
 
@@ -560,14 +573,31 @@ function checkReal(ctx) {
   else if (locked === 0) group = `<p class="small muted" style="margin-top:10px">Nothing locked on X Layer yet.</p>`;
   else if (!g) group = `<p class="small muted" style="margin-top:10px"><a class="link" href="#/group">Start or join a group</a> to check its points.</p>`;
   else {
-    const onKickoff = new Map((ctx.standings?.group?.rows ?? []).map((r) => [r.name, r.points]));
-    const lines = g.members.map((m) => {
-      const fromChain = (m.players ?? [m.player]).reduce((sum, id) => sum + (chain.points[id]?.points ?? 0), 0);
-      const here = onKickoff.get(m.name);
-      const same = here === fromChain;
-      return `<tr class="${sits(m, ctx.mine.player) ? "you" : ""}"><td></td><td>${esc(m.name)}</td><td>${fromChain}</td><td>${here ?? "–"}</td><td class="pts">${same ? "✓" : '<span class="muted">Not yet</span>'}</td></tr>`;
+    const rows = ctx.standings?.group?.rows ?? [];
+    const onKickoff = new Map(rows.map((r) => [r.name, r]));
+    // A group of friends is checked member by member. A brand's group is too big to list, so what
+    // is checked is the top of its leaderboard, and your own row, as Kickoff sent them.
+    const listed = g.brand ? rows.map((r) => ({ name: r.name, players: r.players ?? [], you: r.you })) : g.members;
+    const seats = listed.map((m) => {
+      const ids = m.players ?? [m.player];
+      return {
+        m,
+        fromChain: ids.reduce((sum, id) => sum + (chain.points[id]?.points ?? 0), 0),
+        joined: Math.min(...ids.map((id) => chain.joined?.[id] ?? Infinity)),
+        here: onKickoff.get(m.name),
+      };
     });
-    group = `<div class="glass clip" style="margin-top:12px"><table class="table"><thead><tr><th></th><th>Player</th><th>On X Layer</th><th>On Kickoff</th><th>Same</th></tr></thead><tbody>${lines.join("")}</tbody></table></div>`;
+    const lines = seats.map(({ m, fromChain, here }) => {
+      const same = here?.points === fromChain;
+      return `<tr class="${(g.brand ? m.you : sits(m, ctx.mine.player)) ? "you" : ""}"><td></td><td>${esc(m.name)}</td><td>${fromChain}</td><td>${here?.points ?? "–"}</td><td class="pts">${same ? "✓" : '<span class="muted">Not yet</span>'}</td></tr>`;
+    });
+    // The order too. X Layer knows the players whose picks it holds: taken in Kickoff's order,
+    // each must have more points than the next, or the same points and have joined no later.
+    const known = seats.filter((x) => x.here && Number.isFinite(x.joined)).sort((a, b) => a.here.place - b.here.place);
+    const pointsSame = seats.every((x) => x.here?.points === x.fromChain);
+    const orderSame = known.every((x, i) => i === 0 || known[i - 1].fromChain > x.fromChain || (known[i - 1].fromChain === x.fromChain && known[i - 1].joined <= x.joined));
+    const order = !pointsSame || known.length < 2 ? "" : `<p class="fine muted">${orderSame ? "The order is the same on X Layer. ✓" : "The order on X Layer is different just now."}</p>`;
+    group = `<div class="glass clip" style="margin-top:12px"><table class="table"><thead><tr><th></th><th>Player</th><th>On X Layer</th><th>On Kickoff</th><th>Same</th></tr></thead><tbody>${lines.join("")}</tbody></table></div>${order}${g.brand ? '<p class="fine muted">The top of the group\'s leaderboard, and you.</p>' : ""}`;
   }
   // This device's picks whose match X Layer has locked, newest first.
   const mine = chain
@@ -582,7 +612,7 @@ function checkReal(ctx) {
 ${titlebar({ heading: "Check it yourself" })}
 <p class="sub">Read from X Layer by your browser, not from Kickoff.</p>
 
-${mine.length ? `<h2>Your picks on X Layer</h2>
+${mine.length ? `<h2>Your predictions on X Layer</h2>
 <div class="glass">${mine.join("")}</div>` : ""}
 
 <h2>Your group's points</h2>
@@ -605,9 +635,9 @@ export function checkScreen(_, ctx) {
     .join("");
   const html = `
 ${titlebar({ heading: "Check it yourself" })}
-<p style="margin-top:8px">Nobody can change a pick after kickoff. Not a player, not the person who started the group, not Kickoff. You don't have to take that on trust. This is what X Layer has on record.</p>
+<p style="margin-top:8px">Nobody can change a prediction after kickoff. Not a player, not the person who started the group, not Kickoff. You don't have to take that on trust. This is what X Layer has on record.</p>
 
-<h2>When the picks were sealed</h2>
+<h2>When the predictions were sealed</h2>
 ${sealed}
 
 <h2>What was not believed</h2>
@@ -677,6 +707,8 @@ const shortWallet = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`
  * The group screen. `arg` is "start" or "join" to show just that form.
  * With no group yet, both forms are shown.
  */
+const playersWord = (n) => `${n.toLocaleString("en-GB")} ${n === 1 ? "player" : "players"}`;
+
 export function groupScreen(arg, ctx) {
   const mine = ctx.mine;
   const g = mine.group;
@@ -694,9 +726,11 @@ ${DEVICE_NOTE}`;
     return { html, title: `${heading} on Kickoff`, tab: "group", real: true };
   }
 
-  const starter = g.members.find((m) => sits(m, g.startedBy));
-  const isStarter = starter ? sits(starter, mine.player) : g.startedBy === mine.player;
-  const count = `${g.members.length} ${g.members.length === 1 ? "player" : "players"}`;
+  // A group run by a brand: nobody in it started it, and it is too big to list.
+  const brand = typeof g.brand === "string" ? g.brand : null;
+  const starter = brand ? null : g.members.find((m) => sits(m, g.startedBy));
+  const isStarter = brand ? false : starter ? sits(starter, mine.player) : g.startedBy === mine.player;
+  const count = playersWord(brand ? (g.players ?? g.members.length) : g.members.length);
   const nextId = nextUp(ctx, g.plays);
   const plays = Object.keys(COMPETITIONS)
     .map((key) => {
@@ -722,26 +756,28 @@ ${DEVICE_NOTE}`;
   const others = mine.groups.filter((other) => other.code !== g.code);
   const switcher = others.length
     ? `<h2>Your other groups</h2>
-<div class="glass">${others.map((o) => `<div class="row"><div class="grow"><div class="title" style="margin:0">${esc(o.name)}</div><div class="sub">${o.members.length} ${o.members.length === 1 ? "player" : "players"}</div></div><button type="button" class="btn small quiet" data-choose="${esc(o.code)}">Open</button></div>`).join("")}</div>`
+<div class="glass">${others.map((o) => `<div class="row"><div class="grow"><div class="title" style="margin:0">${esc(o.name)}</div><div class="sub">${o.brand ? `Run by ${esc(o.brand)} · ` : ""}${playersWord(o.brand ? (o.players ?? o.members.length) : o.members.length)}</div></div><button type="button" class="btn small quiet" data-choose="${esc(o.code)}">Open</button></div>`).join("")}</div>`
     : "";
   const html = `
 ${titlebar({ heading: esc(g.name) })}
-<p class="sub">${isStarter ? "You started this group" : starter ? `${esc(starter.name)} started this group` : "Your group"}. ${count}.</p>
+<p class="sub">${brand ? `Run by ${esc(brand)}` : isStarter ? "You started this group" : starter ? `${esc(starter.name)} started this group` : "Your group"}. ${count}.</p>
+${brand && g.prize ? `<p class="sub prize"><b>Prize:</b> ${esc(g.prize)}</p>` : ""}
 ${mine.offline ? OFFLINE_NOTE : ""}
 
 ${nextId ? `${nextCard(ctx, nextId)}
 <p class="say-so"><a class="link" href="#/league">See every match</a></p>` : `<div class="note" style="margin-top:14px">No matches are open for this group right now. New ones arrive by themselves.</div>`}
 
 <div class="glass invite"><div><small class="muted">Invite code</small><b>${esc(g.code)}</b></div><button type="button" class="btn small go" data-copy="${esc(g.code)}">Copy</button></div>
-<p class="sub">Send this code to your friends. They choose "Join with a code" on Kickoff.</p>
+<p class="sub">${brand ? 'Anyone with this code can join. They choose "Join with a code" on Kickoff.' : 'Send this code to your friends. They choose "Join with a code" on Kickoff.'}</p>
 
 <h2>What this group plays</h2>
 <div class="glass">${plays}</div>
-<p class="say-so muted" data-note-out role="status">${isStarter ? "" : `Only ${starter ? esc(starter.name) : "whoever started the group"} can change this.`}</p>
+<p class="say-so muted" data-note-out role="status">${isStarter ? "" : brand ? `${esc(brand)} chose these.` : `Only ${starter ? esc(starter.name) : "whoever started the group"} can change this.`}</p>
 <p class="fine muted">Fixtures and results come in by themselves from live sports data.</p>
 
-<h2>Players</h2>
+<h2>${brand ? "You" : "Players"}</h2>
 <div class="glass">${players}</div>
+${brand ? '<p class="fine muted">This group is too big to list. Its leaderboard is on the <a href="#/league">League</a> tab.</p>' : ""}
 <p class="say-so muted" data-wallet-out role="status"></p>
 ${switcher}
 

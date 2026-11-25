@@ -98,7 +98,7 @@ export function createStore(storage) {
  *          and, if an earlier pick had already been sent, `fallback`: that earlier entry
  */
 export async function seal({ store, league, fixture, competitions, pick, now, player }) {
-  if (hasClosed(now, fixture.kickoff)) throw new Error("Picks for this match have closed.");
+  if (hasClosed(now, fixture.kickoff)) throw new Error("Predictions for this match have closed.");
   if (typeof player !== "string" || !/^[0-9a-f]{64}$/.test(player)) throw new Error("This device has no player id yet.");
   const facts = fixtureFacts(fixture, competitions);
   const match = await matchId(league, facts);

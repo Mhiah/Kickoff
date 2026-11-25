@@ -250,7 +250,8 @@ test("opened picks that are not published yet show as not opened", async () => {
   const { node, parts } = await seasonOnANode();
   delete node.files[openingsPath(parts.tennis.match)];
   const got = await table(node);
-  assert.deepEqual(lines(got.table), ["1 ada 4", "1 bola 4", "3 chidi 0"]);
+  assert.deepEqual(lines(got.table).map((l) => l.replace(/^\d+ /, "")).sort(), ["ada 4", "bola 4", "chidi 0"]);
+  assert.deepEqual(got.table.map((row) => row.position), [1, 2, 3]);
   assert.equal(got.files.find((f) => f.path === openingsPath(parts.tennis.match)).found, false);
 });
 

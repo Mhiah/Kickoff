@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { newDeviceKey, signRequest } from "../../engine/src/index.js";
-import { MAX_BODY, PREVIEW_LEAGUE, fromEnv, pathOf } from "../src/web.js";
+import { MAX_BODY, OPEN_TO_BROWSERS, PREVIEW_LEAGUE, fromEnv, pathOf } from "../src/web.js";
 import { FAKE_TOKEN, FAKE_URL, fakeRedis } from "./fake-redis.js";
 import { fixtures } from "./helpers.js";
 
@@ -96,4 +96,30 @@ test("an unexpected fault is noted for Kickoff and hidden from the person asking
   assert.ok(!(await answer.text()).includes("secret detail"));
   assert.equal(noted.length, 1);
   assert.equal(noted[0].message, "the database could not be reached");
+});
+
+test("the copy of the site on X Layer can ask this server from a browser, and the robot's key cannot come that way", async () => {
+  const handler = hosted();
+  const there = "https://5-2-409.tapekit.org";
+  // A browser on another site asks first whether it may send JSON.
+  const may = await handler(new Request(`${SITE}/api/groups`, { method: "OPTIONS", headers: { origin: there, "access-control-request-method": "POST", "access-control-request-headers": "content-type" } }));
+  assert.equal(may.status, 204);
+  assert.equal(may.headers.get("access-control-allow-origin"), "*");
+  assert.equal(may.headers.get("access-control-allow-methods"), "GET, POST, OPTIONS");
+  assert.equal(await may.text(), "");
+  // The only header it may add is the one saying the body is JSON. The robot's key is not among them.
+  assert.equal(may.headers.get("access-control-allow-headers"), "content-type");
+  assert.ok(!Object.values(OPEN_TO_BROWSERS).join(" ").toLowerCase().includes("x-kickoff-admin"));
+  assert.ok(!("access-control-allow-credentials" in OPEN_TO_BROWSERS), "nothing is ever sent along by the browser on a player's behalf");
+
+  // Then the real request, and its answer can be read from the other site: good answers and refusals alike.
+  const key = await newDeviceKey();
+  const made = await signedPost(handler, key, "/api/groups", { name: "On chain", playerName: "Ada" });
+  assert.equal(made.status, 200);
+  assert.equal(made.headers.get("access-control-allow-origin"), "*");
+  const missing = await handler(new Request(`${SITE}/api/groups/NOSUCH-0000`, { headers: { origin: there } }));
+  assert.equal(missing.status, 404);
+  assert.equal(missing.headers.get("access-control-allow-origin"), "*");
+  const noDatabase = await hosted({})(new Request(`${SITE}/api/fixtures`));
+  assert.equal(noDatabase.headers.get("access-control-allow-origin"), "*");
 });
