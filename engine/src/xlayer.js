@@ -184,7 +184,8 @@ export async function fetchLeague({ node, mailbox = XLAYER.mailbox, league }) {
       if (inboxIndex !== BigInt(index)) continue;
       const ref = fromHex(topics[3]);
       // The mailbox's own fingerprint of a message: keccak256(reference, then keccak256(the text)).
-      if (equal(keccak256(concat(ref, keccak256(payload))), fingerprint)) found = { ref, payload };
+      // `tx` is the transaction that carried it, for anyone who wants to look it up. Nothing is decided by it.
+      if (equal(keccak256(concat(ref, keccak256(payload))), fingerprint)) found = { ref, payload, tx: log.transactionHash ?? null };
     }
     if (!found) {
       throw new Error(

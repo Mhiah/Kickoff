@@ -3,9 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { BASKETBALL, FOOTBALL, basketballResult, encodePick, sealPick, toHex, walletLinkText } from "../../engine/src/index.js";
+import { BASKETBALL, BASKETBALL_HEX, FOOTBALL, FOOTBALL_HEX, TENNIS_HEX, basketballResult, encodePick, sealPick, toHex, walletLinkText } from "../../engine/src/index.js";
 import { testWallet } from "../../engine/test/test-wallet.js";
-import { BASKETBALL_HEX, FOOTBALL_HEX, TENNIS_HEX } from "../src/circuits.js";
 import { TABLE_TOP } from "../src/kickoff.js";
 import { RedisStore } from "../src/redis-store.js";
 import { FAKE_TOKEN, FAKE_URL, fakeRedis } from "./fake-redis.js";
@@ -113,7 +112,7 @@ test("everyone is numbered from 1 in the order they joined, until points say oth
   assert.deepEqual(names(t.everyone), ["1 Jerkson 3", "2 mya 0", "3 Kemi 0"]);
   assert.deepEqual(t.you, { place: 2, points: 0, threes: 0, ones: 0, wrong: 1 });
   assert.deepEqual(names(t.group), ["1 Jerkson 3", "2 mya 0"]);
-  assert.deepEqual(t.played, [{ match: s.f.football.id, comp: "pl", sport: FOOTBALL, home: "Arsenal", away: "Chelsea", score: "2 – 1", pickByte: picks.mya.pickByte, points: 0 }]);
+  assert.deepEqual(t.played, [{ match: s.f.football.id, comp: "pl", sport: FOOTBALL, home: "Arsenal", away: "Chelsea", score: "2 – 1", kickoff: s.f.football.kickoff, pickByte: picks.mya.pickByte, points: 0 }]);
 
   // Kemi opens hers after the result. It scores then, and she passes mya too.
   await open(s, kemi, picks.kemi);

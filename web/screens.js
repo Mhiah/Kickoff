@@ -14,6 +14,7 @@
 //              { player, groups, group (the one being looked at, or null), name, offline }
 
 import { COMPETITIONS, check, group, match, record, scores, voided, week } from "./data/sample.js";
+import { ON_CHAIN } from "./config.js";
 import { sits } from "./lib/groups.js";
 import { MARK, SAMPLE_NOTE, TOGGLE, comp, esc, stamp, titlebar } from "./lib/html.js";
 import { decodePick } from "./engine/picks.js";
@@ -196,14 +197,14 @@ function boardHtml(board, empty) {
  *   played    this player's finished matches, newest first: { id, comp, title, said, points }
  */
 /** One finished match of this player's: the score, what they said, and what it scored. */
-function playedRow(r) {
+function playedRow(r, under = "") {
   let said = "";
   try {
     said = `You said ${pickWords({ sport: r.sport, pick: decodePick(r.sport, r.pickByte) }, r)}`;
   } catch {
     // a pick this screen cannot put in words: the points still show
   }
-  return `<div class="row"><div class="grow">${comp(r.comp)}<div class="title">${esc(r.home)} ${esc(r.score)} ${esc(r.away)}</div><div class="sub">${esc(said)}</div></div>${pointsCell(r.points)}</div>`;
+  return `<div class="row"><div class="grow">${comp(r.comp)}<div class="title">${esc(r.home)} ${esc(r.score)} ${esc(r.away)}</div><div class="sub">${esc(said)}</div>${under}</div>${pointsCell(r.points)}</div>`;
 }
 
 function leagueReal(ctx) {
@@ -216,7 +217,7 @@ function leagueReal(ctx) {
   const closesIn = next ? howLong(ctx.now, closesAt(next.kickoff)) : "";
   const people = (n) => `${n} ${n === 1 ? "player" : "players"}`;
   const played = s.played.length
-    ? `<div class="glass">${s.played.slice(0, 3).map(playedRow).join("")}</div>
+    ? `<div class="glass">${s.played.slice(0, 3).map((r) => playedRow(r)).join("")}</div>
     <p class="say-so"><a class="link" href="#/record">Every match you picked</a></p>`
     : `<p class="small muted" style="margin-top:10px">Nothing played yet.</p>`;
   const html = `
@@ -439,23 +440,64 @@ ${SAMPLE_NOTE}`;
 
 // ------------------------------------------------------------------------------------ my record
 
-/** My record, with real numbers: this player's points, place, and every finished match they picked. */
+/**
+ * What X Layer shows for one of this player's picks: when its match was locked, and whether this
+ * pick is inside that lock. Empty until the match has been locked.
+ */
+function lockLine(lock, kickoff, entry) {
+  if (!lock) return "";
+  const early = Math.max(1, Math.round((kickoff - lock.at) / 60));
+  const inside = entry?.receipt?.root === lock.root ? " Your pick is in it." : "";
+  const see = lock.tx ? ` <a class="link" href="${ON_CHAIN.explorer}/tx/${esc(lock.tx)}" target="_blank" rel="noopener">See it</a>` : "";
+  return `<div class="small muted state-line">Locked on X Layer at ${clock(lock.at)}, ${early} ${early === 1 ? "minute" : "minutes"} before kickoff.${inside}${see}</div>`;
+}
+
+/**
+ * Every pick of this player's, newest first: the ones made on this device, whatever stage they are
+ * at, and the finished ones Kickoff's server knows of from their other devices. Each is the match,
+ * what they said, its stage, and its points once it has finished. The proof from X Layer is on the
+ * Check screen.
+ */
+function everyPick(ctx, s) {
+  const scored = new Map(s.played.map((r) => [r.match, r]));
+  const rows = [];
+  for (const [match, entry] of Object.entries(ctx.picks)) {
+    const f = ctx.fixtures[match];
+    const done = scored.get(match);
+    if (!f && !done) continue;
+    scored.delete(match);
+    const about = f ?? done;
+    rows.push({
+      kickoff: about.kickoff,
+      html: `<div class="row"><div class="grow">${comp(about.comp)}<div class="title">${done ? `${esc(done.home)} ${esc(done.score)} ${esc(done.away)}` : teams(about)}</div><div class="sub">You said ${esc(pickWords(entry, about))}</div>${f ? standingMark(entry, f, ctx) : ""}</div>${done ? pointsCell(done.points) : ""}</div>`,
+    });
+  }
+  for (const r of scored.values()) rows.push({ kickoff: r.kickoff, html: playedRow(r) });
+  return rows.sort((a, b) => b.kickoff - a.kickoff).map((r) => r.html);
+}
+
+/** My record, with real numbers: this player's points and place, and every pick. */
 function recordReal(ctx) {
   const s = ctx.standings ?? EMPTY;
   const name = ctx.mine.name;
+  const picks = everyPick(ctx, s);
+  // The totals: every pick made, the ones that scored, and how often a finished pick scored.
+  const won = s.you.threes + s.you.ones;
+  const finished = won + s.you.wrong;
+  const total = Math.max(picks.length, finished);
+  const rate = finished > 0 ? `${Math.round((100 * won) / finished)}%` : "–";
   const html = `
 ${titlebar({ heading: name ? `${esc(name)}'s record` : "My record" })}
-<p class="sub">Every line was sealed before kickoff and cannot be edited.</p>
 <div class="glass sum">
-  <div class="big"><b>${s.you.points}</b><span>points${s.you.place ? `<br><span class="muted">${ordinal(s.you.place)} of ${s.everyone.players}</span>` : ""}</span></div>
-  <div class="split">
-    <div><b>${s.you.threes}</b> spot on<small>3 points each</small></div>
-    <div><b>${s.you.ones}</b> right winner<small>1 point each</small></div>
-    <div><b>${s.you.wrong}</b> wrong<small>no points</small></div>
-  </div>
+  <div class="big"><b>${s.you.points}</b><span class="word">Points</span></div>
+</div>
+<div class="boxes">
+  <div class="glass box"><small>Total picks</small><b>${total}</b><span>${total - finished} to play</span></div>
+  <div class="glass box"><small>Total won</small><b>${won}</b><span>${s.you.threes} spot on</span></div>
+  <div class="glass box"><small>Win rate</small><b>${rate}</b><span>of ${finished} played</span></div>
 </div>
 <h2>Every pick</h2>
-${s.played.length ? `<div class="glass">${s.played.map(playedRow).join("")}</div>` : `<p class="small muted" style="margin-top:10px">Nothing played yet.</p>`}`;
+${picks.length ? `<div class="glass">${picks.join("")}</div>` : `<p class="small muted" style="margin-top:10px">No picks yet.</p>`}`;
   return { html, title: "My record on Kickoff", tab: "record" };
 }
 
@@ -494,7 +536,63 @@ function timeline({ lock, kickoff, late }) {
   <div class="tick" style="left:62%"></div><div class="lab" style="left:62%">${kickoff}<small>kickoff</small></div>${lateHtml}</div>`;
 }
 
-export function checkScreen() {
+/** A value with a name and a Copy button. */
+const copyRow = (label, value, shown = value) => `<div class="idrow"><div><small class="muted">${label}</small><br><b>${esc(shown)}</b></div><button type="button" class="btn small quiet" data-copy="${esc(value)}">Copy</button></div>`;
+const shortHex = (h) => `${h.slice(0, 8)}…${h.slice(-6)}`;
+
+/**
+ * The Check screen with real records. Everything on it was read from X Layer by this browser
+ * (lib/chain.js), not from Kickoff's server, apart from the "On Kickoff" column it is compared with.
+ */
+function checkReal(ctx) {
+  const chain = ctx.chain;
+  const g = ctx.mine.group;
+  const account = `0x${ctx.league.slice(-40)}`;
+  const locked = chain ? Object.values(chain.matches).filter((m) => m.lock).length : 0;
+  let group;
+  if (!chain) group = `<p class="small muted" style="margin-top:10px">${ctx.chainUnreachable ? "X Layer could not be reached just now." : "Reading X Layer…"}</p>`;
+  else if (locked === 0) group = `<p class="small muted" style="margin-top:10px">Nothing locked on X Layer yet.</p>`;
+  else if (!g) group = `<p class="small muted" style="margin-top:10px"><a class="link" href="#/group">Start or join a group</a> to check its points.</p>`;
+  else {
+    const onKickoff = new Map((ctx.standings?.group?.rows ?? []).map((r) => [r.name, r.points]));
+    const lines = g.members.map((m) => {
+      const fromChain = (m.players ?? [m.player]).reduce((sum, id) => sum + (chain.points[id]?.points ?? 0), 0);
+      const here = onKickoff.get(m.name);
+      const same = here === fromChain;
+      return `<tr class="${sits(m, ctx.mine.player) ? "you" : ""}"><td></td><td>${esc(m.name)}</td><td>${fromChain}</td><td>${here ?? "–"}</td><td class="pts">${same ? "✓" : '<span class="muted">Not yet</span>'}</td></tr>`;
+    });
+    group = `<div class="glass clip" style="margin-top:12px"><table class="table"><thead><tr><th></th><th>Player</th><th>On X Layer</th><th>On Kickoff</th><th>Same</th></tr></thead><tbody>${lines.join("")}</tbody></table></div>`;
+  }
+  // This device's picks whose match X Layer has locked, newest first.
+  const mine = chain
+    ? Object.entries(ctx.picks)
+        .map(([match, entry]) => ({ entry, f: ctx.fixtures[match], lock: chain.matches[match]?.lock }))
+        .filter((p) => p.f && p.lock)
+        .sort((a, b) => b.f.kickoff - a.f.kickoff)
+        .map((p) => `<div class="row"><div class="grow">${comp(p.f.comp)}<div class="title">${teams(p.f)}</div>${lockLine(p.lock, p.f.kickoff, p.entry)}</div></div>`)
+    : [];
+  const read = chain ? `<p class="fine muted">Read at ${clock(chain.at)}, block ${chain.block.toLocaleString("en-GB")}. ${locked} ${locked === 1 ? "match" : "matches"} locked.${ctx.chainUnreachable ? " X Layer could not be reached just now." : ""}</p>` : "";
+  const html = `
+${titlebar({ heading: "Check it yourself" })}
+<p class="sub">Read from X Layer by your browser, not from Kickoff.</p>
+
+${mine.length ? `<h2>Your picks on X Layer</h2>
+<div class="glass">${mine.join("")}</div>` : ""}
+
+<h2>Your group's points</h2>
+${group}
+${read}
+
+<h2>Kickoff on X Layer</h2>
+${copyRow("The league's account", account, shortHex(account))}
+${copyRow("TapeOut processor", ON_CHAIN.processor, shortHex(ON_CHAIN.processor))}
+${copyRow("Circuits on it", `league ${ON_CHAIN.circuits.league}, football ${ON_CHAIN.circuits.football}, basketball ${ON_CHAIN.circuits.basketball}, tennis ${ON_CHAIN.circuits.tennis}`)}
+<p class="say-so"><a class="link" href="${ON_CHAIN.explorer}/address/${account}" target="_blank" rel="noopener">See the league's account on X Layer</a></p>`;
+  return { html, title: "Check it yourself on Kickoff", tab: "check" };
+}
+
+export function checkScreen(_, ctx) {
+  if (ctx?.real) return checkReal(ctx);
   const shortId = `${check.id.slice(0, 6)}…${check.id.slice(-8)}`;
   const sealed = check.sealed
     .map((s) => `<div class="glass match">${comp(s.comp)}<div class="title">${esc(s.title)}</div>${timeline(s)}${s.late ? `<div class="note red plain">${esc(s.late.note)}</div>` : ""}</div>`)

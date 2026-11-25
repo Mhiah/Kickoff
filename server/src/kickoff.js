@@ -25,9 +25,9 @@
 // Times are in seconds. Ids, fingerprints and secrets are 64 hex digits.
 
 import {
+  BASKETBALL_HEX, FOOTBALL_HEX, TENNIS_HEX,
   buildBundle, fingerprintOf, fromHex, loadCircuits, receiptFor, scorePick, toHex, verifyWalletLink, writeOpenings, decodePick,
 } from "../../engine/src/index.js";
-import { BASKETBALL_HEX, FOOTBALL_HEX, TENNIS_HEX } from "./circuits.js";
 
 /** The scoring circuits, the same ones that are published on X Layer. Every point on a table comes from them. */
 const CIRCUITS = loadCircuits({ football: FOOTBALL_HEX, basketball: BASKETBALL_HEX, tennis: TENNIS_HEX });
@@ -451,7 +451,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
      *             someone with no name yet, who is not on the table. `wrong` counts their picks
      *             that scored nothing.
      *   played    this player's finished matches, newest first:
-     *             [{ match, comp, sport, home, away, score, pickByte, points }]
+     *             [{ match, comp, sport, home, away, score, kickoff, pickByte, points }]
      * }
      * A row is { place, name, threes, ones, points, you }. Nothing in it says who a player is
      * beyond their name.
@@ -497,7 +497,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
         everyone: { players: all.length, rows: top },
         group: inGroup ? { players: inGroup.length, rows: inGroup.map((row, i) => show(row, i + 1)) } : null,
         you: { place: mine?.place ?? null, points: mine?.points ?? 0, threes: mine?.threes ?? 0, ones: mine?.ones ?? 0, wrong: played.filter((p) => p.points === 0).length },
-        played: played.slice(0, PLAYED_SHOWN).map(({ kickoff, ...rest }) => rest),
+        played: played.slice(0, PLAYED_SHOWN),
       };
     },
 

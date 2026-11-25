@@ -3,6 +3,7 @@
 import { SERVER } from "./config.js";
 import { COMPETITIONS, SAMPLE_LEAGUE, sampleFixtures } from "./data/sample.js";
 import { createDevice } from "./lib/device.js";
+import { createChain } from "./lib/chain.js";
 import { createFixtures } from "./lib/fixtures.js";
 import { createGroups } from "./lib/groups.js";
 import { createStore, seal } from "./lib/picks.js";
@@ -27,6 +28,7 @@ const client = createClient({ base: SERVER, device });
 const groups = createGroups({ store, device, client });
 const wallet = createWallet({ device, client });
 const table = createTable({ store, client });
+const chain = createChain({ store });
 const matches = createFixtures({ store, client, competitions: COMPETITIONS, sample: { league: SAMPLE_LEAGUE, fixtures: sampleFixtures } });
 
 document.body.insertAdjacentHTML("afterbegin", frame());
@@ -43,7 +45,7 @@ async function context() {
   const now = Math.floor(Date.now() / 1000);
   const { real, league, fixtures, matchIds } = await matches.view(now);
   const mine = await groups.view();
-  return { now, real, league, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine, standings: real ? table.view(mine.group?.code ?? null) : null };
+  return { now, real, league, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine, standings: real ? table.view(mine.group?.code ?? null) : null, chain: real ? chain.view(league) : null, chainUnreachable: chain.unreachable };
 }
 
 async function draw({ keepPlace = false } = {}) {
@@ -254,6 +256,7 @@ async function catchUp() {
 let carrying = false;
 let matchesAskedAt = 0;
 let tableAskedAt = 0;
+let chainAskedAt = 0;
 let tableFor; // the group the tables were last asked for. Not set yet, so the first round asks.
 async function carry() {
   if (carrying) return;
@@ -276,6 +279,13 @@ async function carry() {
       tableAskedAt = Date.now();
       tableFor = group;
       changed = (await table.refresh(group)) || changed;
+    }
+    // X Layer is read by this browser when a screen that shows it is open, at most every two minutes.
+    if (ctx.real && !document.hidden && /^#\/(record|check)/.test(location.hash) && Date.now() - chainAskedAt >= 2 * 60_000) {
+      chainAskedAt = Date.now();
+      const players = (ctx.mine.group?.members ?? []).flatMap((m) => m.players ?? [m.player]);
+      const was = chain.unreachable;
+      changed = (await chain.refresh({ league: ctx.league, players: [...new Set([ctx.mine.player, ...players])] })) || chain.unreachable !== was || changed;
     }
     // Draw again if something changed, or if picks have closed or a match has started since the
     // screen was drawn. A pick being made is left alone, unless its match has just closed.

@@ -157,13 +157,28 @@ test("whoever joins next is 2nd; whoever scores more goes above; My group is onl
   // My record says the same, in full.
   let record = await mya.record();
   assert.match(record, /mya's record/);
-  assert.match(record, /<b>0<\/b><span>points<br><span class="muted">3rd of 3<\/span>/);
-  assert.match(record, /<b>1<\/b> wrong/);
+  assert.match(record, /<b>0<\/b><span class="word">Points<\/span>/);
+  assert.ok(!record.includes("3rd of 3"), "the place is on the League screen, not here");
+  const box = (html, label) => html.match(new RegExp(`<small>${label}</small><b>([^<]*)</b><span>([^<]*)</span>`))?.slice(1, 3);
+  assert.deepEqual(box(record, "Total picks"), ["1", "0 to play"]);
+  assert.deepEqual(box(record, "Total won"), ["0", "0 spot on"]);
+  assert.deepEqual(box(record, "Win rate"), ["0%", "of 1 played"]);
+  assert.ok(!record.includes("right winner") && !record.includes("no points"), "the old breakdown is gone");
   assert.match(record, /Arsenal 2 – 1 Chelsea/);
   assert.ok(!record.includes("made-up") && !record.includes("Bola"), "nothing made up on My record");
   record = await kemi.record();
-  assert.match(record, /<b>1<\/b> right winner/);
+  assert.deepEqual(box(record, "Total won"), ["1", "0 spot on"]);
+  assert.deepEqual(box(record, "Win rate"), ["100%", "of 1 played"]);
   assert.match(record, /You said 1 – 0/);
+  // Someone with nothing finished has no rate yet, and a pick still to play counts as a pick.
+  const fresh = phone(online);
+  await fresh.groups.start({ name: "Late lot", playerName: "Late", plays: ["nba"] });
+  await fresh.carry();
+  await fresh.seal(online.f.basketball, { winner: "home", band: "A" });
+  await fresh.carry();
+  record = await fresh.record();
+  assert.deepEqual(box(record, "Total picks"), ["1", "1 to play"]);
+  assert.deepEqual(box(record, "Win rate"), ["–", "of 0 played"]);
 });
 
 test("a name somebody already has is refused, in plain words, when starting or joining", async () => {
