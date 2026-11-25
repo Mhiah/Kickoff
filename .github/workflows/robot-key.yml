@@ -1,0 +1,34 @@
+# Shows the public key that predictions are locked to.
+#
+# When a player predicts, their phone locks a copy of the prediction to the robot's key, so the
+# robot can open it after kickoff and the player never has to come back. That key is worked out
+# from the robot's wallet key. This prints its public half, which is safe to show to anyone, so it
+# can be written into the website (ROBOT_KEY in web/config.js). The wallet's key is never printed.
+name: Robot's public key
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "robot/src/envelope.js"
+      - "robot/bin/key.js"
+      - ".github/workflows/robot-key.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  key:
+    name: Show the robot's public key
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      KICKOFF_WALLET_KEY: ${{ secrets.KICKOFF_WALLET_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: The public key
+        run: node robot/bin/key.js

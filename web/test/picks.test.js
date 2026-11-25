@@ -146,12 +146,12 @@ test("the prediction screen shows your own prediction back to you once it is sea
   assert.match(before, /data-seal="ars-che"/);
   assert.match(before, />Seal my prediction</);
   assert.ok(!before.includes('class="glass sealed"'));
-  assert.match(before, /Nobody can see it before kickoff\. You can change it until predictions close\.</);
+  assert.match(before, /No other player can see it before kickoff\. You can change it until predictions close\.</);
 
   const after = await sealOn(ctx, "ars-che", { home: 2, away: 1 });
   const html = pick("ars-che", after).html;
   assert.match(html, /<div class="small muted">Your prediction<\/div>/);
-  assert.match(html, /Sealed at \d\d:\d\d on [A-Z][a-z]+ \d+ [A-Z][a-z]+\. Only you can see it\.</);
+  assert.match(html, /Sealed at \d\d:\d\d on [A-Z][a-z]+ \d+ [A-Z][a-z]+\. No other player can see it\.</);
   // The screen is the pick and one button. No explanations.
   for (const gone of ["fingerprint", "Why this phone", "kept in this browser", "goes no further", "0x"]) assert.ok(!html.includes(gone), `"${gone}" is back on the prediction screen`);
   const words = html.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;

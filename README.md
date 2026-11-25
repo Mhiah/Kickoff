@@ -84,13 +84,13 @@ they got wrong quietly disappear.
 1. **You start a group or join one with a code.** No wallet and no sign-up. A group holds up to 30
    friends. A group run by a brand holds up to 5,000.
 2. **Each week's real fixtures appear by themselves.** Nobody types them in.
-3. **Before a match, you make your prediction.** It is sealed on your own phone, so nobody can see it or
-   copy it, not even Kickoff.
+3. **Before a match, you make your prediction.** It is sealed on your own phone, so no other player
+   can see it or copy it. That is all you ever have to do.
 4. **Ten minutes before kickoff, predictions close.** One fingerprint covering every sealed prediction is
    written to X Layer, which stamps the time. A prediction only counts if it was locked there before
    kickoff.
-5. **After the match, the result comes in by itself** and every prediction opens. Everyone is scored by
-   the same fixed rule.
+5. **After the match, the result comes in by itself** and every prediction is opened by Kickoff's
+   robot. Nobody has to come back for that. Everyone is scored by the same fixed rule.
 6. **The leaderboards update:** one for your group and one for everyone who plays. Every prediction,
    right or wrong, stays on your record for good.
 
@@ -212,16 +212,24 @@ it brings back are the ones on the website.
 
 ### 2. A prediction is sealed on the player's own device
 
-The first time someone predictions, their device makes its own player id. Pressing "Seal my prediction" works
+The first time someone predicts, their device makes its own player id. Pressing "Seal my prediction" works
 out the prediction's **fingerprint**: a short code made from the prediction and a secret random number that
 never leaves the device. Nobody can work the prediction out from the fingerprint.
 
-The prediction and its secret stay in that browser. Only the fingerprint is ever meant to leave it
-before kickoff.
+With the fingerprint the phone sends a **locked copy** of the prediction. The copy is locked to the
+public key of Kickoff's robot, so only the robot can open it. Kickoff's server stores the copy but
+cannot read it, and it hands copies to the robot only once the match has started. That is how a
+prediction gets opened and scored without the player ever coming back: a player who predicts on
+Friday and never opens Kickoff again is still on the leaderboard on Saturday night.
 
-**State: built and working on the website.** For a real match the phone then sends the fingerprint
-to Kickoff's server, fetches and checks its receipt once predictions are locked, and opens the prediction after
-kickoff, all by itself. That is built and checked against the server's own code. **It is live:**
+The locked copy cannot be used to change anything. When the robot opens it, what comes out is
+checked against the fingerprint that was locked on X Layer before kickoff. A copy that does not
+match its fingerprint is refused.
+
+**State: built and working on the website.** For a real match the phone sends the fingerprint and
+the locked copy to Kickoff's server, and that is the end of the player's part. The first two real
+predictions, on 25 November 2026, were made before locked copies existed, so those two can only be
+opened by the phone that made them. **It is live:**
 the robot (see [robot/README.md](robot/README.md)) put 74 real matches on the server's list on
 24 November 2026 and keeps them up to date every half hour, so the site now shows real Premier
 League, Champions League and NBA matches to predict.
@@ -237,8 +245,8 @@ bundle written after kickoff is stamped late and never counts.
 
 Gathering the sealed predictions is the job of **Kickoff's server**. A player has no wallet, so each
 device makes its own key and signs everything it sends, and the server refuses anything not signed
-by the right key. The server is only ever sent fingerprints before kickoff, never predictions. More in
-[server/README.md](server/README.md).
+by the right key. Before kickoff the server is only ever sent fingerprints and locked copies it
+cannot read, never a prediction it can see. More in [server/README.md](server/README.md).
 
 **A prediction only counts if it was locked on X Layer before kickoff.** The robot tells Kickoff's server
 how each lock went, and the server gives points only for matches it has been told were locked. If a
@@ -252,9 +260,10 @@ match. The server is online at <https://kickoff-two-xi.vercel.app>, with a real 
 
 ### 4. Results come in and predictions are scored by a fixed rule
 
-After the match, the result from the feed is written to the same mailbox. Players' devices give
-out each prediction and its secret, and anyone can check each one against its fingerprint, its receipt
-and the lock on X Layer.
+Once the match has started, Kickoff's robot fetches the locked copies, opens each one, and hands
+the server each prediction with its secret. After the match, the result from the feed is written to
+the same mailbox. Anyone can check each opened prediction against its fingerprint, its receipt and
+the lock on X Layer.
 
 Each prediction is then scored by its sport's **scoring circuit**: a small published rule that takes a
 prediction and a result and gives 0, 1 or 3 points. Once published it cannot be changed, and anyone can
@@ -389,12 +398,19 @@ results.
   first. Joining happens on Kickoff, not on X Layer, so that time cannot prove itself the way a
   prediction does. It is published on X Layer with each match's opened predictions, where anyone can read it.
 - **Sealed predictions pass through Kickoff's server.** A player needs no wallet, so the server gathers
-  the fingerprints and Kickoff locks them. The server never sees a prediction before kickoff and cannot
+  the fingerprints and Kickoff locks them. The server cannot read a prediction before kickoff and cannot
   change one or add one afterwards, but it could leave one out. Each player's receipt is the proof
   their prediction was included. The receipt is not signed yet, so Kickoff could deny having issued it.
   Signing receipts is still to do.
-- **A prediction lives in the browser's storage.** If that is cleared, or the phone is lost, the secret
-  is gone and that prediction can never be opened. Linking a wallet does not bring it back.
+- **Kickoff's robot could read a prediction early, and you are trusting it not to.** So that nobody
+  has to come back after a match, each prediction travels with a copy locked to the robot's key. The
+  server refuses to hand those copies over before kickoff, and the server and the robot's key are
+  kept in two different places. But both are run by Kickoff, so this is a promise Kickoff keeps, not
+  one X Layer enforces. What X Layer does enforce is unchanged: no prediction can be added or changed
+  after it is locked, by a player or by Kickoff, and no other player can see yours before kickoff.
+- **A prediction made before locked copies existed still lives only on its phone.** That is two
+  predictions, both from 25 November 2026. Every prediction made since opens by itself, even if the
+  phone is lost.
 - **A brand's group has been tested with 300 players, not 5,000.** The server keeps the
   leaderboard of everyone as one list and fetches it whole each time someone looks. With thousands
   of people playing at once, the free database plan Kickoff runs on would not carry that.

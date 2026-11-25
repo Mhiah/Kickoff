@@ -169,7 +169,7 @@ test("the whole journey: sealed, sent, locked, receipt checked, opened after kic
   online.clock.now = KICKOFF;
   await ada.carry();
   assert.equal(await ada.stands(online.football), "opened");
-  assert.match(await ada.screen(online.football), /<div class="state ">Revealed<\/div>/);
+  assert.match(await ada.screen(online.football), /<div class="state ">Locked in<\/div>/);
   // Bola never comes back, so his stays sealed.
   const file = parseOpenings(await online.kickoff.openingsFile({ now: online.clock.now, match: online.football }));
   assert.equal(file.entries.length, 2);
@@ -351,4 +351,10 @@ test("a basketball prediction reads back in words at every step", async () => {
   assert.equal(pickWords(entry, c.fixtures[online.basketball]), "Bucks by 11 to 15");
   assert.match(await ada.screen(online.basketball), /Bucks by 11 to 15/);
   assert.match(await ada.screen(online.basketball), /<div class="state ">Entered<\/div>/);
+});
+
+test("the robot's key written into the website is either not set yet or a real public key", async () => {
+  const { ROBOT_KEY } = await import("../config.js");
+  const { isEnvelopeKey } = await import("../engine/envelope.js");
+  assert.ok(ROBOT_KEY === null || isEnvelopeKey(ROBOT_KEY), "ROBOT_KEY in web/config.js is not a key a copy can be locked to");
 });

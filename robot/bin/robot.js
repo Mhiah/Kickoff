@@ -16,6 +16,7 @@ import { appendFileSync } from "node:fs";
 
 import { XLAYER, connect, leagueOfCircuit, toHex } from "../../engine/src/index.js";
 import { chainTick, newMemory } from "../src/chain.js";
+import { createOpener, envelopeKeysFrom } from "../src/envelope.js";
 import { createNotes, noteMissed, walletWatch } from "../src/notes.js";
 import { createServer } from "../src/server.js";
 import { inWords, syncFixtures } from "../src/sync.js";
@@ -109,8 +110,12 @@ if (walletKey && processor && circuit) {
     if (listed.league !== league) throw new Error("Kickoff's server is set up for a different league from the one this wallet holds");
     const sender = await castSender({ node, key: walletKey });
     const chain = createChain({ node, league, processor, circuit, sender });
+    // The key that unlocks predictions after kickoff is worked out from the wallet's key. Its
+    // public half is the one written into the website (web/config.js), and is safe to print.
+    const opener = createOpener(walletKey);
+    say(`Predictions are locked to this robot's key: ${envelopeKeysFrom(walletKey).publicKey}`);
     chainRound = async (fixtures) => {
-      const out = await chainTick({ now: clock(), league, fixtures, server: kickoff, chain, memory, since: LIVE_SINCE });
+      const out = await chainTick({ now: clock(), league, fixtures, server: kickoff, chain, memory, since: LIVE_SINCE, opener });
       unnoted = await noteMissed({ missed: [...unnoted, ...out.missed], notes, say });
       return out;
     };

@@ -90,6 +90,14 @@ way the challenge stays visible.
 
 ## The opened picks
 
+A pick is opened by giving its pick byte and its salt. A player can do that from their own device.
+So that nobody has to, a device also sends, with its fingerprint, a **locked copy**: the pick byte
+and salt encrypted to the league robot's public key (P-256 ECDH with a one-time key, HKDF-SHA-256,
+AES-256-GCM, bound to the league, match, player and fingerprint; 127 bytes; see
+`engine/src/envelope.js`). The robot opens the copies once the match has started. A locked copy
+gives nobody any way to change a pick: whatever comes out of it must still produce the fingerprint
+that was locked before kickoff, exactly as below.
+
 After kickoff the league publishes, for each match, a file with the list of sealed picks that went
 into the bundle and the picks that have been opened:
 

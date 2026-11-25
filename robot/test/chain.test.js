@@ -7,13 +7,14 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import {
-  BASKETBALL, FOOTBALL, basketballResult, buildBundle, encodePick, fromHex, loadCircuits, lockMessage, matchId, newDeviceKey, openingsPath, parseMessage, playerIdOf, readLeague,
+  BASKETBALL, FOOTBALL, basketballResult, buildBundle, encodePick, sealEnvelope, fromHex, loadCircuits, lockMessage, matchId, newDeviceKey, openingsPath, parseMessage, playerIdOf, readLeague,
   sealPick, signRequest, tableFromChain, toHex,
 } from "../../engine/src/index.js";
 import { createHandler } from "../../server/src/http.js";
 import { createKickoff } from "../../server/src/kickoff.js";
 import { MemoryStore } from "../../server/src/store.js";
 import { CLOSES_BEFORE, SETTLE, TOO_LATE, chainTick, lockTime, newMemory, nextLock } from "../src/chain.js";
+import { createOpener, envelopeKeysFrom } from "../src/envelope.js";
 import { PIECE, publishCalls } from "../src/xlayer.js";
 
 const LEAGUE = "0000000000000000000000c424ad6fe8a46a34fa9b0610959beaba8a2c6b6982";
@@ -77,6 +78,8 @@ async function world() {
   const server = {
     bundle: (match) => kickoff.freeze({ now: clock.now, match }),
     openings: (match) => kickoff.openingsFile({ now: clock.now, match }).catch(() => null),
+    envelopes: (match) => kickoff.envelopes({ now: clock.now, match }),
+    open: (match, openings) => kickoff.openMany({ now: clock.now, match, openings }),
     reports: [],
     async report(locks) {
       if (server.deaf) throw new Error("status 503: no answer");
@@ -90,7 +93,7 @@ async function world() {
   chain.read = async () => (w.reads++, read());
   w.tick = async ({ patient = false } = {}) => {
     if (!patient) w.memory.lookedAt.clear(); // most checks here do not wait ten minutes between looks
-    return chainTick({ now: clock.now, league: LEAGUE, fixtures: await kickoff.fixtures(), server, chain, memory: w.memory });
+    return chainTick({ now: clock.now, league: LEAGUE, fixtures: await kickoff.fixtures(), server, chain, memory: w.memory, opener: w.opener ?? null });
   };
   w.kinds = () => inbox.map((m) => parseMessage(m.payload).kind);
   return w;
@@ -130,13 +133,22 @@ function siteStore() {
 }
 
 /** A phone seals a pick and enters it. `open()` hands it over after kickoff. */
-async function phone(w, which, pick) {
+/** The robot's key for unlocking predictions in these tests, and somebody else's. */
+const ROBOT_KEY = "ab".repeat(32);
+const lockedTo = (secret) => envelopeKeysFrom(secret).publicKey;
+
+/**
+ * @param copyFor  the wallet key of the robot the phone locks a copy of its prediction to, as the
+ *                 website does. Left out, the phone sends only the fingerprint, as it used to.
+ */
+async function phone(w, which, pick, { copyFor = null } = {}) {
   const key = await newDeviceKey();
   const id = toHex(await playerIdOf(key.publicKey));
   const f = w.f[which];
   const sealed = await sealPick({ league: LEAGUE, match: f.id, sport: f.sport, pick, player: id });
   const post = async (path, payload) => w.handle({ method: "POST", path, headers: {}, body: await signRequest({ ...key, method: "POST", path, payload, at: w.clock.now }) });
-  assert.equal((await post("/api/picks", { match: f.id, fingerprint: toHex(sealed.fingerprint) })).status, 200);
+  const envelope = copyFor ? await sealEnvelope({ to: lockedTo(copyFor), league: LEAGUE, match: f.id, player: id, fingerprint: sealed.fingerprint, pickByte: sealed.pickByte, salt: sealed.salt }) : undefined;
+  assert.equal((await post("/api/picks", { match: f.id, fingerprint: toHex(sealed.fingerprint), ...(envelope ? { envelope } : {}) })).status, 200);
   return { id, open: async () => assert.equal((await post("/api/opened", { match: f.id, pickByte: sealed.pickByte, salt: toHex(sealed.salt) })).status, 200) };
 }
 const finish = (w, which, result, score) =>
@@ -345,6 +357,98 @@ test("a robot that slept through kickoff says which match's picks were never loc
   await finish(w, "football", { home: 2, away: 1 }, "2 – 1");
   assert.deepEqual(await w.tick(), { did: [], problems: [], missed: [] });
   assert.equal(w.inbox.length, 0);
+});
+
+test("nobody comes back after predicting: the robot opens every prediction itself, and everyone is scored", async () => {
+  const w = await world();
+  w.opener = createOpener(ROBOT_KEY);
+  const picks = [{ home: 2, away: 1 }, { home: 1, away: 0 }, { home: 0, away: 3 }]; // spot on, right winner, wrong
+  const players = [];
+  for (const pick of picks) players.push(await phone(w, "football", pick, { copyFor: ROBOT_KEY }));
+
+  // Before kickoff the locked copies are handed to nobody, whatever key they hold.
+  w.clock.now = lockTime(w.f.football);
+  await w.tick();
+  await assert.rejects(w.server.envelopes(w.f.football.id), /Predictions are not opened before the match starts/);
+  assert.equal((await w.handle({ method: "GET", path: `/api/admin/envelopes/${w.f.football.id}`, headers: {}, body: null })).status, 403, "and never without the robot's key");
+
+  // The match starts. No phone does anything. On its next round the robot opens all three and publishes them.
+  w.clock.now = w.f.football.kickoff + 60;
+  const started = await w.tick();
+  assert.deepEqual(started.problems, []);
+  assert.deepEqual(started.did, ["Premier League: Arsenal v Chelsea: opened 3 sealed picks", "Premier League: Arsenal v Chelsea: published 3 opened picks"]);
+  assert.deepEqual(await w.server.envelopes(w.f.football.id), [], "nothing is left to open");
+
+  // The result comes in. Everyone has their points, on Kickoff and rebuilt from X Layer alone.
+  w.clock.now = w.f.football.kickoff + 2 * HOUR;
+  await finish(w, "football", { home: 2, away: 1 }, "2 – 1");
+  const ended = await w.tick();
+  assert.deepEqual(ended.did, ["Premier League: Arsenal v Chelsea: result recorded (2 – 1)"]);
+  const onKickoff = [];
+  for (const p of players) onKickoff.push((await w.kickoff.table({ player: p.id, now: w.clock.now })).you.points);
+  assert.deepEqual(onKickoff, [3, 1, 0]);
+  const circuit = (name) => readFileSync(new URL(`../../circuits/out/${name}.hex`, import.meta.url), "utf8");
+  const circuits = loadCircuits({ football: circuit("football"), basketball: circuit("basketball"), tennis: circuit("tennis") });
+  const { table } = await tableFromChain({ league: fromHex(LEAGUE), account: ACCOUNT, messages: w.inbox, openingsFiles: w.files, circuits });
+  const fromChain = new Map(table.map((row) => [toHex(row.player), row.points]));
+  assert.deepEqual(players.map((p) => fromChain.get(p.id)), [3, 1, 0]);
+
+  // It is done once. A phone that does come back and hands its own over changes nothing.
+  await players[0].open();
+  w.clock.now += 600;
+  assert.deepEqual(await w.tick(), { did: [], problems: [], missed: [] });
+});
+
+test("a prediction with no locked copy, or one locked to another key, still waits for its own phone, and the robot says so once", async () => {
+  const w = await world();
+  w.opener = createOpener(ROBOT_KEY);
+  const withCopy = await phone(w, "football", { home: 2, away: 1 }, { copyFor: ROBOT_KEY });
+  const oldWay = await phone(w, "football", { home: 1, away: 1 });
+  const wrongKey = await phone(w, "football", { home: 0, away: 0 }, { copyFor: "cd".repeat(32) });
+  w.clock.now = lockTime(w.f.football);
+  await w.tick();
+  w.clock.now = w.f.football.kickoff + 60;
+  const started = await w.tick();
+  assert.deepEqual(started.did, ["Premier League: Arsenal v Chelsea: opened 1 sealed pick", "Premier League: Arsenal v Chelsea: published 1 opened pick"]);
+  assert.deepEqual(started.problems, ["Premier League: Arsenal v Chelsea: 1 locked copy could not be opened. Only the phone that made it can open it now."]);
+  w.clock.now += 600;
+  assert.deepEqual((await w.tick()).problems, [], "said once");
+  // Their own phones can still open them, and then they are published too.
+  await oldWay.open();
+  await wrongKey.open();
+  w.clock.now += 600;
+  assert.deepEqual((await w.tick()).did, ["Premier League: Arsenal v Chelsea: published 3 opened picks"]);
+  assert.ok(withCopy.id);
+});
+
+test("if the locked copies cannot be fetched, nothing is marked as done and the robot tries again", async () => {
+  const w = await world();
+  w.opener = createOpener(ROBOT_KEY);
+  await phone(w, "football", { home: 2, away: 1 }, { copyFor: ROBOT_KEY });
+  w.clock.now = lockTime(w.f.football);
+  await w.tick();
+  w.clock.now = w.f.football.kickoff + 60;
+  const envelopes = w.server.envelopes;
+  w.server.envelopes = async () => {
+    throw new Error("status 503: no answer");
+  };
+  const first = await w.tick();
+  assert.deepEqual(first.did, []);
+  assert.match(first.problems[0], /its sealed picks could not be opened this time \(status 503: no answer\)\. It will be tried again\./);
+  w.server.envelopes = envelopes;
+  w.clock.now += 300;
+  assert.deepEqual((await w.tick()).did, ["Premier League: Arsenal v Chelsea: opened 1 sealed pick", "Premier League: Arsenal v Chelsea: published 1 opened pick"]);
+});
+
+test("without the unlocking key the robot opens nothing, and phones open their own as before", async () => {
+  const w = await world();
+  const p = await phone(w, "football", { home: 2, away: 1 }, { copyFor: ROBOT_KEY });
+  w.clock.now = lockTime(w.f.football);
+  await w.tick();
+  w.clock.now = w.f.football.kickoff + 60;
+  assert.deepEqual(await w.tick(), { did: [], problems: [], missed: [] });
+  await p.open();
+  assert.deepEqual((await w.tick()).did, ["Premier League: Arsenal v Chelsea: published 1 opened pick"]);
 });
 
 test("Kickoff's server is told how each lock went, and only gives points for a match it was told was locked", async () => {

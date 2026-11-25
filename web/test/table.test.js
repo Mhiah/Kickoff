@@ -12,6 +12,7 @@ import { createClient } from "../lib/server.js";
 import { syncPicks } from "../lib/sync.js";
 import { EMPTY, createTable } from "../lib/table.js";
 import { groupScreen, league, recordScreen } from "../screens.js";
+import { createOpener, envelopeKeysFrom } from "../../robot/src/envelope.js";
 import { FakeStorage, NOW } from "./helpers.js";
 
 import { BASKETBALL, FOOTBALL, encodePick, matchId, toHex } from "../../engine/src/index.js";
@@ -70,7 +71,7 @@ function phone(online) {
     async carry() {
       await matches.refresh();
       const c = await self.ctx();
-      await syncPicks({ store, client, player: c.mine.player, league: c.league, fixtures: c.fixtures, now: c.now });
+      await syncPicks({ store, client, player: c.mine.player, league: c.league, fixtures: c.fixtures, now: c.now, robotKey: online.robotKey ?? null });
       return table.refresh(c.mine.group?.code ?? null);
     },
     async seal(fixture, chosen) {
@@ -234,6 +235,82 @@ test("a match that was not locked on X Layer in time: the prediction says so pla
   record = await mya.record();
   assert.ok(record.includes(said));
   assert.ok(!/class="points/.test(record));
+});
+
+test("nobody comes back after predicting: the robot opens every prediction, and the leaderboard updates for everyone", async () => {
+  const online = await kickoffOnline();
+  // The website is given the robot's public key. The robot keeps the private half.
+  const wallet = "ab".repeat(32);
+  online.robotKey = envelopeKeysFrom(wallet).publicKey;
+  const unlock = createOpener(wallet);
+  const mya = phone(online);
+  const jerkson = phone(online);
+  const g = await mya.groups.start({ name: "Sunday Ballers", playerName: "mya", plays: ["pl", "nba"] });
+  online.clock.now += 60;
+  await jerkson.groups.join({ code: g.code, playerName: "Jerkson" });
+  await mya.carry();
+  await jerkson.carry();
+  await mya.seal(online.f.football, { home: 2, away: 1 });
+  await jerkson.seal(online.f.football, { home: 1, away: 0 });
+  await mya.carry();
+  await jerkson.carry();
+  // What went to Kickoff is a fingerprint and a locked copy. The copy is not the prediction in the clear.
+  const kept = Object.values((await mya.ctx()).picks)[0];
+  assert.equal(kept.sent.copy, true);
+  const before = JSON.stringify(await online.kickoff.match({ now: online.clock.now, match: online.f.football.id }));
+  assert.ok(!before.includes(kept.salt) && !before.includes('"pickByte"'), "nothing about what anyone predicted can be seen before kickoff");
+
+  // Predictions close and are locked. Then both phones are put away for good.
+  online.clock.now = KICKOFF - CLOSES_BEFORE + SETTLE;
+  await online.kickoff.freeze({ now: online.clock.now, match: online.f.football.id });
+  await online.lock(online.f.football);
+
+  // The match starts. The robot does what it does every round: fetches the locked copies, unlocks them, hands them over.
+  online.clock.now = KICKOFF + 60;
+  const copies = await online.kickoff.envelopes({ now: online.clock.now, match: online.f.football.id });
+  assert.equal(copies.length, 2);
+  const openings = [];
+  for (const c of copies) openings.push({ player: c.player, ...(await unlock({ league: (await mya.ctx()).league, match: online.f.football.id, ...c })) });
+  assert.deepEqual(await online.kickoff.openMany({ now: online.clock.now, match: online.f.football.id, openings }), { opened: 2, refused: [] });
+  online.clock.now = KICKOFF + 2 * HOUR;
+  await online.result(online.f.football, "2 – 1", { home: 2, away: 1 });
+
+  // A third person who never predicted opens Kickoff. The leaderboard is already right, though neither phone came back.
+  const visitor = phone(online);
+  online.clock.now += 60;
+  await visitor.groups.join({ code: g.code, playerName: "Tunde" });
+  await visitor.carry();
+  assert.deepEqual(rowsOf(await visitor.league(), "group"), ["1 mya 3", "2 Jerkson 1", "3 Tunde 0 (you)"]);
+
+  // When mya does look, days later, her record shows it all, with nothing for her to do.
+  online.clock.now = KICKOFF + 3 * HOUR - 60;
+  await mya.carry();
+  const record = await mya.record();
+  assert.match(record, /<b>3<\/b><span class="word">Points<\/span>/);
+  assert.match(record, /<div class="title">Arsenal 2 – 1 Chelsea<\/div><div class="sub">You said 2 – 1<\/div>/);
+  assert.ok(!/Revealed|opened|Opened/.test(record), "nothing on her record talks about opening");
+});
+
+test("a prediction that went to Kickoff before locked copies were sent is sent again with one, while predictions are open", async () => {
+  const online = await kickoffOnline();
+  const mya = phone(online);
+  await mya.groups.start({ name: "Sunday Ballers", playerName: "mya", plays: ["pl"] });
+  await mya.carry();
+  await mya.seal(online.f.football, { home: 2, away: 1 });
+  await mya.carry();
+  assert.equal(Object.values((await mya.ctx()).picks)[0].sent.copy, undefined);
+  assert.deepEqual(await online.kickoff.envelopes({ now: KICKOFF, match: online.f.football.id }), []);
+
+  // The website now knows the robot's key. The next time the phone is open, the copy goes too.
+  online.robotKey = envelopeKeysFrom("ab".repeat(32)).publicKey;
+  online.clock.now += 120;
+  await mya.carry();
+  assert.equal(Object.values((await mya.ctx()).picks)[0].sent.copy, true);
+  const sentAt = Object.values((await mya.ctx()).picks)[0].sent.at;
+  online.clock.now += 120;
+  await mya.carry();
+  assert.equal(Object.values((await mya.ctx()).picks)[0].sent.at, sentAt, "and it is not sent a third time");
+  assert.equal((await online.kickoff.envelopes({ now: KICKOFF, match: online.f.football.id })).length, 1);
 });
 
 test("a group run by a brand: who runs it, the prize, how many play, and a leaderboard instead of a list of names", async () => {

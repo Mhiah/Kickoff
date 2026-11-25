@@ -31,6 +31,18 @@ export function createServer({ server, adminKey, fetch = globalThis.fetch }) {
       if (status !== 200) throw new Error(body?.error ?? `status ${status}`);
       return body;
     },
+    /** The locked copies of a match's predictions still to open: [{ player, fingerprint, envelope }]. Only after kickoff. */
+    async envelopes(match) {
+      const { status, body } = await get(`/api/admin/envelopes/${match}`, { headers: { "x-kickoff-admin": adminKey } });
+      if (status !== 200) throw new Error(`status ${status}: ${body?.error ?? "no reason given"}`);
+      return body.envelopes;
+    },
+    /** Hand over predictions the robot has unlocked: [{ player, pickByte, salt }]. Gives back { opened, refused }. */
+    async open(match, openings) {
+      const { status, body } = await get("/api/admin/opened", { method: "POST", headers: { "x-kickoff-admin": adminKey, "content-type": "application/json" }, body: JSON.stringify({ match, openings }) });
+      if (status !== 200) throw new Error(`status ${status}: ${body?.error ?? "no reason given"}`);
+      return body;
+    },
     /** Say how locking on X Layer went for some matches: [{ match, state }], state "locked" or "missed". */
     async report(locks) {
       const { status, body } = await get("/api/admin/locks", { method: "POST", headers: { "x-kickoff-admin": adminKey, "content-type": "application/json" }, body: JSON.stringify({ locks }) });

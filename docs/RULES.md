@@ -25,8 +25,12 @@ and published again as a new circuit. A circuit that is already published can ne
 
 **Opening**
 
-- After the match starts, predictions are opened so everyone can see them.
-- A sealed prediction that is never opened scores 0 and shows on the player's record as "not opened".
+- After the match starts, Kickoff's robot opens every prediction so everyone can see them. A player
+  does not have to come back, or do anything at all, after predicting.
+- To make that possible, a copy of each prediction travels with it, locked so that only the robot
+  can open it, and only after the match has started. What the robot opens is checked against what
+  was locked on X Layer before kickoff, so the copy cannot be used to change a prediction.
+- A sealed prediction that cannot be opened scores 0 and shows on the player's record as "not opened".
 - No prediction at all scores 0.
 
 **Scoring**

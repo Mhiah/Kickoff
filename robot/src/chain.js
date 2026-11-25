@@ -9,6 +9,10 @@
 //   lock       a few seconds after picks close, the fingerprint of the match's bundle of sealed
 //              picks is written. It must be on X Layer before kickoff, or it never counts.
 //   result     once the feed says a match is finished (or is off), its result is written.
+//   unlock     once a match has started, the robot unlocks the locked copies of its predictions
+//              and hands them to Kickoff's server, so every prediction is opened without its
+//              player having to come back. Each one still has to match the fingerprint that was
+//              locked before kickoff.
 //   report     Kickoff's server is told how each lock went: "locked" or "missed". The server only
 //              gives points for a match once it has been told it was locked, so a pick counts
 //              only if it was locked on X Layer before kickoff.
@@ -31,7 +35,7 @@ export const TOO_LATE = 30;
 /** How long after kickoff results and newly opened picks are still looked for, in seconds. */
 export const LOOK_BACK = 2 * 24 * 3600;
 /** What the robot remembers between ticks, so it does not ask about things it has already settled. */
-export const newMemory = () => ({ locked: new Set(), nobody: new Set(), missed: new Set(), resulted: new Set(), published: new Map(), lookedAt: new Map(), told: new Map() });
+export const newMemory = () => ({ locked: new Set(), nobody: new Set(), missed: new Set(), resulted: new Set(), published: new Map(), lookedAt: new Map(), told: new Map(), unlocked: new Set() });
 /** Opened picks for a match are looked for at most this often, in seconds. */
 export const OPENINGS_EVERY = 10 * 60;
 
@@ -53,7 +57,11 @@ export function nextLock(fixtures, now, memory) {
  * @param league    Kickoff's id on X Layer, as hex
  * @param fixtures  the server's list of matches
  * @param server    { bundle(match) -> { count, root, entries }, openings(match) -> text or null,
- *                    report([{ match, state }]) } where state is "locked" or "missed"
+ *                    report([{ match, state }]) } where state is "locked" or "missed",
+ *                    envelopes(match) -> [{ player, fingerprint, envelope }],
+ *                    open(match, [{ player, pickByte, salt }]) -> { opened, refused }
+ * @param opener    from createOpener(): unlocks a locked copy. Without one, predictions are only
+ *                  opened by their own phones
  * @param chain     { read() -> Map(match id -> { announced, lock, resulted }), send(message), publish(match, text) -> pieces, publishedCount(match) }
  * @param memory    from newMemory(), kept between ticks
  * @param since     when Kickoff went live on X Layer, in seconds. A match that started before then
@@ -62,7 +70,7 @@ export function nextLock(fixtures, now, memory) {
  *   missed  the matches found this time whose sealed picks were not locked on X Layer before
  *           kickoff: [{ id, label, kickoff, count }]. Each is reported once.
  */
-export async function chainTick({ now, league, fixtures, server, chain, memory, since = 0 }) {
+export async function chainTick({ now, league, fixtures, server, chain, memory, since = 0, opener = null }) {
   const did = [];
   const problems = [];
   const missed = [];
@@ -151,6 +159,33 @@ export async function chainTick({ now, league, fixtures, server, chain, memory, 
       }
       memory.locked.add(f.id);
       if (there.resulted) memory.resulted.add(f.id);
+    }
+
+    // ---- unlock: every prediction the robot holds a locked copy of is opened, once per match.
+    if (opener && !memory.unlocked.has(f.id)) {
+      try {
+        const waiting = await server.envelopes(f.id);
+        const openings = [];
+        let unreadable = 0;
+        for (const e of waiting) {
+          try {
+            openings.push({ player: e.player, ...(await opener({ league, match: f.id, player: e.player, fingerprint: e.fingerprint, envelope: e.envelope })) });
+          } catch {
+            unreadable++;
+          }
+        }
+        let refused = 0;
+        if (openings.length > 0) {
+          const answer = await server.open(f.id, openings);
+          refused = answer.refused.length;
+          if (answer.opened > 0) did.push(`${f.label}: opened ${answer.opened} sealed ${answer.opened === 1 ? "pick" : "picks"}`);
+        }
+        const left = unreadable + refused;
+        if (left > 0) problems.push(`${f.label}: ${left} locked ${left === 1 ? "copy" : "copies"} could not be opened. Only the ${left === 1 ? "phone that made it" : "phones that made them"} can open ${left === 1 ? "it" : "them"} now.`);
+        memory.unlocked.add(f.id);
+      } catch (error) {
+        problems.push(`${f.label}: its sealed picks could not be opened this time (${error.message}). It will be tried again.`);
+      }
     }
 
     // ---- result

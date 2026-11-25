@@ -1,20 +1,25 @@
 // Carrying a sealed pick through, one step at a time.
 //
-//   1. Before picks close, its fingerprint is sent to Kickoff. Only the fingerprint.
+//   1. Before picks close, its fingerprint is sent to Kickoff, with a locked copy of the pick that
+//      only Kickoff's robot can open, and only once the match has started.
 //   2. Once picks have closed, the receipt is fetched and checked: the proof that this pick is in
 //      the bundle that was locked.
-//   3. Once the match has started, the pick and its secret are handed over, so everyone can see it.
+//   3. Once the match has started, the robot opens every pick from its locked copy. The player
+//      does not have to come back. If this device does happen to be open, it hands its own over
+//      too, which does no harm and covers a pick that was sent without a copy.
 //
 // Each step is tried again whenever the page is opened or comes back online, until it is done.
 // What happened is written on the pick itself, so the screens can say exactly where it stands.
 //
-//   sent      { fingerprint, at }   Kickoff has this fingerprint
+//   sent      { fingerprint, at, copy }   Kickoff has this fingerprint; `copy` is true if the locked
+//                                   copy went with it
 //   waiting   true                  Kickoff could not be reached; it will be tried again
 //   receipt   { index, count, path, root }
 //   opened    { at }
 //   problem   a plain sentence, when a step was refused for good
 
 import { verifyReceipt } from "../engine/bundle.js";
+import { isEnvelopeKey, sealEnvelope } from "../engine/envelope.js";
 import { fromHex } from "../engine/bytes.js";
 import { closesAt } from "./time.js";
 
@@ -28,9 +33,12 @@ export const RETRY_AFTER = 5 * 60;
  * @param league    Kickoff's id on X Layer, as the fixtures came with
  * @param fixtures  the real matches, by match id: { kickoff, ... }
  * @param now       the time in seconds
+ * @param robotKey  the public key of Kickoff's robot, which copies are locked to. Without it,
+ *                  picks are sent without a copy and only this device can open them
  * @returns true if anything kept on the device changed
  */
-export async function syncPicks({ store, client, player, league, fixtures, now }) {
+export async function syncPicks({ store, client, player, league, fixtures, now, robotKey = null }) {
+  const copies = isEnvelopeKey(robotKey);
   let changed = false;
   for (const [match, kept] of Object.entries(store.all(player))) {
     const fixture = fixtures[match];
@@ -41,12 +49,16 @@ export async function syncPicks({ store, client, player, league, fixtures, now }
     // After the server has refused a step, it is not asked again straight away.
     if (entry.problem && entry.triedAt && now >= entry.triedAt && now - entry.triedAt < RETRY_AFTER) continue;
 
-    // 1. Send it, while picks are open.
-    if (!isSent(entry) && now < closes) {
+    // 1. Send it, while picks are open. A pick that went earlier without its locked copy is sent
+    // again with one, so that it too opens by itself.
+    if ((!isSent(entry) || (copies && !entry.sent.copy)) && now < closes) {
       try {
-        const answer = await client.sendPick({ match, fingerprint: entry.fingerprint });
+        const envelope = copies
+          ? await sealEnvelope({ to: robotKey, league, match, player, fingerprint: entry.fingerprint, pickByte: entry.pickByte, salt: entry.salt })
+          : null;
+        const answer = await client.sendPick({ match, fingerprint: entry.fingerprint, envelope });
         const { fallback, waiting, problem, triedAt, ...rest } = entry;
-        entry = { ...rest, sent: { fingerprint: entry.fingerprint, at: answer.receivedAt ?? now } };
+        entry = { ...rest, sent: { fingerprint: entry.fingerprint, at: answer.receivedAt ?? now, ...(envelope ? { copy: true } : {}) } };
       } catch (error) {
         if (error.unreachable) entry.waiting = true;
         else Object.assign(entry, { problem: error.message, triedAt: now });

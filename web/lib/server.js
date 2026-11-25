@@ -55,7 +55,7 @@ export function createClient({ base = "", device, fetch = (...args) => globalThi
     /** Kickoff's id on X Layer, and every match on its list: { league, fixtures }. */
     fixtures: () => send("GET", "/api/fixtures"),
     /** Send a sealed pick: its fingerprint, and nothing else. */
-    sendPick: ({ match, fingerprint }) => signed("/api/picks", { match, fingerprint }),
+    sendPick: ({ match, fingerprint, envelope }) => signed("/api/picks", { match, fingerprint, ...(envelope ? { envelope } : {}) }),
     /** The proof that a player's sealed pick is in the locked bundle. */
     receipt: ({ match, player }) => send("GET", `/api/matches/${match}/receipt/${player}`),
     /** Open a pick after the match has started: the pick and its secret. */

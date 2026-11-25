@@ -25,7 +25,7 @@
 // Times are in seconds. Ids, fingerprints and secrets are 64 hex digits.
 
 import {
-  BASKETBALL_HEX, FOOTBALL_HEX, TENNIS_HEX,
+  BASKETBALL_HEX, ENVELOPE_BYTES, FOOTBALL_HEX, TENNIS_HEX,
   buildBundle, fingerprintOf, fromHex, loadCircuits, receiptFor, scorePick, toHex, verifyWalletLink, writeOpenings, decodePick,
 } from "../../engine/src/index.js";
 
@@ -615,9 +615,14 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
      * `at` is the time the device signed the request; a request older than the last one accepted
      * for the same match is refused, so an earlier pick cannot be played back over a later one.
      */
-    async sealPick({ player, now, at, match, fingerprint }) {
+    async sealPick({ player, now, at, match, fingerprint, envelope = null }) {
       const f = await fixture(match);
       if (!isId(fingerprint)) refuse(400, "That is not a sealed prediction.");
+      // The locked copy that lets the robot open this prediction after kickoff. The server keeps
+      // it and cannot read it. A prediction sent without one can only be opened by its own phone.
+      if (envelope !== null && envelope !== undefined && !(typeof envelope === "string" && /^[0-9a-f]+$/.test(envelope) && envelope.length === 2 * ENVELOPE_BYTES)) {
+        refuse(400, "That is not a locked copy of a prediction.");
+      }
       if (f.state !== "scheduled") refuse(409, "This match is no longer open for predictions.");
       if (now >= f.kickoff - CLOSES_BEFORE) refuse(409, "Predictions for this match have closed.");
       const before = await store.tableGet(`sealed:${match}`, player);
@@ -625,7 +630,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       // Everyone who plays is on the table, so everyone has a name. Someone who picks before
       // choosing one is called "Player" and four characters of their id until they do.
       await ensurePerson(player, now, `Player ${player.slice(0, 4).toUpperCase()}`);
-      await store.tableSet(`sealed:${match}`, player, { fingerprint, signedAt: at, receivedAt: now });
+      await store.tableSet(`sealed:${match}`, player, { fingerprint, signedAt: at, receivedAt: now, ...(envelope ? { envelope } : {}) });
       // One player, one pick. If this player's wallet has other devices, a pick one of them sent
       // for this match is replaced by this one, just as a device replaces its own.
       const link = await store.get(`wallet-of:${player}`);
@@ -693,6 +698,47 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
         await stale();
       }
       return { match, pickByte };
+    },
+
+    /**
+     * The locked copies of a match's predictions that have not been opened yet, for the robot to
+     * unlock. They are handed over only once the match has started: before that nobody gets them,
+     * whatever key they hold.
+     * @returns [{ player, fingerprint, envelope }]
+     */
+    async envelopes({ now, match }) {
+      const f = await fixture(match);
+      if (now < f.kickoff) refuse(409, "Predictions are not opened before the match starts.");
+      const frozen = await settle(f, now);
+      const sealed = await store.tableAll(`sealed:${match}`);
+      const opened = await store.tableAll(`opened:${match}`);
+      return (frozen?.entries ?? [])
+        .filter((e) => !opened[e.player] && sealed[e.player]?.envelope && sealed[e.player].fingerprint === e.fingerprint)
+        .map((e) => ({ player: e.player, fingerprint: e.fingerprint, envelope: sealed[e.player].envelope }));
+    },
+
+    /**
+     * Open several of a match's predictions at once: what the robot does with the copies it has
+     * unlocked. Each is checked exactly as if its own phone had handed it over, so the robot can
+     * open a prediction but cannot change one.
+     * @param openings  [{ player, pickByte, salt }]
+     * @returns { opened, refused: [{ player, why }] }
+     */
+    async openMany({ now, match, openings }) {
+      if (!Array.isArray(openings) || openings.length > 5000) refuse(400, "That is not a list of opened predictions.");
+      let opened = 0;
+      const refused = [];
+      for (const o of openings) {
+        try {
+          if (!isId(o?.player)) refuse(400, "That is not a player.");
+          await this.openPick({ player: o.player, now, match, pickByte: o.pickByte, salt: o.salt });
+          opened++;
+        } catch (error) {
+          if (!error.status) throw error;
+          refused.push({ player: o?.player ?? null, why: error.message });
+        }
+      }
+      return { opened, refused };
     },
 
     /**

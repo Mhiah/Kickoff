@@ -122,7 +122,7 @@ A device must sign these:
 | `POST /api/wallet` | Link a wallet: its address, the note's time, and its signature of the note |
 | `POST /api/picks` | Send a sealed pick. Sending again before picks close replaces it |
 | `POST /api/picks/mine` | What the server holds for this device |
-| `POST /api/opened` | Open a pick, after the match has started |
+| `POST /api/opened` | Open a pick, after the match has started. The robot does this for every pick, so a phone only does it for a pick that was sent without a locked copy |
 
 Only Kickoff's robot may use these, with a key of its own:
 
@@ -233,7 +233,13 @@ is not allowed to send from another site.
   hundreds of players and will want rethinking for many thousands.
 - **A linked wallet cannot be changed or taken off yet.** A device links one wallet, once.
 - **Wallets that are themselves contracts cannot link.** Only an ordinary wallet's signature is read.
-- **A pick sealed on a lost phone cannot be opened from a new one.** The pick's secret was on the
-  old phone. The seat and the groups come back; that one pick does not.
+- **The robot's key could open a pick early.** With each fingerprint a phone sends a copy of the
+  pick locked to the robot's public key (`engine/src/envelope.js`). The server stores the copy but
+  cannot read it, and it hands copies out only to the robot, and only after the match has started
+  (`GET /api/admin/envelopes/<match>`, refused before kickoff). The robot opens them and hands each
+  pick back (`POST /api/admin/opened`), where it is checked against the locked fingerprint like any
+  other. So nobody has to come back after a match, and a lost phone loses nothing. The price is
+  that the server and the robot together could read a pick before kickoff. They are kept apart,
+  but both are Kickoff's. Neither can change a pick.
 - **A group's code is all that guards it.** Anyone with the code can see the group and join it.
 - **Nothing limits how often a device can ask.** That comes with putting it on the internet.

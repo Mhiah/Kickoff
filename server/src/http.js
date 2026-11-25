@@ -14,13 +14,16 @@
 //     POST /api/me/groups             {}                        the groups this device is in, and its wallet if it linked one
 //     POST /api/me/table              { group }                 the League screen: both tables, and this player's place and matches
 //     POST /api/wallet                { wallet, linkAt, signature } link a wallet (engine/src/wallet.js)
-//     POST /api/picks                 { match, fingerprint }    send a sealed pick
+//     POST /api/picks                 { match, fingerprint, envelope }  send a sealed pick, with the locked
+//                                                                copy that lets the robot open it after kickoff
 //     POST /api/picks/mine            { match }                 what the server holds for this device
 //     POST /api/opened                { match, pickByte, salt } open a pick, after kickoff
 //
 //   Only the robot may use these, with the admin key
 //     POST /api/admin/fixtures        { fixtures }              put matches on the list
 //     POST /api/admin/freeze/<match>                            a match's bundle, once picks have closed
+//     GET  /api/admin/envelopes/<match>                         the locked copies still to open, once the match has started
+//     POST /api/admin/opened          { match, openings }       open predictions the robot has unlocked
 //     POST /api/admin/brand-groups    { name, brand, prize, plays }   start a group run by a brand, of up to 5,000 players
 //     POST /api/admin/locks           { locks: [{ match, state }] }   how locking on X Layer went: "locked" or "missed"
 //
@@ -94,7 +97,7 @@ export function createHandler({ kickoff, now, adminKey = null }) {
     }],
     ["POST", /^\/api\/picks$/, async (r) => {
       const s = await signed(r);
-      return kickoff.sealPick({ player: s.player, now: now(), at: s.at, match: s.match, fingerprint: s.fingerprint });
+      return kickoff.sealPick({ player: s.player, now: now(), at: s.at, match: s.match, fingerprint: s.fingerprint, envelope: s.envelope ?? null });
     }],
     ["POST", /^\/api\/picks\/mine$/, async (r) => {
       const s = await signed(r);
@@ -112,6 +115,14 @@ export function createHandler({ kickoff, now, adminKey = null }) {
     ["POST", /^\/api\/admin\/freeze\/([0-9a-f]{64})$/, async (r, match) => {
       admin(r);
       return kickoff.freeze({ now: now(), match });
+    }],
+    ["GET", /^\/api\/admin\/envelopes\/([0-9a-f]{64})$/, async (r, match) => {
+      admin(r);
+      return { envelopes: await kickoff.envelopes({ now: now(), match }) };
+    }],
+    ["POST", /^\/api\/admin\/opened$/, async (r) => {
+      admin(r);
+      return kickoff.openMany({ now: now(), match: r.body?.match, openings: r.body?.openings });
     }],
     ["POST", /^\/api\/admin\/brand-groups$/, async (r) => {
       admin(r);

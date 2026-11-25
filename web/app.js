@@ -1,6 +1,6 @@
 // Kickoff's website. No build step and nothing to install: plain files a browser runs as they are.
 
-import { SERVER } from "./config.js";
+import { ROBOT_KEY, SERVER } from "./config.js";
 import { COMPETITIONS, SAMPLE_LEAGUE, sampleFixtures } from "./data/sample.js";
 import { createDevice } from "./lib/device.js";
 import { createChain } from "./lib/chain.js";
@@ -279,7 +279,7 @@ async function carry() {
       changed = await matches.refresh();
     }
     const ctx = await context();
-    if (ctx.real) changed = (await syncPicks({ store, client, player: ctx.mine.player, league: ctx.league, fixtures: ctx.fixtures, now: ctx.now })) || changed;
+    if (ctx.real) changed = (await syncPicks({ store, client, player: ctx.mine.player, league: ctx.league, fixtures: ctx.fixtures, now: ctx.now, robotKey: ROBOT_KEY })) || changed;
     // The tables are asked for when something of this player's has changed, when what is kept is
     // for another group, and otherwise at most every five minutes while a screen that shows them
     // is open. Not more often: every look costs the server work.

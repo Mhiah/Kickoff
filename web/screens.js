@@ -77,9 +77,9 @@ export function home() {
   <section>
     <h2>How a match goes</h2>
     <ol class="steps">
-      <li><b>Before kickoff, you predict.</b> Your prediction is sealed on your phone. Nobody can see it, not even Kickoff.</li>
+      <li><b>Before kickoff, you predict.</b> Your prediction is sealed on your phone. No other player can see it.</li>
       <li><b>Ten minutes before kickoff, predictions close.</b> X Layer stamps the time. A prediction that turns up later does not count.</li>
-      <li><b>After the match, every prediction opens.</b> Everyone sees what everyone said, and the leaderboard updates.</li>
+      <li><b>After the match, the leaderboard updates.</b> Everyone sees what everyone predicted.</li>
     </ol>
   </section>
   <section>
@@ -351,10 +351,12 @@ function standingMark(entry, f, ctx) {
     case "sent":
     case "closed":
       return mark("", "Entered");
+    // Once the match has started the prediction is opened for scoring, by Kickoff's robot or by
+    // this device. A player has nothing to do and nothing to watch for: it stays "Locked in" until
+    // the result gives it its points.
     case "locked":
-      return mark("", "Locked in");
     case "opened":
-      return mark("", "Revealed");
+      return mark("", "Locked in");
     case "missed":
       return mark("bad", "Not entered in time", "It does not count for this match.");
     case "unlocked":
@@ -384,13 +386,13 @@ export function pick(id, ctx) {
 <div class="glass picker" data-picker="${football ? "football" : "basketball"}">${pickControls(f, entry)}</div>
 <ul class="rules">${rules.map((r) => `<li>${r}</li>`).join("")}</ul>
 <button type="button" class="btn go" data-seal="${id}">${entry ? "Seal my new prediction" : "Seal my prediction"}</button>
-<p class="after" data-note-out role="status">Nobody can see it before ${start}. You can change it until predictions close.</p>`;
+<p class="after" data-note-out role="status">No other player can see it before ${start}. You can change it until predictions close.</p>`;
   } else if (entry) {
     body = `
 <div class="glass sealed" role="status">
   <div class="small muted">Your prediction</div>
   <div class="yours${football ? "" : " words"}">${esc(pickWords(entry, f))}</div>
-  <div class="small muted">Sealed at ${clock(entry.sealedAt)} on ${esc(dayLabel(entry.sealedAt))}. Only you can see it.</div>
+  <div class="small muted">Sealed at ${clock(entry.sealedAt)} on ${esc(dayLabel(entry.sealedAt))}. No other player can see it.</div>
   ${standingMark(entry, f, ctx)}
 </div>
 ${closed ? "" : `<button type="button" class="btn quiet" data-change="${id}" style="margin-top:14px">Change my prediction</button>`}
@@ -423,7 +425,7 @@ export function matchScreen() {
     )
     .join("");
   const waiting = m.notOpened
-    .map((name) => `<div class="row"><div class="grow"><div class="title" style="margin:0">${esc(name)}</div><div class="sub">Not opened yet. It opens the next time ${esc(name)} comes back.</div></div><span class="sealed-box">Sealed</span></div>`)
+    .map((name) => `<div class="row"><div class="grow"><div class="title" style="margin:0">${esc(name)}</div><div class="sub">Still sealed.</div></div><span class="sealed-box">Sealed</span></div>`)
     .join("");
   const html = `
 <a class="back" href="#/league">Back to the league</a>

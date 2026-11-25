@@ -40,7 +40,8 @@ record on X Layer. The robot writes that record, as the league, through TapeOut:
 | --- | --- | --- |
 | Five seconds after a match's picks close | The match is announced, then the fingerprint of its bundle of sealed picks is locked | TapeOut's mailbox (TapeSend) |
 | When the feed says the match is finished, or off | The result | TapeOut's mailbox |
-| After kickoff, and again whenever more phones have opened their picks | The file of opened picks | The league's on-chain site (DeWEB) |
+| Once a match has started | Nothing on chain: it fetches the locked copies of that match's picks from the server, opens each with its own key, and hands the picks back | Kickoff's server |
+| After that, and again if any more picks are opened | The file of opened picks | The league's on-chain site (DeWEB) |
 
 A lock only counts if it is on X Layer before kickoff, so this is the one job where timing
 matters. The robot is awake within a second of the moment each lock becomes possible, which leaves
@@ -80,7 +81,7 @@ To write to X Layer the robot needs a wallet of its own, holding a little OKB fo
 
 | Where | Name | What it is |
 | --- | --- | --- |
-| GitHub, in the repository's secrets | `KICKOFF_WALLET_KEY` | The wallet's private key. Handed to `cast` to sign, and to nothing else. Never printed. |
+| GitHub, in the repository's secrets | `KICKOFF_WALLET_KEY` | The wallet's private key. Handed to `cast` to sign. The robot also works out from it, inside its own run, the key that opens the locked copies of picks. Never printed, and neither is that key. Only its public half is, by the "Robot's public key" workflow, for the website to lock copies to. |
 | GitHub, in the repository's variables | `KICKOFF_PROCESSOR`, `KICKOFF_CIRCUIT` | Which TapeOut circuit is the league. Not secret. |
 
 Until all three are set, nothing is written to X Layer and the robot only keeps the list up to date.
@@ -215,6 +216,8 @@ Every run's report is on its own page.
 | `bin/golive.js` | The commands for going live: `look` and `go` |
 | `bin/brand.js` | Starts a group run by a brand, and prints its code |
 | `bin/site.js` | The commands for the website on X Layer: `look`, `go` and `check` |
+| `bin/key.js` | Prints the public key that picks are locked to. It is safe to show to anyone |
+| `src/envelope.js` | The robot's key for opening the locked copies of picks after kickoff |
 | `test/` | The tests, run against the server's own code and stand-ins for the two feeds |
 
 ## Honest limits
@@ -224,7 +227,7 @@ Every run's report is on its own page.
 - **A big match costs more to publish.** The league's site takes a file in pieces of 24,000
   bytes, about 32 opened picks to a piece, and each piece is one transaction. The robot sends as
   many pieces as the file needs, so any number of players can pick the same match. The whole file
-  is sent again each time more phones have opened their picks, at most every ten minutes.
+  is sent again each time more picks have been opened, at most every ten minutes.
 - **Announcing only matches that were picked** saves money, but it means a match appears on
   X Layer ten minutes before kickoff, not days before.
 - **A result is the feed's word.** The robot checks it is a result that can happen, not that it is
