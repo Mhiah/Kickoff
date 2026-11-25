@@ -79,12 +79,12 @@ export function home() {
     <ol class="steps">
       <li><b>Before kickoff, you pick.</b> Your pick is sealed on your phone. Nobody can see it, not even Kickoff.</li>
       <li><b>Ten minutes before kickoff, picks close.</b> X Layer stamps the time. A pick that turns up later does not count.</li>
-      <li><b>After the match, every pick opens.</b> Everyone sees what everyone said, and your group's table updates.</li>
+      <li><b>After the match, every pick opens.</b> Everyone sees what everyone said, and the leaderboard updates.</li>
     </ol>
   </section>
   <section>
     <h2>You don't have to trust us</h2>
-    <p>Every pick's seal and every result is kept on X Layer through TapeOut. Anyone can read the record and rebuild the table themselves.</p>
+    <p>Every pick's seal and every result is kept on X Layer through TapeOut. Anyone can read the record and rebuild the leaderboard themselves.</p>
     <a class="btn quiet" href="#/check" style="margin-top:14px">See how to check it</a>
   </section>
 </div>
@@ -216,6 +216,10 @@ function leagueReal(ctx) {
   const next = nextId ? ctx.fixtures[nextId] : null;
   const closesIn = next ? howLong(ctx.now, closesAt(next.kickoff)) : "";
   const people = (n) => `${n} ${n === 1 ? "player" : "players"}`;
+  // What the player last chose to look at, so the screen keeps it when it is drawn again. On a
+  // phone the matches and the table take turns; on a wide screen they sit side by side.
+  const part = ctx.looking?.part === "table" ? "table" : "matches";
+  const board = ctx.looking?.board === "group" ? "group" : "everyone";
   const played = s.played.length
     ? `<div class="glass">${s.played.slice(0, 3).map((r) => playedRow(r)).join("")}</div>
     <p class="say-so"><a class="link" href="#/record">Every match you picked</a></p>`
@@ -237,13 +241,15 @@ ${titlebar({
 
 ${next ? `<div class="phone-only">${nextCard(ctx, nextId)}</div>` : ""}
 
-<div class="cols">
-  <section>${weekHtml({ ...ctx, fixtures: Object.fromEntries(ids.map((id) => [id, ctx.fixtures[id]])) })}</section>
-  <section>
-    <h2>Table</h2>
-    <div class="chips" role="group" aria-label="Which table"><button type="button" data-board="everyone" aria-pressed="true">Everyone</button><button type="button" data-board="group" aria-pressed="false">My group</button></div>
-    <div data-board-of="everyone" style="margin-top:12px">${boardHtml(s.everyone, "Nobody has played yet.")}</div>
-    <div data-board-of="group" style="margin-top:12px" hidden>${s.group ? boardHtml(s.group, "Nobody has played yet.") : `<p class="small muted" style="margin-top:10px">You are not in a group yet. <a class="link" href="#/group">Start or join one</a>.</p>`}</div>
+<div class="chips parts phone-only" role="group" aria-label="What to show"><button type="button" data-part="matches" aria-pressed="${part === "matches"}">Matches</button><button type="button" data-part="table" aria-pressed="${part === "table"}">Leaderboard</button></div>
+
+<div class="cols" data-show="${part}">
+  <section data-part-of="matches">${weekHtml({ ...ctx, fixtures: Object.fromEntries(ids.map((id) => [id, ctx.fixtures[id]])) })}</section>
+  <section data-part-of="table">
+    <h2>Leaderboard</h2>
+    <div class="chips" role="group" aria-label="Which leaderboard"><button type="button" data-board="everyone" aria-pressed="${board === "everyone"}">Everyone</button><button type="button" data-board="group" aria-pressed="${board === "group"}">My group</button></div>
+    <div data-board-of="everyone" style="margin-top:12px"${board === "everyone" ? "" : " hidden"}>${boardHtml(s.everyone, "Nobody has played yet.")}</div>
+    <div data-board-of="group" style="margin-top:12px"${board === "group" ? "" : " hidden"}>${s.group ? boardHtml(s.group, "Nobody has played yet.") : `<p class="small muted" style="margin-top:10px">You are not in a group yet. <a class="link" href="#/group">Start or join one</a>.</p>`}</div>
     <h2>Played</h2>
     ${played}
   </section>
@@ -290,7 +296,7 @@ ${
 <div class="cols">
   <section>${weekHtml(ctx)}</section>
   <section>
-    <h2>Table</h2>
+    <h2>Leaderboard</h2>
     ${tableHtml()}
     <h2>Played</h2>
     ${playedHtml(3)}
@@ -610,8 +616,8 @@ ${check.notBelieved.map((n) => `<div class="note red"><b>${esc(n.title)}</b> ${e
 <h2>Disputes</h2>
 ${check.disputes.map((d) => `<div class="note warn"><b>${esc(d.title)}</b> ${esc(d.text)}</div>`).join("")}
 
-<h2>Rebuild the table without us</h2>
-<p class="small">Everything above was read straight from X Layer. Anyone can do the same with one command and get the same table.</p>
+<h2>Rebuild the leaderboard without us</h2>
+<p class="small">Everything above was read straight from X Layer. Anyone can do the same with one command and get the same leaderboard.</p>
 <pre class="cmd">node engine/bin/table.js ${shortId}</pre>
 <div class="idrow"><div><small class="muted">Kickoff's id on X Layer</small><br><b>${shortId}</b></div><button type="button" class="btn small quiet" data-copy="${check.id}">Copy</button></div>
 
@@ -635,7 +641,7 @@ function startForm(mine) {
   <h2>Start a group</h2>
   <p class="sub">You get a code to share. Anyone with the code can join.</p>
   ${field({ label: "Group name", name: "name", max: 40 })}
-  ${field({ label: "Your name", name: "playerName", value: mine.name, max: 24, hint: "What your friends will see on the table." })}
+  ${field({ label: "Your name", name: "playerName", value: mine.name, max: 24, hint: "What everyone sees on the leaderboard." })}
   <fieldset class="plays">
     <legend>What this group plays</legend>
     ${Object.keys(COMPETITIONS).map((key) => `<label class="tick"><input type="checkbox" name="plays" value="${key}" checked>${comp(key)}<span class="muted">${SPORT_WORDS[COMPETITIONS[key].sport]}</span></label>`).join("")}

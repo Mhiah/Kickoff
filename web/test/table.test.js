@@ -102,6 +102,16 @@ test("the first person on Kickoff is 1st, with no points, and nothing on the scr
   // Everyone opens first; My group is there to switch to.
   assert.match(html, /data-board="everyone" aria-pressed="true">Everyone<.*data-board="group" aria-pressed="false">My group</s);
   assert.match(html, /data-board-of="group"[^>]* hidden>/);
+  // On a phone the matches and the table take turns, chosen at the top of the screen.
+  assert.match(html, /class="chips parts phone-only"[^>]*><button type="button" data-part="matches" aria-pressed="true">Matches<\/button><button type="button" data-part="table" aria-pressed="false">Leaderboard</);
+  assert.ok(html.indexOf('data-part="table"') < html.indexOf("This week"), "the switch comes before the list of matches");
+  assert.match(html, /<div class="cols" data-show="matches">/);
+  // What was chosen is kept when the screen is drawn again.
+  const again = league(null, { ...(await mya.ctx()), looking: { part: "table", board: "group" } }).html;
+  assert.match(again, /<div class="cols" data-show="table">/);
+  assert.match(again, /data-part="table" aria-pressed="true"/);
+  assert.match(again, /data-board="group" aria-pressed="true"/);
+  assert.match(again, /data-board-of="everyone"[^>]* hidden>/);
 });
 
 test("before the server has answered, the League screen shows an empty table, not a made-up one", async () => {

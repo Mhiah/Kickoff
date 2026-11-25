@@ -29,6 +29,8 @@ const groups = createGroups({ store, device, client });
 const wallet = createWallet({ device, client });
 const table = createTable({ store, client });
 const chain = createChain({ store });
+// What the player last chose on the League screen, kept while the screen is drawn again.
+const looking = { part: "matches", board: "everyone" };
 const matches = createFixtures({ store, client, competitions: COMPETITIONS, sample: { league: SAMPLE_LEAGUE, fixtures: sampleFixtures } });
 
 document.body.insertAdjacentHTML("afterbegin", frame());
@@ -45,7 +47,7 @@ async function context() {
   const now = Math.floor(Date.now() / 1000);
   const { real, league, fixtures, matchIds } = await matches.view(now);
   const mine = await groups.view();
-  return { now, real, league, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine, standings: real ? table.view(mine.group?.code ?? null) : null, chain: real ? chain.view(league) : null, chainUnreachable: chain.unreachable };
+  return { now, real, league, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine, standings: real ? table.view(mine.group?.code ?? null) : null, chain: real ? chain.view(league) : null, chainUnreachable: chain.unreachable, looking };
 }
 
 async function draw({ keepPlace = false } = {}) {
@@ -156,8 +158,16 @@ document.addEventListener("click", async (event) => {
 
   // The league screen: the table of everyone, or of your group.
   if (target.matches("[data-board]")) {
+    looking.board = target.dataset.board;
     for (const chip of target.parentElement.children) chip.setAttribute("aria-pressed", String(chip === target));
     for (const board of view.querySelectorAll("[data-board-of]")) board.hidden = board.dataset.boardOf !== target.dataset.board;
+    return;
+  }
+  // The league screen on a phone: the matches, or the table.
+  if (target.matches("[data-part]")) {
+    looking.part = target.dataset.part;
+    for (const chip of target.parentElement.children) chip.setAttribute("aria-pressed", String(chip === target));
+    view.querySelector(".cols[data-show]")?.setAttribute("data-show", looking.part);
     return;
   }
 
