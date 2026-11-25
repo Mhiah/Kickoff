@@ -100,7 +100,7 @@ test("a new phone that links the same wallet takes the same seat in the same gro
   const { body: group } = await s.post(oldPhone, "/api/groups", { name: "Sunday Ballers", playerName: "Ada" });
   s.clock.now += 60;
   await s.post(bola, `/api/groups/${group.code}/join`, { playerName: "Bola" });
-  const { body: second } = await s.post(oldPhone, "/api/groups", { name: "Work lot", playerName: "Ada O" });
+  const { body: second } = await s.post(oldPhone, "/api/groups", { name: "Work lot", playerName: "Ada" });
   await link(s, oldPhone, wallet);
 
   // The old phone is lost. A new one has no groups until it links the wallet.
@@ -116,7 +116,7 @@ test("a new phone that links the same wallet takes the same seat in the same gro
   assert.equal(seen.members[0].player, newPhone.player, "the seat is listed under the phone being used now");
   assert.deepEqual(seen.members[0].players, [oldPhone.player, newPhone.player].sort());
   assert.equal(seen.members[0].joinedAt, group.members[0].joinedAt, "and it joined when the old phone did");
-  assert.equal((await s.get(`/api/groups/${second.code}`)).body.members[0].name, "Ada O");
+  assert.equal((await s.get(`/api/groups/${second.code}`)).body.members[0].name, "Ada");
 
   // The new phone has the starter's say over the group. So does the old one, if it turns up.
   assert.equal((await s.post(newPhone, `/api/groups/${group.code}/plays`, { plays: ["pl"] })).status, 200);
@@ -165,7 +165,9 @@ test("two devices that were separate players in a group become one seat when the
   assert.equal(linked.body.carried, 0);
   const seen = (await s.get(`/api/groups/${group.code}`)).body;
   assert.equal(seen.members.length, 1);
-  assert.equal(seen.members[0].name, "Ada laptop", "the name chosen most recently");
+  assert.equal(seen.members[0].name, "Ada", "under the name the wallet already had");
+  // The name the laptop gave up is free for somebody else.
+  assert.equal((await s.post(await device(), `/api/groups/${group.code}/join`, { playerName: "Ada laptop" })).status, 200);
 });
 
 test("one player, one pick: a pick from a wallet's other device is replaced, not added", async () => {

@@ -103,7 +103,7 @@ test("what the server refuses comes back in its own plain words", async () => {
   const online = kickoffOnline();
   const [ada, bola] = [phone(online), phone(online)];
   await ada.groups.start({ name: "Sunday Ballers", playerName: "Ada" });
-  await assert.rejects(bola.groups.join({ code: "SUNDAYB-4821", playerName: "ada" }), /Someone in this group is already called ada/);
+  await assert.rejects(bola.groups.join({ code: "SUNDAYB-4821", playerName: "ada" }), /That name is taken\. Pick another\./);
   await assert.rejects(bola.groups.join({ code: "NOBODY-0000", playerName: "Bola" }), /no group with that code/);
   await assert.rejects(bola.groups.join({ code: "hello", playerName: "Bola" }), /A code looks like BALLERS-4821/);
   await assert.rejects(bola.groups.join({ code: "SUNDAYB-4821", playerName: "" }), /Your name is missing/);
@@ -150,14 +150,13 @@ test("a player in two groups can look at either", async () => {
   let view = await bola.groups.view();
   assert.equal(view.groups.length, 2);
   assert.equal(view.group.name, "Sunday Ballers", "the one just joined");
-  assert.equal(view.name, "Bola B", "their name in this group");
+  assert.equal(view.name, "Bola B");
   bola.groups.choose(office.code);
+  // Refreshing keeps the one being looked at. A player has one name: the new one, in both groups.
+  await bola.groups.refresh();
   view = await bola.groups.view();
   assert.equal(view.group.name, "Office");
-  assert.equal(view.name, "Bola");
-  // Refreshing keeps the one being looked at.
-  await bola.groups.refresh();
-  assert.equal((await bola.groups.view()).group.name, "Office");
+  assert.equal(view.name, "Bola B");
 });
 
 test("offline, the phone shows what it last saw and says so; back online, it catches up", async () => {

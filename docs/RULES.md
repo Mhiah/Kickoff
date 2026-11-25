@@ -130,12 +130,15 @@ A number of sets that cannot happen in that kind of match, such as 2 sets in a b
 
 ## The table
 
-Players are ranked by:
+Everyone who plays is on the table, numbered from 1. Nobody shares a place.
 
-1. Total points.
-2. If level, the player with more 3-point picks.
-3. If still level, the player with more 1-point picks.
-4. If still level, they share the position.
+1. Most points first.
+2. Between players level on points, whoever joined Kickoff first is ahead.
+
+So the first person to join is 1st, the next is 2nd, and a player moves up by scoring more points
+than the player above them. A group's table follows the same two rules, with only the group in it.
+
+Every player has one name, and no two players have the same name, whatever the capitals.
 
 The table is not stored anywhere. It is worked out from the opened picks and the results, so
 anyone can work it out again and get the same table.

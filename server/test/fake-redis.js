@@ -16,6 +16,8 @@ export function fakeRedis() {
         if (args[2] === "NX" && strings.has(args[0])) return null;
         strings.set(args[0], args[1]);
         return "OK";
+      case "DEL":
+        return strings.delete(args[0]) ? 1 : 0;
       case "HGET":
         return hashes.get(args[0])?.get(args[1]) ?? null;
       case "HSET": {

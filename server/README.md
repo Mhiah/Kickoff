@@ -6,7 +6,7 @@ picks so they can be locked on X Layer together.
 > [!NOTE]
 > **What is here:** the server's rules as tested code, the way a device proves it is itself, the
 > addresses the website will talk to, the connection to a real database, the entry point a web
-> host uses, and a version that runs on your own computer. 63 tests.
+> host uses, and a version that runs on your own computer. 75 tests.
 > **Online** at <https://kickoff-two-xi.vercel.app> (every address under `/api/`), with a real
 > database. Starting a group, joining it, a changed request and a keyless robot request have all
 > been tried on the live server, and each behaved as the tests say.
@@ -44,6 +44,22 @@ the device. The public half can be seen by anyone.
 
 The code is in [`engine/src/identity.js`](../engine/src/identity.js), because the website needs the
 same code to sign as the server uses to check.
+
+## Names, points and the tables
+
+Every player has one name, the same in every group, and no two players have the same one whatever
+the capitals. A name is claimed in one step, so two people asking for it at the same moment cannot
+both get it. Changing a name frees the old one.
+
+A pick scores once its match has a result and the pick has been opened; whichever happens second
+does the scoring. The points come from Kickoff's three scoring circuits, the same ones that are
+published on X Layer, which the server carries as text in `src/circuits.js`. A test fails if that
+copy ever differs from the published files.
+
+There are two tables, both numbered from 1 with nobody sharing a place: everyone who plays, and
+one group. Most points first, and between players level on points, whoever joined Kickoff first.
+Only the top twenty of the table of everyone is sent, with the asking player's own row added if
+they are further down. A row carries a name and numbers and nothing else about the player.
 
 ## Linking a wallet
 
@@ -84,6 +100,7 @@ A device must sign these:
 | `POST /api/groups/<code>/join` | Join a group with a name |
 | `POST /api/groups/<code>/plays` | Choose which competitions it plays. Only the person who started it can |
 | `POST /api/me/groups` | The groups this device is in, and the wallet it has linked, if any |
+| `POST /api/me/table` | The League screen's numbers: the table of everyone, the table of a group, and this player's place and finished matches |
 | `POST /api/wallet` | Link a wallet: its address, the note's time, and its signature of the note |
 | `POST /api/picks` | Send a sealed pick. Sending again before picks close replaces it |
 | `POST /api/picks/mine` | What the server holds for this device |
@@ -184,6 +201,10 @@ every `/api/...` address to `api/index.mjs`, which starts the server.
 - **The server could leave a pick out of a bundle.** A player can check for their receipt as soon as
   picks are locked, but by then it is too late to add the pick. This is the one thing a player has
   to trust the server for, and it is said plainly here.
+- **The server's table is not yet checked against X Layer on the website.** The points come from
+  the published circuits, but the Check screen that rebuilds the table from X Layer is still to do.
+- **The table of everyone is worked out again whenever anything changes.** That is fine for
+  hundreds of players and will want rethinking for many thousands.
 - **A linked wallet cannot be changed or taken off yet.** A device links one wallet, once.
 - **Wallets that are themselves contracts cannot link.** Only an ordinary wallet's signature is read.
 - **A pick sealed on a lost phone cannot be opened from a new one.** The pick's secret was on the

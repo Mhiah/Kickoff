@@ -1,0 +1,293 @@
+// Names, points and the two tables: everyone, and a group.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+import { BASKETBALL, FOOTBALL, basketballResult, encodePick, sealPick, toHex, walletLinkText } from "../../engine/src/index.js";
+import { testWallet } from "../../engine/test/test-wallet.js";
+import { BASKETBALL_HEX, FOOTBALL_HEX, TENNIS_HEX } from "../src/circuits.js";
+import { TABLE_TOP } from "../src/kickoff.js";
+import { RedisStore } from "../src/redis-store.js";
+import { FAKE_TOKEN, FAKE_URL, fakeRedis } from "./fake-redis.js";
+import { LEAGUE, device, server, serverWithFixtures } from "./helpers.js";
+
+const table = async (s, who, group = null) => (await s.post(who, "/api/me/table", { group })).body;
+const names = (board) => board.rows.map((r) => `${r.place} ${r.name} ${r.points}`);
+
+/** Start or join so as to have a name. Each call a minute after the last, so who joined first is clear. */
+async function join(s, who, name, code = null) {
+  s.clock.now += 60;
+  const r = code ? await s.post(who, `/api/groups/${code}/join`, { playerName: name }) : await s.post(who, "/api/groups", { name: `${name}'s lot`, playerName: name });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  return r.body;
+}
+
+/** A device seals a pick and sends its fingerprint. Returns what it needs to open it later. */
+async function pick(s, who, fixture, what) {
+  const sealed = await sealPick({ league: LEAGUE, match: fixture.id, sport: fixture.sport, pick: what, player: who.player });
+  const sent = await s.post(who, "/api/picks", { match: fixture.id, fingerprint: toHex(sealed.fingerprint) });
+  assert.equal(sent.status, 200, JSON.stringify(sent.body));
+  return { match: fixture.id, pickByte: sealed.pickByte, salt: toHex(sealed.salt) };
+}
+const open = async (s, who, sealed) => assert.equal((await s.post(who, "/api/opened", sealed)).status, 200);
+/** The robot records a result, as it does from the sports feed. */
+const result = (s, fixture, score, res) => s.robot("/api/admin/fixtures", { fixtures: [{ ...fixture, state: "final", score, resultByte: encodePick(fixture.sport, res) }] });
+
+test("the server's copies of the scoring circuits are the published ones", () => {
+  const file = (name) => readFileSync(new URL(`../../circuits/out/${name}.hex`, import.meta.url), "utf8").trim();
+  assert.equal(FOOTBALL_HEX, file("football"));
+  assert.equal(BASKETBALL_HEX, file("basketball"));
+  assert.equal(TENNIS_HEX, file("tennis"));
+});
+
+test("nobody has the same name: across groups, and whatever the capitals", async () => {
+  const s = server();
+  const [ada, other, third] = [await device(), await device(), await device()];
+  const group = await join(s, ada, "Ada");
+  // In the same group, in another group, and in capitals.
+  let r = await s.post(other, `/api/groups/${group.code}/join`, { playerName: "Ada" });
+  assert.equal(r.status, 409);
+  r = await s.post(other, "/api/groups", { name: "Elsewhere", playerName: "ADA" });
+  assert.deepEqual([r.status, r.body.error], [409, "That name is taken. Pick another."]);
+  assert.deepEqual((await s.post(other, "/api/me/groups")).body.groups, [], "and no group was started for a name that was refused");
+  await join(s, other, "Ada B");
+  // A player keeps their own name wherever they go.
+  const elsewhere = await join(s, ada, "Ada");
+  assert.equal(elsewhere.members[0].name, "Ada");
+  await join(s, third, "Chidi", group.code);
+});
+
+test("a player has one name everywhere, and changing it frees the old one", async () => {
+  const s = server();
+  const [ada, bola] = [await device(), await device()];
+  const first = await join(s, ada, "Ada");
+  const second = await join(s, ada, "Ada");
+  // Giving a new name when joining changes it in every group.
+  await join(s, bola, "Bola", first.code);
+  const renamed = await join(s, ada, "Ada the Great", first.code);
+  assert.deepEqual(renamed.members.map((m) => m.name), ["Ada the Great", "Bola"]);
+  assert.equal((await s.get(`/api/groups/${second.code}`)).body.members[0].name, "Ada the Great");
+  assert.deepEqual(names((await table(s, bola)).everyone), ["1 Ada the Great 0", "2 Bola 0"]);
+  // Only a change of capitals is still her own name.
+  assert.equal((await s.post(ada, `/api/groups/${first.code}/join`, { playerName: "ADA THE GREAT" })).status, 200);
+  // The old name is free for somebody else.
+  await join(s, await device(), "Ada");
+});
+
+test("everyone is numbered from 1 in the order they joined, until points say otherwise", async () => {
+  const s = await serverWithFixtures();
+  const [mya, jerkson, kemi] = [await device(), await device(), await device()];
+  const group = await join(s, mya, "mya");
+
+  // The first person is 1st of 1.
+  let t = await table(s, mya, group.code);
+  assert.deepEqual(names(t.everyone), ["1 mya 0"]);
+  assert.deepEqual(t.you, { place: 1, points: 0, threes: 0, ones: 0, wrong: 0 });
+  assert.deepEqual(t.played, []);
+  assert.deepEqual(t.everyone.rows[0], { place: 1, name: "mya", threes: 0, ones: 0, points: 0, you: true });
+
+  // Whoever joins next is 2nd, then 3rd.
+  await join(s, jerkson, "Jerkson", group.code);
+  await join(s, kemi, "Kemi");
+  t = await table(s, jerkson, group.code);
+  assert.deepEqual(names(t.everyone), ["1 mya 0", "2 Jerkson 0", "3 Kemi 0"]);
+  assert.equal(t.everyone.players, 3);
+  assert.deepEqual(t.you.place, 2);
+  assert.deepEqual(names(t.group), ["1 mya 0", "2 Jerkson 0"], "the group's table has only the group in it");
+  assert.equal(t.group.rows[1].you, true);
+
+  // All three pick Arsenal v Chelsea. It ends 2–1.
+  const picks = {
+    mya: await pick(s, mya, s.f.football, { home: 0, away: 0 }), // wrong
+    jerkson: await pick(s, jerkson, s.f.football, { home: 2, away: 1 }), // spot on: 3
+    kemi: await pick(s, kemi, s.f.football, { home: 1, away: 0 }), // right winner: 1
+  };
+  s.clock.now = s.f.football.kickoff + 2 * 3600;
+  await open(s, mya, picks.mya);
+  await open(s, jerkson, picks.jerkson);
+  assert.deepEqual(names((await table(s, mya)).everyone), ["1 mya 0", "2 Jerkson 0", "3 Kemi 0"], "nothing is scored before the result is in");
+  assert.equal((await result(s, s.f.football, "2 – 1", { home: 2, away: 1 })).status, 200);
+
+  // Jerkson passes mya and is 1st. Kemi has not opened her pick yet, so it has not scored.
+  t = await table(s, mya, group.code);
+  assert.deepEqual(names(t.everyone), ["1 Jerkson 3", "2 mya 0", "3 Kemi 0"]);
+  assert.deepEqual(t.you, { place: 2, points: 0, threes: 0, ones: 0, wrong: 1 });
+  assert.deepEqual(names(t.group), ["1 Jerkson 3", "2 mya 0"]);
+  assert.deepEqual(t.played, [{ match: s.f.football.id, comp: "pl", sport: FOOTBALL, home: "Arsenal", away: "Chelsea", score: "2 – 1", pickByte: picks.mya.pickByte, points: 0 }]);
+
+  // Kemi opens hers after the result. It scores then, and she passes mya too.
+  await open(s, kemi, picks.kemi);
+  t = await table(s, kemi);
+  assert.deepEqual(names(t.everyone), ["1 Jerkson 3", "2 Kemi 1", "3 mya 0"]);
+  assert.deepEqual(t.you, { place: 2, points: 1, threes: 0, ones: 1, wrong: 0 });
+  assert.equal(t.group, null, "no group was asked for");
+  assert.deepEqual(t.everyone.rows[0], { place: 1, name: "Jerkson", threes: 1, ones: 0, points: 3, you: false });
+});
+
+test("level on points, whoever joined Kickoff first is ahead. Nobody shares a place", async () => {
+  const s = await serverWithFixtures();
+  const [first, second, third] = [await device(), await device(), await device()];
+  await join(s, first, "First");
+  await join(s, second, "Second");
+  await join(s, third, "Third");
+  const sealed = [];
+  for (const who of [third, second, first]) sealed.push([who, await pick(s, who, s.f.basketball, { winner: "home", band: "B" })]);
+  s.clock.now = s.f.basketball.kickoff + 3 * 3600;
+  for (const [who, p] of sealed) await open(s, who, p);
+  // Knicks win by 8: the right winner and the right margin, 3 points each.
+  await result(s, s.f.basketball, "104 – 96", basketballResult({ home: 104, away: 96 }));
+  const t = await table(s, third);
+  assert.deepEqual(names(t.everyone), ["1 First 3", "2 Second 3", "3 Third 3"]);
+  assert.equal(t.played[0].sport, BASKETBALL);
+});
+
+test("scoring a match twice changes nothing, and a result put right is scored again", async () => {
+  const s = await serverWithFixtures();
+  const ada = await device();
+  await join(s, ada, "Ada");
+  const mine = await pick(s, ada, s.f.football, { home: 2, away: 1 });
+  s.clock.now = s.f.football.kickoff + 2 * 3600;
+  await open(s, ada, mine);
+  await result(s, s.f.football, "2 – 1", { home: 2, away: 1 });
+  await result(s, s.f.football, "2 – 1", { home: 2, away: 1 });
+  await open(s, ada, mine);
+  assert.deepEqual((await table(s, ada)).you, { place: 1, points: 3, threes: 1, ones: 0, wrong: 0 });
+  // The feed corrects the score to 3–1: the right winner now, not the exact score.
+  await result(s, s.f.football, "3 – 1", { home: 3, away: 1 });
+  const t = await table(s, ada);
+  assert.deepEqual(t.you, { place: 1, points: 1, threes: 0, ones: 1, wrong: 0 });
+  assert.equal(t.played[0].score, "3 – 1");
+  assert.equal(t.played.length, 1);
+});
+
+test("someone who picks before choosing a name is on the table as Player and four characters", async () => {
+  const s = await serverWithFixtures();
+  const [ada, guest] = [await device(), await device()];
+  await join(s, ada, "Ada");
+  assert.deepEqual((await table(s, guest)).you, { place: null, points: 0, threes: 0, ones: 0, wrong: 0 }, "not on the table before playing");
+  assert.equal((await table(s, guest)).everyone.rows.some((r) => r.you), false);
+  s.clock.now += 60;
+  await pick(s, guest, s.f.football, { home: 1, away: 1 });
+  const t = await table(s, guest);
+  const placeholder = `Player ${guest.player.slice(0, 4).toUpperCase()}`;
+  assert.deepEqual(names(t.everyone), ["1 Ada 0", `2 ${placeholder} 0`]);
+  // They choose a real name by starting or joining a group, and keep their place in the queue.
+  await join(s, guest, "Guest");
+  assert.deepEqual(names((await table(s, guest)).everyone), ["1 Ada 0", "2 Guest 0"]);
+  await join(s, await device(), placeholder);
+});
+
+test("only the top of a long table is sent, with your own row if you are further down", async () => {
+  const s = server();
+  const players = [];
+  for (let i = 1; i <= TABLE_TOP + 5; i++) {
+    const d = await device();
+    players.push(d);
+    await join(s, d, `Player number ${i}`);
+  }
+  const last = await table(s, players.at(-1));
+  assert.equal(last.everyone.players, TABLE_TOP + 5);
+  assert.equal(last.everyone.rows.length, TABLE_TOP + 1);
+  assert.deepEqual(last.everyone.rows.at(-1), { place: TABLE_TOP + 5, name: `Player number ${TABLE_TOP + 5}`, threes: 0, ones: 0, points: 0, you: true, below: true });
+  const top = await table(s, players[2]);
+  assert.equal(top.everyone.rows.length, TABLE_TOP);
+  assert.equal(top.everyone.rows[2].you, true);
+});
+
+test("a wallet's devices are one person on the table: one row, one name, their points together", async () => {
+  const s = await serverWithFixtures();
+  const [phone, laptop, bola] = [await device(), await device(), await device()];
+  const wallet = testWallet("ada");
+  const link = (who) => {
+    const at = s.clock.now;
+    return s.post(who, "/api/wallet", { wallet: wallet.address, linkAt: at, signature: wallet.sign(walletLinkText({ player: who.player, wallet: wallet.address, at })) });
+  };
+  await join(s, bola, "Bola");
+  const group = await join(s, phone, "Ada");
+  await join(s, laptop, "Ada laptop");
+  assert.equal((await table(s, bola)).everyone.players, 3);
+
+  // The phone picks football, the laptop basketball. Then both link the same wallet.
+  const onPhone = await pick(s, phone, s.f.football, { home: 2, away: 1 });
+  const onLaptop = await pick(s, laptop, s.f.basketball, { winner: "home", band: "A" });
+  assert.equal((await link(phone)).status, 200);
+  assert.equal((await link(laptop)).status, 200);
+  let t = await table(s, laptop, group.code);
+  assert.deepEqual(names(t.everyone), ["1 Bola 0", "2 Ada 0"], "two rows became one, under the name the wallet had first");
+  assert.equal(t.everyone.rows[1].you, true);
+  assert.deepEqual(names(t.group), ["1 Ada 0"]);
+  assert.ok(!JSON.stringify(t).includes(wallet.address.slice(2)), "the wallet's address is not in the table");
+
+  s.clock.now = s.f.basketball.kickoff + 3 * 3600;
+  await open(s, phone, onPhone);
+  await open(s, laptop, onLaptop);
+  await result(s, s.f.football, "2 – 1", { home: 2, away: 1 }); // 3
+  await result(s, s.f.basketball, "101 – 99", basketballResult({ home: 101, away: 99 })); // 3
+  t = await table(s, phone);
+  assert.deepEqual(names(t.everyone), ["1 Ada 6", "2 Bola 0"]);
+  assert.deepEqual(t.you, { place: 1, points: 6, threes: 2, ones: 0, wrong: 0 });
+  assert.equal(t.played.length, 2, "the phone sees the laptop's match too");
+  assert.equal(t.played[0].sport, BASKETBALL, "newest first");
+});
+
+test("people who joined a group before names were shared keep their names, and are put on the table", async () => {
+  const s = server();
+  const [ada, bola, alsoAda] = [await device(), await device(), await device()];
+  // As the database held them before: members of groups, and nothing else.
+  const put = async (code, who, name, joinedAt, startedBy = who) => {
+    await s.store.setIfAbsent(`group:${code}`, { code, name: code, startedBy: startedBy.player, startedAt: joinedAt, plays: ["pl"] });
+    await s.store.tableSet(`members:${code}`, who.player, { name, joinedAt });
+    await s.store.tableSet(`groups-of:${who.player}`, code, { joinedAt });
+  };
+  await put("OLD-0001", ada, "Ada", 100);
+  await put("OLD-0001", bola, "Bola", 200, ada);
+  await put("OLD-0002", alsoAda, "Ada", 300);
+
+  const t = await table(s, bola, "OLD-0001");
+  assert.deepEqual(names(t.group), ["1 Ada 0", "2 Bola 0"]);
+  assert.deepEqual(names(t.everyone), ["1 Ada 0", "2 Bola 0"]);
+  // The second Ada turns up later. The name is taken, so a number is added, in her group too.
+  const late = await s.post(alsoAda, "/api/me/groups");
+  assert.equal(late.body.groups[0].members[0].name, "Ada 2");
+  assert.deepEqual(names((await table(s, alsoAda)).everyone), ["1 Ada 0", "2 Bola 0", "3 Ada 2 0"]);
+});
+
+test("a wallet linked on two devices before names were shared is one person, not two", async () => {
+  const s = server();
+  const [phone, laptop] = [await device(), await device()];
+  const wallet = testWallet("ada").address;
+  // As the database held them before: one seat shared by the wallet's two devices.
+  await s.store.setIfAbsent("group:OLD-0001", { code: "OLD-0001", name: "Old", startedBy: phone.player, startedAt: 100, plays: ["pl"] });
+  for (const [who, since] of [[phone, 100], [laptop, 500]]) {
+    await s.store.set(`wallet-of:${who.player}`, { wallet, at: since, signature: "00", linkedAt: since });
+    await s.store.tableSet(`players-of:${wallet}`, who.player, { linkedAt: since });
+    await s.store.tableSet("members:OLD-0001", who.player, { name: "Ada", joinedAt: 100, wallet, since });
+    await s.store.tableSet(`groups-of:${who.player}`, "OLD-0001", { joinedAt: 100 });
+  }
+  let t = await table(s, laptop, "OLD-0001");
+  assert.deepEqual(names(t.everyone), ["1 Ada 0"]);
+  assert.equal(t.everyone.rows[0].you, true);
+  t = await table(s, phone, "OLD-0001");
+  assert.deepEqual(names(t.everyone), ["1 Ada 0"]);
+  assert.equal(t.everyone.rows[0].you, true);
+  assert.deepEqual(names(t.group), ["1 Ada 0"]);
+});
+
+test("the tables work the same on the real kind of database", async () => {
+  const redis = fakeRedis();
+  const s = await serverWithFixtures({ store: new RedisStore({ url: FAKE_URL, token: FAKE_TOKEN, fetch: redis.fetch }) });
+  const [ada, bola] = [await device(), await device()];
+  const group = await join(s, ada, "Ada");
+  await join(s, bola, "Bola", group.code);
+  const mine = await pick(s, bola, s.f.football, { home: 2, away: 1 });
+  s.clock.now = s.f.football.kickoff + 2 * 3600;
+  await open(s, bola, mine);
+  await result(s, s.f.football, "2 – 1", { home: 2, away: 1 });
+  const before = redis.seen.length;
+  assert.deepEqual(names((await table(s, ada, group.code)).group), ["1 Bola 3", "2 Ada 0"]);
+  const first = redis.seen.length - before;
+  await table(s, ada, group.code);
+  assert.ok(redis.seen.length - before - first < first, "the second look does less work, because the table was kept");
+  await join(s, ada, "Ada B", group.code);
+  assert.deepEqual(names((await table(s, bola)).everyone), ["1 Bola 3", "2 Ada B 0"]);
+});

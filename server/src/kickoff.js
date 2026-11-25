@@ -18,11 +18,19 @@
 // server never asks a wallet to pay or to send anything, and it tells other players only that a
 // seat has a wallet linked, never which wallet.
 //
+// Everyone who plays has one name, and no two players have the same one. The table of everyone
+// is numbered from 1: most points first, and between players level on points, whoever joined
+// Kickoff first.
+//
 // Times are in seconds. Ids, fingerprints and secrets are 64 hex digits.
 
 import {
-  buildBundle, fingerprintOf, fromHex, receiptFor, toHex, verifyWalletLink, writeOpenings, decodePick,
+  buildBundle, fingerprintOf, fromHex, loadCircuits, receiptFor, scorePick, toHex, verifyWalletLink, writeOpenings, decodePick,
 } from "../../engine/src/index.js";
+import { BASKETBALL_HEX, FOOTBALL_HEX, TENNIS_HEX } from "./circuits.js";
+
+/** The scoring circuits, the same ones that are published on X Layer. Every point on a table comes from them. */
+const CIRCUITS = loadCircuits({ football: FOOTBALL_HEX, basketball: BASKETBALL_HEX, tennis: TENNIS_HEX });
 
 /** Picks close this many seconds before a match starts. */
 export const CLOSES_BEFORE = 10 * 60;
@@ -36,6 +44,11 @@ export const MAX_PLAYER_NAME = 24;
 /** A group is for friends, so it is kept small. When it is full, nobody else can join it. */
 export const MAX_MEMBERS = 30;
 export const COMPETITIONS = ["pl", "cl", "nba", "wnba"];
+/** How many rows of the table of everyone are sent. A player further down is sent their own row as well. */
+export const TABLE_TOP = 20;
+/** How many of a player's finished matches are sent. */
+export const PLAYED_SHOWN = 20;
+export const NAME_TAKEN = "That name is taken. Pick another.";
 
 /** Something the server will not do, with the reason to show the player. */
 export class Refusal extends Error {
@@ -112,10 +125,143 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
   /** Every device a wallet has linked. */
   const devicesOf = async (wallet) => Object.keys(await store.tableAll(`players-of:${wallet}`));
 
+  // ------------------------------------------------------------------ people and their names
+  //
+  // A person is one device, or every device of one wallet. `people` holds each person's name and
+  // when they joined Kickoff; `owner-of` says which person a device belongs to. A name is claimed
+  // in one step, so two people asking for the same name at the same moment cannot both get it.
+
+  // A device that linked a wallet before this list was kept is found by its wallet.
+  const personOf = async (player) => (await store.tableGet("owner-of", player)) ?? (await store.get(`wallet-of:${player}`))?.wallet ?? player;
+  const devicesOfPerson = async (person) => (person.startsWith("0x") ? devicesOf(person) : [person]);
+  const nameKey = (name) => `name:${name.toLowerCase()}`;
+  /** The tables are worked out again the next time anyone asks. */
+  const stale = () => store.set("table-stamp", globalThis.crypto.randomUUID());
+
+  const claim = async (person, name) => {
+    await store.setIfAbsent(nameKey(name), person);
+    if ((await store.get(nameKey(name))) !== person) refuse(409, NAME_TAKEN);
+  };
+
+  /**
+   * Give the person behind a device their name, or change it. The name is the same in every group
+   * they are in. Refused if somebody else has it.
+   */
+  const named = async (player, name, now) => {
+    const person = await personOf(player);
+    const before = await store.tableGet("people", person);
+    if (before?.name === name) return person;
+    await claim(person, name);
+    if (before && before.name.toLowerCase() !== name.toLowerCase()) await store.remove(nameKey(before.name));
+    await store.tableSet("people", person, { name, joinedAt: before?.joinedAt ?? now });
+    await store.tableSet("owner-of", player, person);
+    if (before) await writeName(person, name);
+    await stale();
+    return person;
+  };
+
+  /** Put a person's name on their seat in every group they are in. */
+  const writeName = async (person, name) => {
+    for (const device of await devicesOfPerson(person)) {
+      for (const code of Object.keys(await store.tableAll(`groups-of:${device}`))) {
+        const m = await store.tableGet(`members:${code}`, device);
+        if (m && m.name !== name) await store.tableSet(`members:${code}`, device, { ...m, name });
+      }
+    }
+  };
+
+  /** A name nobody has, made from one that may be taken: "Ada", then "Ada 2", "Ada 3"… */
+  const freeName = async (wanted, person) => {
+    for (let n = 1; n < 1000; n++) {
+      const name = n === 1 ? wanted : `${wanted.slice(0, MAX_PLAYER_NAME - String(n).length - 1)} ${n}`;
+      const holder = await store.get(nameKey(name));
+      if (!holder || holder === person) return name;
+    }
+    return refuse(503, "Could not find a free name. Try again.");
+  };
+
+  /**
+   * Make sure the person behind a device is on Kickoff's list of people. Someone who joined a
+   * group before names were shared keeps the name they had there, with a number added only if
+   * somebody else took it first. `fallback` is the name for someone who has none at all.
+   * @returns the person, or null if they have no name and no fallback was given
+   */
+  const ensurePerson = async (player, now, fallback = null) => {
+    const person = await personOf(player);
+    if (await store.tableGet("people", person)) {
+      if (person !== player && !(await store.tableGet("owner-of", player))) await store.tableSet("owner-of", player, person);
+      return person;
+    }
+    let first = null;
+    for (const device of await devicesOfPerson(person)) {
+      for (const code of Object.keys(await store.tableAll(`groups-of:${device}`))) {
+        const m = await store.tableGet(`members:${code}`, device);
+        if (m && (!first || m.joinedAt < first.joinedAt)) first = m;
+      }
+    }
+    const wanted = first?.name ?? fallback;
+    if (!wanted) return null;
+    const name = await freeName(wanted, person);
+    await claim(person, name);
+    await store.tableSet("people", person, { name, joinedAt: first?.joinedAt ?? now });
+    for (const device of new Set([player, ...(await devicesOfPerson(person))])) await store.tableSet("owner-of", device, person);
+    await stale();
+    if (first) await writeName(person, name);
+    return person;
+  };
+
+  // ------------------------------------------------------------------ points
+  //
+  // A pick scores once its match is final and it has been opened. Whichever of those happens
+  // second does the scoring. Scoring the same pick twice writes the same thing twice.
+
+  const scoreOne = async (f, player, pickByte) => {
+    const points = scorePick({ circuits: CIRCUITS, sport: f.sport, pickByte, result: decodePick(f.sport, f.resultByte) });
+    await store.tableSet(`points:${f.id}`, player, points);
+    await store.tableSet(`played:${player}`, f.id, { pickByte, points });
+  };
+  const isFinal = (f) => f.state === "final" && Number.isInteger(f.resultByte);
+  /** Score every opened pick of a match that has just been given its result. */
+  const scoreMatch = async (f) => {
+    const frozen = await store.get(`frozen:${f.id}`);
+    if (!frozen) return;
+    const opened = await store.tableAll(`opened:${f.id}`);
+    for (const e of frozen.entries) if (opened[e.player]) await scoreOne(f, e.player, opened[e.player].pickByte);
+    await store.tableSet("scored", f.id, { kickoff: f.kickoff });
+    await stale();
+  };
+
+  /**
+   * Everyone on Kickoff, in order: most points first, and between players level on points, whoever
+   * joined first. Kept until something changes it.
+   * @returns [{ key, name, joinedAt, threes, ones, points, place }]
+   */
+  const everyone = async () => {
+    const stamp = (await store.get("table-stamp")) ?? "start";
+    const kept = await store.get("table-kept");
+    if (kept?.stamp === stamp) return kept.rows;
+    const people = await store.tableAll("people");
+    const owner = await store.tableAll("owner-of");
+    const tally = new Map(Object.keys(people).map((key) => [key, { threes: 0, ones: 0 }]));
+    for (const match of Object.keys(await store.tableAll("scored"))) {
+      for (const [player, points] of Object.entries(await store.tableAll(`points:${match}`))) {
+        const t = tally.get(owner[player] ?? player);
+        if (!t) continue;
+        if (points === 3) t.threes++;
+        else if (points === 1) t.ones++;
+      }
+    }
+    const rows = [...tally]
+      .map(([key, t]) => ({ key, name: people[key].name, joinedAt: people[key].joinedAt, ...t, points: 3 * t.threes + t.ones }))
+      .sort((a, b) => b.points - a.points || a.joinedAt - b.joinedAt || a.key.localeCompare(b.key));
+    rows.forEach((row, i) => (row.place = i + 1));
+    await store.set("table-kept", { stamp, rows });
+    return rows;
+  };
+
   /**
    * One wallet has one seat in a group, whichever of its devices is being used. This gives every
-   * device of the wallet the same seat: the same name, joined at the same time. The name is the
-   * one most recently chosen.
+   * device of the wallet the same seat: the person's name, joined at the same time.
    */
   const shareSeat = async (code, wallet, now) => {
     const records = [];
@@ -123,10 +269,11 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     const seated = records.filter(([, m]) => m);
     if (seated.length === 0) return;
     const newest = seated.reduce((a, b) => ((b[1].since ?? b[1].joinedAt) > (a[1].since ?? a[1].joinedAt) ? b : a))[1];
+    const name = (await store.tableGet("people", wallet))?.name ?? newest.name;
     const joinedAt = Math.min(...seated.map(([, m]) => m.joinedAt));
     for (const [device, m] of records) {
       // A device given the seat just now is the one being used, so it is the newest.
-      const next = { name: newest.name, joinedAt, wallet, since: m?.since ?? m?.joinedAt ?? now };
+      const next = { name, joinedAt, wallet, since: m?.since ?? m?.joinedAt ?? now };
       if (!m || m.name !== next.name || m.joinedAt !== next.joinedAt || m.wallet !== wallet) await store.tableSet(`members:${code}`, device, next);
       if (!m) await store.tableSet(`groups-of:${device}`, code, { joinedAt });
     }
@@ -152,6 +299,8 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       const groupName = tidyName(name, MAX_GROUP_NAME, "The group's name");
       const who = tidyName(playerName, MAX_PLAYER_NAME, "Your name");
       const chosen = plays === undefined ? [...COMPETITIONS] : tidyPlays(plays);
+      await ensurePerson(player, now);
+      await named(player, who, now);
       // The code is claimed and the group written in one step, so two groups started at the same
       // moment can never be given the same code.
       let code = null;
@@ -167,7 +316,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       return this.group({ code });
     },
 
-    /** Join a group with its code. Joining again just changes your name in it. */
+    /** Join a group with its code. A player has one name everywhere: giving another one here changes it everywhere. */
     async joinGroup({ player, now, code, playerName }) {
       const group = await this.group({ code });
       const who = tidyName(playerName, MAX_PLAYER_NAME, "Your name");
@@ -175,10 +324,12 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       const already = group.members.some(sits);
       if (!already && group.members.length >= MAX_MEMBERS) refuse(409, `This group is full. A group can have ${MAX_MEMBERS} players.`);
       if (group.members.some((m) => !sits(m) && m.name.toLowerCase() === who.toLowerCase())) {
-        refuse(409, `Someone in this group is already called ${who}. Pick another name.`);
+        refuse(409, NAME_TAKEN);
       }
+      await ensurePerson(player, now);
+      await named(player, who, now);
       const before = await store.tableGet(`members:${group.code}`, player);
-      // `since` is when this name was last chosen, so a wallet's devices agree on the newest one.
+      // `since` is when this device last sat down here, so the seat is listed under the one in use.
       await store.tableSet(`members:${group.code}`, player, { ...before, name: who, joinedAt: before?.joinedAt ?? now, since: now });
       await store.tableSet(`groups-of:${player}`, group.code, { joinedAt: before?.joinedAt ?? now });
       await bringDevices(group.code, player, now);
@@ -211,7 +362,8 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     },
 
     /** The groups a player is in. */
-    async groupsOf({ player }) {
+    async groupsOf({ player, now = 0 }) {
+      await ensurePerson(player, now);
       const codes = Object.keys(await store.tableAll(`groups-of:${player}`));
       const groups = [];
       for (const code of codes) groups.push(await this.group({ code }));
@@ -252,6 +404,24 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       if (link.wallet !== address) refuse(409, "This device is already linked to another wallet.");
       const mineBefore = new Set(Object.keys(await store.tableAll(`groups-of:${player}`)));
       if (!(await store.tableGet(`players-of:${address}`, player))) await store.tableSet(`players-of:${address}`, player, { linkedAt: link.linkedAt });
+      // The device and the wallet's other devices are one person from now on, with one name. If
+      // the wallet already has a name, this device takes it and gives its own up. Whichever of
+      // them joined Kickoff first is when the person joined.
+      await ensurePerson(player, now);
+      if ((await personOf(player)) !== address) {
+        const mine = await store.tableGet("people", player);
+        const theirs = await store.tableGet("people", address);
+        if (mine && !theirs) {
+          await store.tableSet("people", address, mine);
+          await store.set(nameKey(mine.name), address);
+        } else if (mine && theirs) {
+          if (mine.name.toLowerCase() !== theirs.name.toLowerCase()) await store.remove(nameKey(mine.name));
+          if (mine.joinedAt < theirs.joinedAt) await store.tableSet("people", address, { ...theirs, joinedAt: mine.joinedAt });
+        }
+        if (mine) await store.tableDelete("people", player);
+        await store.tableSet("owner-of", player, address);
+        await stale();
+      }
       // Every group any device of this wallet is in now has one seat for all of them.
       const codes = new Set();
       for (const device of await devicesOf(address)) for (const code of Object.keys(await store.tableAll(`groups-of:${device}`))) codes.add(code);
@@ -266,6 +436,69 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     async walletOf({ player }) {
       const link = await store.get(`wallet-of:${player}`);
       return link ? { wallet: link.wallet, at: link.at, signature: link.signature, linkedAt: link.linkedAt } : null;
+    },
+
+    // ---------------------------------------------------------------- tables
+
+    /**
+     * What a player's League screen shows.
+     * @param code  the group they are looking at, if any
+     * @returns {
+     *   everyone  { players, rows }: the top of the table of everybody, and this player's own row
+     *             (marked `below`) if they are further down
+     *   group     { players, rows }: the same for the group, in full, or null
+     *   you       { place, points, threes, ones, wrong } among everybody. `place` is null for
+     *             someone with no name yet, who is not on the table. `wrong` counts their picks
+     *             that scored nothing.
+     *   played    this player's finished matches, newest first:
+     *             [{ match, comp, sport, home, away, score, pickByte, points }]
+     * }
+     * A row is { place, name, threes, ones, points, you }. Nothing in it says who a player is
+     * beyond their name.
+     */
+    async table({ player, now, code = null }) {
+      const me = await ensurePerson(player, now);
+      let all = await everyone();
+      let members = null;
+      if (code !== null && code !== undefined) {
+        const group = await this.group({ code });
+        const owner = await store.tableAll("owner-of");
+        const known = new Set(all.map((row) => row.key));
+        members = new Set();
+        let added = false;
+        for (const m of group.members) {
+          let key = owner[m.player] ?? m.player;
+          if (!known.has(key)) {
+            // Someone who joined before names were shared is put on the list of people now.
+            key = (await ensurePerson(m.player, now)) ?? key;
+            added = true;
+          }
+          members.add(key);
+        }
+        if (added) all = await everyone();
+      }
+      const mine = me ? (all.find((row) => row.key === me) ?? null) : null;
+      const show = (row, place, extra = {}) => ({ place, name: row.name, threes: row.threes, ones: row.ones, points: row.points, you: row.key === me, ...extra });
+      const top = all.slice(0, TABLE_TOP).map((row) => show(row, row.place));
+      if (mine && mine.place > TABLE_TOP) top.push(show(mine, mine.place, { below: true }));
+      const inGroup = members ? all.filter((row) => members.has(row.key)) : null;
+
+      const mineByMatch = new Map();
+      if (me) for (const device of await devicesOfPerson(me)) for (const [match, p] of Object.entries(await store.tableAll(`played:${device}`))) mineByMatch.set(match, p);
+      const played = [];
+      const fixtures = mineByMatch.size > 0 ? await store.tableAll("fixtures") : {};
+      for (const [match, p] of mineByMatch) {
+        const f = fixtures[match];
+        if (f && isFinal(f)) played.push({ match, comp: f.comp, sport: f.sport, home: f.home, away: f.away, score: f.score ?? "", kickoff: f.kickoff, pickByte: p.pickByte, points: p.points });
+      }
+      played.sort((a, b) => b.kickoff - a.kickoff || a.match.localeCompare(b.match));
+
+      return {
+        everyone: { players: all.length, rows: top },
+        group: inGroup ? { players: inGroup.length, rows: inGroup.map((row, i) => show(row, i + 1)) } : null,
+        you: { place: mine?.place ?? null, points: mine?.points ?? 0, threes: mine?.threes ?? 0, ones: mine?.ones ?? 0, wrong: played.filter((p) => p.points === 0).length },
+        played: played.slice(0, PLAYED_SHOWN).map(({ kickoff, ...rest }) => rest),
+      };
     },
 
     // ---------------------------------------------------------------- fixtures
@@ -289,6 +522,9 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       if (now >= f.kickoff - CLOSES_BEFORE) refuse(409, "Picks for this match have closed.");
       const before = await store.tableGet(`sealed:${match}`, player);
       if (before && at <= before.signedAt) refuse(409, "A newer pick from this device is already in.");
+      // Everyone who plays is on the table, so everyone has a name. Someone who picks before
+      // choosing one is called "Player" and four characters of their id until they do.
+      await ensurePerson(player, now, `Player ${player.slice(0, 4).toUpperCase()}`);
       await store.tableSet(`sealed:${match}`, player, { fingerprint, signedAt: at, receivedAt: now });
       // One player, one pick. If this player's wallet has other devices, a pick one of them sent
       // for this match is replaced by this one, just as a device replaces its own.
@@ -351,6 +587,11 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
         refuse(409, "That is not a pick that can happen in this kind of match.");
       }
       await store.tableSet(`opened:${match}`, player, { pickByte, salt, openedAt: now });
+      if (isFinal(f)) {
+        await scoreOne(f, player, pickByte);
+        await store.tableSet("scored", f.id, { kickoff: f.kickoff });
+        await stale();
+      }
       return { match, pickByte };
     },
 
@@ -408,7 +649,10 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
         if (before && (before.kickoff !== f.kickoff || before.label !== f.label || before.sport !== f.sport)) {
           refuse(409, `The facts of ${before.label} cannot change. A moved match is a new match.`);
         }
-        await store.tableSet("fixtures", f.id, { ...before, ...f });
+        const after = { ...before, ...f };
+        await store.tableSet("fixtures", f.id, after);
+        // The result has just come in, or has been put right: every opened pick is scored.
+        if (isFinal(after) && !(before && isFinal(before) && before.resultByte === after.resultByte)) await scoreMatch(after);
         if (before) updated++;
         else added++;
       }

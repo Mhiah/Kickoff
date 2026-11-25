@@ -8,6 +8,7 @@ import { createGroups } from "./lib/groups.js";
 import { createStore, seal } from "./lib/picks.js";
 import { createClient } from "./lib/server.js";
 import { syncPicks } from "./lib/sync.js";
+import { createTable } from "./lib/table.js";
 import { hasClosed } from "./lib/time.js";
 import { createWallet } from "./lib/wallet.js";
 import { checkScreen, frame, groupScreen, home, league, matchScreen, pick, recordScreen } from "./screens.js";
@@ -25,6 +26,7 @@ const device = createDevice(store);
 const client = createClient({ base: SERVER, device });
 const groups = createGroups({ store, device, client });
 const wallet = createWallet({ device, client });
+const table = createTable({ store, client });
 const matches = createFixtures({ store, client, competitions: COMPETITIONS, sample: { league: SAMPLE_LEAGUE, fixtures: sampleFixtures } });
 
 document.body.insertAdjacentHTML("afterbegin", frame());
@@ -41,7 +43,7 @@ async function context() {
   const now = Math.floor(Date.now() / 1000);
   const { real, league, fixtures, matchIds } = await matches.view(now);
   const mine = await groups.view();
-  return { now, real, league, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine };
+  return { now, real, league, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine, standings: real ? table.view(mine.group?.code ?? null) : null };
 }
 
 async function draw({ keepPlace = false } = {}) {
@@ -150,6 +152,13 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  // The league screen: the table of everyone, or of your group.
+  if (target.matches("[data-board]")) {
+    for (const chip of target.parentElement.children) chip.setAttribute("aria-pressed", String(chip === target));
+    for (const board of view.querySelectorAll("[data-board-of]")) board.hidden = board.dataset.boardOf !== target.dataset.board;
+    return;
+  }
+
   // The group screen: whoever started the group turns a competition on or off.
   if (target.matches("[data-plays]")) {
     const { mine } = await context();
@@ -174,6 +183,7 @@ document.addEventListener("click", async (event) => {
       const result = await wallet.link();
       groups.linked(result);
       await draw({ keepPlace: true });
+      carry();
       if (out()) out().textContent = result.carried > 0 ? `Wallet linked. ${result.carried === 1 ? "Your group is back." : "Your groups are back."}` : "Wallet linked.";
     } catch (error) {
       if (out()) out().textContent = error.message;
@@ -184,6 +194,7 @@ document.addEventListener("click", async (event) => {
   if (target.matches("[data-choose]")) {
     groups.choose(target.dataset.choose);
     await draw();
+    carry();
     return;
   }
 
@@ -220,6 +231,7 @@ document.addEventListener("submit", async (event) => {
     else await groups.join({ code: typed.code, playerName: typed.playerName });
     if (location.hash === "#/group") await draw();
     else location.hash = "#/group";
+    carry();
   } catch (error) {
     out.textContent = error.message;
     button.disabled = false;
@@ -241,6 +253,8 @@ async function catchUp() {
  */
 let carrying = false;
 let matchesAskedAt = 0;
+let tableAskedAt = 0;
+let tableFor; // the group the tables were last asked for. Not set yet, so the first round asks.
 async function carry() {
   if (carrying) return;
   carrying = true;
@@ -253,6 +267,16 @@ async function carry() {
     }
     const ctx = await context();
     if (ctx.real) changed = (await syncPicks({ store, client, player: ctx.mine.player, league: ctx.league, fixtures: ctx.fixtures, now: ctx.now })) || changed;
+    // The tables are asked for when something of this player's has changed, when what is kept is
+    // for another group, and otherwise at most every five minutes while a screen that shows them
+    // is open. Not more often: every look costs the server work.
+    const showsTables = /^#\/(league|record)?$/.test(location.hash || "#/league");
+    const group = ctx.mine.group?.code ?? null;
+    if (ctx.real && !document.hidden && (changed || tableFor !== group || (showsTables && Date.now() - tableAskedAt >= 5 * 60_000))) {
+      tableAskedAt = Date.now();
+      tableFor = group;
+      changed = (await table.refresh(group)) || changed;
+    }
     // Draw again if something changed, or if picks have closed or a match has started since the
     // screen was drawn. A pick being made is left alone, unless its match has just closed.
     const moved = stage(ctx) !== drawnAt;
@@ -268,6 +292,7 @@ window.addEventListener("hashchange", () => {
   editing = null;
   draw();
   if (location.hash.startsWith("#/group")) catchUp();
+  carry();
 });
 window.addEventListener("online", () => {
   catchUp();

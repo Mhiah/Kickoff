@@ -7,6 +7,7 @@
 //   get(key)                 a value, or null
 //   set(key, value)
 //   setIfAbsent(key, value)  set it only if nothing is there yet; says whether it did
+//   remove(key)              take a value away
 //   tableGet(table, name)    one value from a table, or null
 //   tableSet(table, name, value)
 //   tableDelete(table, name) take one value out of a table
@@ -26,6 +27,9 @@ export class MemoryStore {
     if (this.values.has(key)) return false;
     this.values.set(key, structuredClone(value));
     return true;
+  }
+  async remove(key) {
+    this.values.delete(key);
   }
   async tableGet(table, name) {
     const t = this.tables.get(table);

@@ -15,10 +15,12 @@
 
 import { COMPETITIONS, check, group, match, record, scores, voided, week } from "./data/sample.js";
 import { sits } from "./lib/groups.js";
-import { MARK, REAL_MATCHES_NOTE, SAMPLE_NOTE, TOGGLE, comp, esc, stamp, titlebar } from "./lib/html.js";
+import { MARK, SAMPLE_NOTE, TOGGLE, comp, esc, stamp, titlebar } from "./lib/html.js";
+import { decodePick } from "./engine/picks.js";
 import { BAND_KEYS, bandWords, pickWords } from "./lib/picks.js";
 import { standing } from "./lib/sync.js";
 import { ordinal, placeName, standings } from "./lib/standings.js";
+import { EMPTY } from "./lib/table.js";
 import { clock, closesAt, dayLabel, hasClosed, howLong, todayLabel } from "./lib/time.js";
 
 const table = standings(scores);
@@ -171,7 +173,85 @@ function nextCard(ctx, nextId) {
 </div>`;
 }
 
+/**
+ * One leaderboard. `board` is { players, rows } where a row is
+ * { place (null until a pick of theirs has been scored), name, threes, ones, points, you }.
+ * Only the top of a long board is sent, with your own row added if it is further down.
+ */
+function boardHtml(board, empty) {
+  if (board.rows.length === 0) return `<p class="small muted" style="margin-top:10px">${empty}</p>`;
+  const top = board.rows.filter((row) => !row.below);
+  const below = board.rows.filter((row) => row.below);
+  const line = (row) =>
+    `<tr class="${row.you ? "you" : ""}"><td>${row.place ?? "–"}</td><td>${esc(row.name)}${row.you ? '<span class="tag">you</span>' : ""}</td><td>${row.threes}</td><td>${row.ones}</td><td class="pts">${row.points}</td></tr>`;
+  const gap = below.length ? `<tr class="gap"><td colspan="5">…</td></tr>` : "";
+  return `<div class="glass clip"><table class="table"><thead><tr><th><span hidden>Place</span></th><th>Player</th><th>3-pt picks</th><th>1-pt picks</th><th>Points</th></tr></thead><tbody>${top.map(line).join("")}${gap}${below.map(line).join("")}</tbody></table></div>`;
+}
+
+/**
+ * The League screen with real numbers. `ctx.standings` is what Kickoff's server worked out:
+ *   everyone  the leaderboard of everybody who has played
+ *   group     the leaderboard of this player's group, or null if they are in none
+ *   you       { place (null at first), points, threes, ones }, among everyone
+ *   played    this player's finished matches, newest first: { id, comp, title, said, points }
+ */
+/** One finished match of this player's: the score, what they said, and what it scored. */
+function playedRow(r) {
+  let said = "";
+  try {
+    said = `You said ${pickWords({ sport: r.sport, pick: decodePick(r.sport, r.pickByte) }, r)}`;
+  } catch {
+    // a pick this screen cannot put in words: the points still show
+  }
+  return `<div class="row"><div class="grow">${comp(r.comp)}<div class="title">${esc(r.home)} ${esc(r.score)} ${esc(r.away)}</div><div class="sub">${esc(said)}</div></div>${pointsCell(r.points)}</div>`;
+}
+
+function leagueReal(ctx) {
+  const s = ctx.standings ?? EMPTY;
+  const g = ctx.mine.group;
+  const ids = inOrder(ctx).filter((id) => !g || g.plays.includes(ctx.fixtures[id].comp));
+  const picked = ids.filter((id) => yourPick(ctx, id)).length;
+  const nextId = nextUp(ctx, g?.plays ?? null);
+  const next = nextId ? ctx.fixtures[nextId] : null;
+  const closesIn = next ? howLong(ctx.now, closesAt(next.kickoff)) : "";
+  const people = (n) => `${n} ${n === 1 ? "player" : "players"}`;
+  const played = s.played.length
+    ? `<div class="glass">${s.played.slice(0, 3).map(playedRow).join("")}</div>
+    <p class="say-so"><a class="link" href="#/record">Every match you picked</a></p>`
+    : `<p class="small muted" style="margin-top:10px">Nothing played yet.</p>`;
+  const html = `
+${titlebar({
+  eyebrow: esc(todayLabel(ctx.now)),
+  heading: "League",
+  actions: `<a class="btn small quiet" href="#/group">${g ? "Invite a friend" : "Start a group"}</a>${next ? `<a class="btn small go" href="#/pick/${nextId}">Make a pick</a>` : ""}`,
+})}
+<p class="sub phone-only">${people(s.everyone.players)}.${s.you.place ? ` You are ${ordinal(s.you.place)}.` : ""}</p>
+
+<div class="tiles">
+  <div class="glass tile"><small>Your place</small><b>${s.you.place ? ordinal(s.you.place) : "–"}</b><span>${s.you.place ? `of ${people(s.everyone.players)}` : "after your first pick"}</span></div>
+  <div class="glass tile"><small>Your points</small><b>${s.you.points}</b><span>${s.you.threes} spot on, ${s.you.ones} right winner</span></div>
+  <div class="glass tile"><small>Picked this week</small><b>${picked} of ${ids.length}</b><span>pick as many as you like</span></div>
+  <div class="glass tile"><small>Next to close</small><b>${next ? esc(closesIn) : "Nothing open"}</b><span>${next ? teams(next) : "new matches arrive each week"}</span></div>
+</div>
+
+${next ? `<div class="phone-only">${nextCard(ctx, nextId)}</div>` : ""}
+
+<div class="cols">
+  <section>${weekHtml({ ...ctx, fixtures: Object.fromEntries(ids.map((id) => [id, ctx.fixtures[id]])) })}</section>
+  <section>
+    <h2>Table</h2>
+    <div class="chips" role="group" aria-label="Which table"><button type="button" data-board="everyone" aria-pressed="true">Everyone</button><button type="button" data-board="group" aria-pressed="false">My group</button></div>
+    <div data-board-of="everyone" style="margin-top:12px">${boardHtml(s.everyone, "Nobody has played yet.")}</div>
+    <div data-board-of="group" style="margin-top:12px" hidden>${s.group ? boardHtml(s.group, "Nobody has played yet.") : `<p class="small muted" style="margin-top:10px">You are not in a group yet. <a class="link" href="#/group">Start or join one</a>.</p>`}</div>
+    <h2>Played</h2>
+    ${played}
+  </section>
+</div>`;
+  return { html, title: "League on Kickoff", tab: "league", wide: true };
+}
+
 export function league(_, ctx) {
+  if (ctx.real) return leagueReal(ctx);
   const ids = inOrder(ctx);
   const picked = ids.filter((id) => yourPick(ctx, id)).length;
   const nextId = nextUp(ctx);
@@ -216,7 +296,7 @@ ${
     <p class="say-so"><a class="link" href="#/record">Every match you picked</a></p>
   </section>
 </div>
-${ctx.real ? REAL_MATCHES_NOTE : SAMPLE_NOTE}`;
+${SAMPLE_NOTE}`;
   return { html, title: `${group.name} on Kickoff`, tab: "league", wide: true };
 }
 
@@ -359,7 +439,28 @@ ${SAMPLE_NOTE}`;
 
 // ------------------------------------------------------------------------------------ my record
 
-export function recordScreen() {
+/** My record, with real numbers: this player's points, place, and every finished match they picked. */
+function recordReal(ctx) {
+  const s = ctx.standings ?? EMPTY;
+  const name = ctx.mine.name;
+  const html = `
+${titlebar({ heading: name ? `${esc(name)}'s record` : "My record" })}
+<p class="sub">Every line was sealed before kickoff and cannot be edited.</p>
+<div class="glass sum">
+  <div class="big"><b>${s.you.points}</b><span>points${s.you.place ? `<br><span class="muted">${ordinal(s.you.place)} of ${s.everyone.players}</span>` : ""}</span></div>
+  <div class="split">
+    <div><b>${s.you.threes}</b> spot on<small>3 points each</small></div>
+    <div><b>${s.you.ones}</b> right winner<small>1 point each</small></div>
+    <div><b>${s.you.wrong}</b> wrong<small>no points</small></div>
+  </div>
+</div>
+<h2>Every pick</h2>
+${s.played.length ? `<div class="glass">${s.played.map(playedRow).join("")}</div>` : `<p class="small muted" style="margin-top:10px">Nothing played yet.</p>`}`;
+  return { html, title: "My record on Kickoff", tab: "record" };
+}
+
+export function recordScreen(_, ctx) {
+  if (ctx?.real) return recordReal(ctx);
   const wrong = record.filter((r) => r.points === 0).length;
   const rows = record
     .map((r) => `<div class="row"><div class="grow">${comp(r.comp)}<div class="title"><a href="#/match/${r.id}">${esc(r.title)}</a></div><div class="sub">${esc(r.said)}</div></div>${pointsCell(r.points)}</div>`)

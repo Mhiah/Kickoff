@@ -65,6 +65,9 @@ export class RedisStore {
   async setIfAbsent(key, value) {
     return (await this.command("SET", this.prefix + key, JSON.stringify(value), "NX")) === "OK";
   }
+  async remove(key) {
+    await this.command("DEL", this.prefix + key);
+  }
   async tableGet(table, name) {
     return read(await this.command("HGET", this.prefix + table, name));
   }

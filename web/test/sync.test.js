@@ -118,8 +118,9 @@ test("real matches replace the made-up ones, and each is only shown if its id ch
   assert.match(html, /Arsenal v Chelsea/);
   assert.match(html, /You have picked 0 of 2 matches/);
   assert.ok(!html.includes("Real Madrid"), "the made-up matches are gone");
-  assert.match(html, /The matches this week are real\. The group, table and results shown here are still made up\./);
+  assert.ok(!html.includes("made up"), "nothing on the screen is made up any more");
   assert.ok(!html.includes("Nothing here is live yet"));
+  for (const name of ["Funke", "Tunde", "Halima", "Emeka", "Dayo"]) assert.ok(!html.includes(name), "the made-up table is gone");
   // Still there when the phone is offline and the page is opened again.
   online.net.down = true;
   const again = await phone(online, ada.storage);

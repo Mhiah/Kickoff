@@ -47,6 +47,8 @@ export function createClient({ base = "", device, fetch = (...args) => globalThi
     myGroups: async () => (await signed("/api/me/groups")).groups,
     /** This device's groups, and the wallet it has linked if any: { groups, wallet }. */
     mine: () => signed("/api/me/groups"),
+    /** The League screen's numbers: both tables, and this player's place and finished matches. */
+    table: ({ group = null } = {}) => signed("/api/me/table", { group }),
     /** Link a wallet: the note it signed, and when. Returns { wallet, linkedAt, carried, groups }. */
     linkWallet: ({ wallet, linkAt, signature }) => signed("/api/wallet", { wallet, linkAt, signature }),
     group: (c) => send("GET", `/api/groups/${code(c)}`),

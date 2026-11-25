@@ -35,9 +35,9 @@ test("whoever started the group is listed first, even if someone joins in the sa
   const s = server();
   for (let i = 0; i < 6; i++) {
     const [starter, friend] = [await device(), await device()];
-    const { body: group } = await s.post(starter, "/api/groups", { name: "Same second", playerName: "Starter" });
-    const joined = await s.post(friend, `/api/groups/${group.code}/join`, { playerName: "Friend" });
-    assert.deepEqual(joined.body.members.map((m) => m.name), ["Starter", "Friend"]);
+    const { body: group } = await s.post(starter, "/api/groups", { name: "Same second", playerName: `Starter ${i}` });
+    const joined = await s.post(friend, `/api/groups/${group.code}/join`, { playerName: `Friend ${i}` });
+    assert.deepEqual(joined.body.members.map((m) => m.name), [`Starter ${i}`, `Friend ${i}`]);
   }
 });
 
@@ -60,7 +60,7 @@ test("two players in a group cannot have the same name, but one can change their
   const { body: group } = await s.post(ada, "/api/groups", { name: "Sunday Ballers", playerName: "Ada" });
   const clash = await s.post(other, `/api/groups/${group.code}/join`, { playerName: "ada" });
   assert.equal(clash.status, 409);
-  assert.match(clash.body.error, /already called ada/);
+  assert.equal(clash.body.error, "That name is taken. Pick another.");
   const renamed = await s.post(ada, `/api/groups/${group.code}/join`, { playerName: "Ada the Great" });
   assert.deepEqual(renamed.body.members.map((m) => m.name), ["Ada the Great"]);
   assert.equal(renamed.body.members.length, 1, "joining again does not add a second copy of you");
