@@ -6,7 +6,9 @@
 //   node server/bin/dev.js --matches  the same, with a few made-up matches on the list, so sending
 //                                     a sealed pick can be tried. The first closes in a few minutes.
 //
-// The league id is a stand-in, and the robot's key is "dev".
+// The league id is a stand-in, and the robot's key is "dev". This server signs for the predictions
+// it takes with a key of its own, made here from a made-up secret, and hands the website that
+// key in place of the real server's, so the two agree.
 
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -16,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { BASKETBALL, FOOTBALL, FOOTBALL_MARKETS, matchId, toHex } from "../../engine/src/index.js";
 import { createHandler } from "../src/http.js";
 import { createKickoff } from "../src/kickoff.js";
+import { createSigner } from "../src/signing.js";
 import { MemoryStore } from "../src/store.js";
 
 const PORT = Number(process.env.PORT ?? 8787);
@@ -23,7 +26,8 @@ const LEAGUE = process.env.KICKOFF_LEAGUE ?? "0000000000000000000000c424ad6fe8a4
 const WEB = fileURLToPath(new URL("../../web/", import.meta.url));
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8" };
 
-const kickoff = createKickoff({ store: new MemoryStore(), league: LEAGUE });
+const signer = createSigner("a made-up secret for trying things out, not a real one");
+const kickoff = createKickoff({ store: new MemoryStore(), league: LEAGUE, signer });
 const handle = createHandler({ kickoff, now: () => Math.floor(Date.now() / 1000), adminKey: process.env.KICKOFF_ADMIN_KEY ?? "dev" });
 
 if (process.argv.includes("--matches")) {
@@ -80,7 +84,9 @@ createServer(async (request, response) => {
     return;
   }
   try {
-    const file = await readFile(wanted);
+    let file = await readFile(wanted);
+    // The website checks signed notes against the real server's key. Here it is given this one's.
+    if (wanted === join(WEB, "config.js")) file = file.toString("utf8").replace(/^export const SERVER_KEY = .*;$/m, `export const SERVER_KEY = "${signer.publicKey}";`);
     response.writeHead(200, { "content-type": TYPES[extname(wanted)] ?? "application/octet-stream" });
     response.end(file);
   } catch {

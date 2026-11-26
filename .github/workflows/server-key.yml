@@ -1,0 +1,34 @@
+# Shows the public key Kickoff's server signs with.
+#
+# Each time the server takes a sealed prediction it signs a short note saying so, and the phone
+# keeps it as proof. The key it signs with is worked out from the server's own key. This prints
+# its public half, which is safe to show to anyone, so it can be written into the website
+# (SERVER_KEY in web/config.js). The server's key is never printed.
+name: Server's public key
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "server/src/signing.js"
+      - "server/bin/key.js"
+      - ".github/workflows/server-key.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  key:
+    name: Show the server's public key
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      KICKOFF_ADMIN_KEY: ${{ secrets.KICKOFF_ADMIN_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: The public key
+        run: node server/bin/key.js

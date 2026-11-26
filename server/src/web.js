@@ -7,11 +7,14 @@
 //   KV_REST_API_URL, KV_REST_API_TOKEN   the database (the names Vercel gives a Redis store)
 //   UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN   the same, under the database's own names
 //   KICKOFF_ADMIN_KEY                    the robot's key. Without it the robot's addresses are off.
+//                                        The key the server signs with is worked out from it too
+//                                        (signing.js), so without it nothing is signed.
 //   KICKOFF_LEAGUE                       Kickoff's id on X Layer. Until Kickoff is live, a stand-in.
 
 import { createHandler } from "./http.js";
 import { createKickoff } from "./kickoff.js";
 import { RedisStore } from "./redis-store.js";
+import { createSigner } from "./signing.js";
 
 /** The stand-in league id used until Kickoff has its own account on X Layer. */
 export const PREVIEW_LEAGUE = "0000000000000000000000c424ad6fe8a46a34fa9b0610959beaba8a2c6b6982";
@@ -88,7 +91,7 @@ export function fromEnv(env, { fetch = globalThis.fetch, log = console.error } =
   const token = env.KV_REST_API_TOKEN ?? env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return async () => json(503, { error: "Kickoff's database is not connected yet." });
   const store = new RedisStore({ url, token, fetch });
-  const kickoff = createKickoff({ store, league: env.KICKOFF_LEAGUE ?? PREVIEW_LEAGUE });
+  const kickoff = createKickoff({ store, league: env.KICKOFF_LEAGUE ?? PREVIEW_LEAGUE, signer: createSigner(env.KICKOFF_ADMIN_KEY || null) });
   const handle = createHandler({ kickoff, now: () => Math.floor(Date.now() / 1000), adminKey: env.KICKOFF_ADMIN_KEY || null });
   return createFetchHandler({ handle, log });
 }

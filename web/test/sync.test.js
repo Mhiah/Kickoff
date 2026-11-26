@@ -8,13 +8,14 @@ import { createDevice } from "../lib/device.js";
 import { createFixtures } from "../lib/fixtures.js";
 import { createStore, pickWords, seal } from "../lib/picks.js";
 import { createClient } from "../lib/server.js";
-import { RETRY_AFTER, standing, syncPicks } from "../lib/sync.js";
+import { RETRY_AFTER, UNSIGNED, standing, syncPicks } from "../lib/sync.js";
 import { league, pick } from "../screens.js";
 import { FakeStorage, NOW, noGroup } from "./helpers.js";
 
-import { FOOTBALL, BASKETBALL, matchId, parseOpenings, toHex } from "../../engine/src/index.js";
+import { FOOTBALL, BASKETBALL, isServerKey, matchId, parseOpenings, toHex, verifyTaken } from "../../engine/src/index.js";
 import { createHandler } from "../../server/src/http.js";
 import { CLOSES_BEFORE, SETTLE, createKickoff } from "../../server/src/kickoff.js";
+import { createSigner } from "../../server/src/signing.js";
 import { MemoryStore } from "../../server/src/store.js";
 
 const LEAGUE = "0000000000000000000000c424ad6fe8a46a34fa9b0610959beaba8a2c6b6982";
@@ -23,9 +24,12 @@ const KICKOFF = NOW + 24 * HOUR;
 const CLOSES = KICKOFF - CLOSES_BEFORE;
 
 /** Kickoff's server with two real matches on its list. `net.down = true` cuts the connection. */
-async function kickoffOnline({ withMatches = true } = {}) {
+async function kickoffOnline({ withMatches = true, signer = null } = {}) {
   const clock = { now: NOW };
-  const kickoff = createKickoff({ store: new MemoryStore(), league: LEAGUE });
+  // `signs.with` can be swapped mid-test, to stand for a server that stops or starts signing.
+  const signs = { with: signer };
+  const kept = new MemoryStore();
+  const kickoff = createKickoff({ store: kept, league: LEAGUE, signer: signer ? { publicKey: signer.publicKey, sign: (facts) => signs.with.sign(facts) } : null });
   const handle = createHandler({ kickoff, now: () => clock.now, adminKey: "robot" });
   const net = { down: false, sent: [] };
   const fetch = async (url, init = {}) => {
@@ -48,7 +52,7 @@ async function kickoffOnline({ withMatches = true } = {}) {
     }
     await kickoff.putFixtures({ fixtures });
   }
-  return { fetch, net, clock, kickoff, ids, football: ids.Arsenal, basketball: ids.Knicks, robotFreezes: (match) => kickoff.freeze({ now: clock.now, match }) };
+  return { fetch, net, clock, kickoff, kept, ids, signs, serverKey: signer?.publicKey ?? null, football: ids.Arsenal, basketball: ids.Knicks, robotFreezes: (match) => kickoff.freeze({ now: clock.now, match }) };
 }
 
 /** A phone. `at(time)` moves the clock, fetches the matches and carries every pick as far as it can go. */
@@ -60,6 +64,8 @@ async function phone(online, storage = new FakeStorage()) {
   const player = await device.player();
   const self = {
     storage, store, player, matches, client,
+    /** The key this phone checks the server's signed notes against, as the website's settings give it. */
+    serverKey: online.serverKey,
     async ctx() {
       const v = await matches.view(online.clock.now);
       return { now: online.clock.now, ...v, picks: store.all(player), lasting: store.lasting, editing: null, mine: noGroup(player) };
@@ -67,7 +73,7 @@ async function phone(online, storage = new FakeStorage()) {
     async carry() {
       await matches.refresh();
       const c = await self.ctx();
-      return c.real ? syncPicks({ store, client, player, league: c.league, fixtures: c.fixtures, now: c.now }) : false;
+      return c.real ? syncPicks({ store, client, player, league: c.league, fixtures: c.fixtures, now: c.now, serverKey: self.serverKey }) : false;
     },
     async seal(match, chosen) {
       const c = await self.ctx();
@@ -359,4 +365,175 @@ test("the robot's key written into the website is either not set yet or a real p
   const { ROBOT_KEY } = await import("../config.js");
   const { isEnvelopeKey } = await import("../engine/envelope.js");
   assert.ok(ROBOT_KEY === null || isEnvelopeKey(ROBOT_KEY), "ROBOT_KEY in web/config.js is not a key a copy can be locked to");
+});
+
+// ---- Kickoff's signed word that it took a prediction
+
+const SERVER = createSigner("the server's secret, long enough to use");
+const SOMEBODY = createSigner("somebody else's secret, just as long");
+
+test("the phone keeps Kickoff's signed note for each prediction it sends, whole, so anyone can check it", async () => {
+  const online = await kickoffOnline({ signer: SERVER });
+  const ada = await phone(online);
+  await ada.carry();
+  const sealed = await ada.seal(online.football, { home: 2, away: 1 });
+  await ada.carry();
+  assert.equal(await ada.stands(online.football), "sent");
+  const { taken } = ada.store.get(online.football);
+  assert.deepEqual(Object.keys(taken).sort(), ["closesAt", "fingerprint", "key", "league", "match", "player", "receivedAt", "sig"]);
+  assert.deepEqual({ ...taken, sig: null }, { league: LEAGUE, match: online.football, player: ada.player, fingerprint: sealed.fingerprint, receivedAt: NOW, closesAt: CLOSES, key: SERVER.publicKey, sig: null });
+  // It needs nothing else to be checked: not this phone, and not Kickoff.
+  assert.equal(await verifyTaken(taken), true);
+  // With the note in hand, the prediction is not sent again.
+  const before = online.net.sent.length;
+  await ada.carry();
+  assert.equal(online.net.sent.filter((x) => x.url === "/api/picks").length, online.net.sent.slice(0, before).filter((x) => x.url === "/api/picks").length);
+});
+
+test("a changed prediction gets its own note, and the earlier one is not passed off as covering it", async () => {
+  const online = await kickoffOnline({ signer: SERVER });
+  const ada = await phone(online);
+  await ada.carry();
+  const first = await ada.seal(online.football, { home: 2, away: 1 });
+  await ada.carry();
+  online.clock.now += 60;
+  const second = await ada.seal(online.football, { home: 1, away: 1 });
+  assert.equal(ada.store.get(online.football).taken, undefined, "a new prediction starts with no note");
+  await ada.carry();
+  const { taken } = ada.store.get(online.football);
+  assert.equal(taken.fingerprint, second.fingerprint);
+  assert.notEqual(taken.fingerprint, first.fingerprint);
+  assert.equal(await verifyTaken(taken), true);
+});
+
+test("CHEAT: a server that takes a prediction without signing for it is found out, and asked again", async () => {
+  const online = await kickoffOnline({ signer: SERVER });
+  const ada = await phone(online);
+  await ada.carry();
+  online.signs.with = { sign: async () => undefined }; // it answers, with no signature
+  await ada.seal(online.football, { home: 2, away: 1 });
+  await ada.carry();
+  const kept = ada.store.get(online.football);
+  assert.equal(kept.sent.fingerprint, kept.fingerprint, "Kickoff does hold it");
+  assert.equal(kept.taken, undefined);
+  assert.equal(await ada.stands(online.football), "problem");
+  assert.match(await ada.screen(online.football), /<div class="state bad">Problem<\/div><div class="small muted state-line">Kickoff has this prediction but did not sign for it\. It will be asked again\.</);
+  assert.equal(kept.problem, UNSIGNED);
+
+  // It is not asked again straight away, and is once a few minutes have passed.
+  const sends = () => online.net.sent.filter((x) => x.url === "/api/picks").length;
+  const once = sends();
+  online.clock.now += 60;
+  await ada.carry();
+  assert.equal(sends(), once);
+  online.signs.with = SERVER;
+  online.clock.now += RETRY_AFTER;
+  await ada.carry();
+  assert.equal(sends(), once + 1);
+  assert.equal(await ada.stands(online.football), "sent");
+  assert.equal(await verifyTaken(ada.store.get(online.football).taken), true);
+  assert.equal(ada.store.get(online.football).problem, undefined);
+});
+
+test("CHEAT: a note signed with any key but Kickoff's, or for other facts, is not kept", async () => {
+  const online = await kickoffOnline({ signer: SERVER });
+  const ada = await phone(online);
+  await ada.carry();
+  const tries = [
+    // somebody else's key
+    (facts) => SOMEBODY.sign(facts),
+    // Kickoff's key, but for another player, another prediction, or an earlier time
+    (facts) => SERVER.sign({ ...facts, player: "ab".repeat(32) }),
+    (facts) => SERVER.sign({ ...facts, fingerprint: "cd".repeat(32) }),
+    (facts) => SERVER.sign({ ...facts, receivedAt: facts.receivedAt - 1 }),
+    // nonsense
+    async () => "00".repeat(64),
+    async () => 7,
+  ];
+  for (const sign of tries) {
+    online.signs.with = { sign };
+    online.clock.now += RETRY_AFTER;
+    await ada.seal(online.football, { home: 2, away: 1 });
+    await ada.carry();
+    assert.equal(ada.store.get(online.football).taken, undefined);
+    assert.equal(ada.store.get(online.football).problem, UNSIGNED);
+  }
+});
+
+test("CHEAT: a note that gives the wrong closing time, or a time after predictions closed, is not kept", async () => {
+  const online = await kickoffOnline({ signer: SERVER });
+  const ada = await phone(online);
+  await ada.carry();
+  await ada.seal(online.football, { home: 2, away: 1 });
+  // The server truly signs, but says predictions close an hour later than they do.
+  const real = ada.client.sendPick;
+  ada.client.sendPick = async (sending) => {
+    const answer = await real(sending);
+    const closesAt = answer.closesAt + HOUR;
+    return { ...answer, closesAt, taken: { key: SERVER.publicKey, sig: await SERVER.sign({ league: LEAGUE, match: sending.match, player: ada.player, fingerprint: sending.fingerprint, receivedAt: answer.receivedAt, closesAt }) } };
+  };
+  await ada.carry();
+  assert.equal(ada.store.get(online.football).taken, undefined);
+  assert.equal(ada.store.get(online.football).problem, UNSIGNED);
+  // Or signs a time that is not before the close.
+  ada.client.sendPick = async (sending) => {
+    const answer = await real(sending);
+    const receivedAt = CLOSES;
+    return { ...answer, receivedAt, taken: { key: SERVER.publicKey, sig: await SERVER.sign({ league: LEAGUE, match: sending.match, player: ada.player, fingerprint: sending.fingerprint, receivedAt, closesAt: answer.closesAt }) } };
+  };
+  online.clock.now += RETRY_AFTER;
+  await ada.carry();
+  assert.equal(ada.store.get(online.football).taken, undefined);
+});
+
+test("CHEAT: left out of the locked bundle, the player now holds Kickoff's own signature that it took the prediction in time", async () => {
+  const online = await kickoffOnline({ signer: SERVER });
+  const ada = await phone(online);
+  const bola = await phone(online);
+  await ada.carry();
+  await bola.carry();
+  const sealed = await ada.seal(online.football, { home: 2, away: 1 });
+  await bola.seal(online.football, { home: 0, away: 0 });
+  await ada.carry();
+  await bola.carry();
+  // Kickoff drops Ada's prediction before bundling.
+  await online.kept.tableDelete(`sealed:${online.football}`, ada.player);
+  online.clock.now = CLOSES + SETTLE;
+  const bundle = await online.robotFreezes(online.football);
+  assert.deepEqual(bundle.entries.map((e) => e.player), [bola.player]);
+  await ada.carry();
+  await bola.carry();
+  assert.equal(await bola.stands(online.football), "locked");
+  assert.equal(await ada.stands(online.football), "problem");
+  assert.match(await ada.screen(online.football), /Kickoff left this prediction out of the locked bundle\./);
+
+  // What Ada holds: signed by Kickoff's key, for her prediction, taken before predictions closed.
+  const { taken } = ada.store.get(online.football);
+  assert.equal(await verifyTaken(taken), true);
+  assert.equal(taken.key, SERVER.publicKey);
+  assert.equal(taken.fingerprint, sealed.fingerprint);
+  assert.ok(taken.receivedAt < taken.closesAt);
+  // And the bundle that was locked does not hold it.
+  assert.ok(!bundle.entries.some((e) => e.fingerprint === taken.fingerprint));
+});
+
+test("a prediction sent before notes existed gets one the next time the phone is open, while predictions are open", async () => {
+  const online = await kickoffOnline({ signer: SERVER });
+  const ada = await phone(online);
+  ada.serverKey = null; // the website as it was: it asks for no note
+  await ada.carry();
+  await ada.seal(online.football, { home: 2, away: 1 });
+  await ada.carry();
+  assert.equal(ada.store.get(online.football).taken, undefined);
+  assert.equal(await ada.stands(online.football), "sent");
+  ada.serverKey = SERVER.publicKey; // the website now
+  online.clock.now += 60;
+  await ada.carry();
+  assert.equal(await verifyTaken(ada.store.get(online.football).taken), true);
+  assert.equal(await ada.stands(online.football), "sent");
+});
+
+test("the server's key written into the website is either not set yet or a real public key", async () => {
+  const { SERVER_KEY } = await import("../config.js");
+  assert.ok(SERVER_KEY === null || isServerKey(SERVER_KEY), "SERVER_KEY in web/config.js is not a key a note can be checked against");
 });

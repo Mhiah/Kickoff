@@ -9,6 +9,13 @@ export const SERVER = "";
 // copy and could only be opened by the phone that made them.
 export const ROBOT_KEY = "041c33b97024442f75b85016b7f6eed75964433da6f325076b9a7399609df2024fd350e04b8d9d74bec7fc50947c6052eba9a5beeb3472e4be19a2d4fa82685374";
 
+// The public key of Kickoff's server. Each time the server takes a sealed prediction it signs a
+// short note saying so, and the phone checks that note against this key and keeps it. If the
+// prediction is later missing from what was locked on X Layer, the note is the player's proof that
+// Kickoff was given it in time. It is a public key: safe to show to anyone. The "Server's public
+// key" action prints it. If it were null, notes would not be asked for or checked.
+export const SERVER_KEY = null;
+
 // Where Kickoff is on X Layer. These are public: anyone can look them up.
 //   processor  the TapeOut processor Kickoff's circuits are published on
 //   circuits   the number of each of Kickoff's circuits on that processor. The league's own

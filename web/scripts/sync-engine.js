@@ -12,8 +12,8 @@
 import { copyFile, mkdir } from "node:fs/promises";
 
 export const ENGINE_FILES = [
-  // sealing a pick, a device's key, and checking a receipt
-  "bytes.js", "picks.js", "seal.js", "envelope.js", "match.js", "identity.js", "bundle.js",
+  // sealing a pick, a device's key, checking a receipt, and checking the server's signed note
+  "bytes.js", "picks.js", "seal.js", "envelope.js", "match.js", "identity.js", "bundle.js", "taken.js",
   // reading Kickoff's league straight from X Layer, and working out points from what is there
   "abi.js", "keccak.js", "messages.js", "reader.js", "open.js", "openings.js", "circuit.js", "score.js", "table.js", "league.js", "xlayer.js", "published.js",
 ];

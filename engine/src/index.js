@@ -4,6 +4,7 @@ export * from "./picks.js";
 export * from "./seal.js";
 export * from "./envelope.js";
 export * from "./bundle.js";
+export * from "./taken.js";
 export * from "./open.js";
 export * from "./circuit.js";
 export * from "./score.js";

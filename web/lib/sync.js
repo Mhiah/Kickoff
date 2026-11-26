@@ -8,11 +8,18 @@
 //      does not have to come back. If this device does happen to be open, it hands its own over
 //      too, which does no harm and covers a pick that was sent without a copy.
 //
+// With step 1, Kickoff's server sends back a signed note saying it took the pick. The phone checks
+// the signature and keeps the note. If step 2 then finds the pick was left out of the bundle, the
+// note is the proof that Kickoff was given it in time.
+//
 // Each step is tried again whenever the page is opened or comes back online, until it is done.
 // What happened is written on the pick itself, so the screens can say exactly where it stands.
 //
 //   sent      { fingerprint, at, copy }   Kickoff has this fingerprint; `copy` is true if the locked
 //                                   copy went with it
+//   taken     { league, match, player, fingerprint, receivedAt, closesAt, key, sig }
+//                                   Kickoff's signed note that it took this pick, whole, so it
+//                                   can be checked by anyone with nothing else to hand
 //   waiting   true                  Kickoff could not be reached; it will be tried again
 //   receipt   { index, count, path, root }
 //   opened    { at }
@@ -21,10 +28,13 @@
 import { verifyReceipt } from "../engine/bundle.js";
 import { isEnvelopeKey, sealEnvelope } from "../engine/envelope.js";
 import { fromHex } from "../engine/bytes.js";
+import { isServerKey, verifyTaken } from "../engine/taken.js";
 import { closesAt } from "./time.js";
 
 /** How long to wait before asking again after the server has refused a step, in seconds. */
 export const RETRY_AFTER = 5 * 60;
+/** What a pick says while Kickoff holds it but has not properly signed for it. */
+export const UNSIGNED = "Kickoff has this prediction but did not sign for it. It will be asked again.";
 
 /**
  * @param store     from createStore()
@@ -35,10 +45,13 @@ export const RETRY_AFTER = 5 * 60;
  * @param now       the time in seconds
  * @param robotKey  the public key of Kickoff's robot, which copies are locked to. Without it,
  *                  picks are sent without a copy and only this device can open them
+ * @param serverKey the public key of Kickoff's server, which its signed notes are checked
+ *                  against. Without it, notes are not asked for
  * @returns true if anything kept on the device changed
  */
-export async function syncPicks({ store, client, player, league, fixtures, now, robotKey = null }) {
+export async function syncPicks({ store, client, player, league, fixtures, now, robotKey = null, serverKey = null }) {
   const copies = isEnvelopeKey(robotKey);
+  const notes = isServerKey(serverKey);
   let changed = false;
   for (const [match, kept] of Object.entries(store.all(player))) {
     const fixture = fixtures[match];
@@ -49,16 +62,30 @@ export async function syncPicks({ store, client, player, league, fixtures, now, 
     // After the server has refused a step, it is not asked again straight away.
     if (entry.problem && entry.triedAt && now >= entry.triedAt && now - entry.triedAt < RETRY_AFTER) continue;
 
+    const hasNote = (e) => e.taken?.fingerprint === e.fingerprint;
+
     // 1. Send it, while picks are open. A pick that went earlier without its locked copy is sent
-    // again with one, so that it too opens by itself.
-    if ((!isSent(entry) || (copies && !entry.sent.copy)) && now < closes) {
+    // again with one, so that it too opens by itself. So is one Kickoff has not signed for.
+    if ((!isSent(entry) || (copies && !entry.sent.copy) || (notes && !hasNote(entry))) && now < closes) {
       try {
         const envelope = copies
           ? await sealEnvelope({ to: robotKey, league, match, player, fingerprint: entry.fingerprint, pickByte: entry.pickByte, salt: entry.salt })
           : null;
         const answer = await client.sendPick({ match, fingerprint: entry.fingerprint, envelope });
-        const { fallback, waiting, problem, triedAt, ...rest } = entry;
-        entry = { ...rest, sent: { fingerprint: entry.fingerprint, at: answer.receivedAt ?? now, ...(envelope ? { copy: true } : {}) } };
+        // The server's signed note. It has to be signed by Kickoff's own key, for exactly this
+        // pick, and say what this phone knows to be true: taken before picks close, and that they
+        // close when they do.
+        const note = { league, match, player, fingerprint: entry.fingerprint, receivedAt: answer.receivedAt, closesAt: answer.closesAt };
+        const signed = notes && note.closesAt === closes && note.receivedAt < closes && (await verifyTaken({ key: serverKey, sig: answer.taken?.sig, ...note }));
+        const { fallback, waiting, problem, triedAt, taken, ...rest } = entry;
+        entry = {
+          ...rest,
+          sent: { fingerprint: entry.fingerprint, at: answer.receivedAt ?? now, ...(envelope ? { copy: true } : {}) },
+          ...(signed ? { taken: { ...note, key: serverKey, sig: answer.taken.sig } } : {}),
+        };
+        // Kickoff holds the pick either way. Without its signature the player has only Kickoff's
+        // word for that, so it is said, and asked for again.
+        if (notes && !signed) Object.assign(entry, { problem: UNSIGNED, triedAt: now });
       } catch (error) {
         if (error.unreachable) entry.waiting = true;
         else Object.assign(entry, { problem: error.message, triedAt: now });

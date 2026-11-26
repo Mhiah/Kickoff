@@ -96,8 +96,10 @@ function codeFor(name, digits) {
  * @param store   somewhere to keep things (see store.js)
  * @param league  Kickoff's id on X Layer, as hex
  * @param random  a function giving a whole number from 0 up to (not including) its argument
+ * @param signer  from createSigner() in signing.js: signs that a sealed prediction was taken.
+ *                Without one, predictions are taken as before and nothing is signed.
  */
-export function createKickoff({ store, league, random = (n) => Math.floor(Math.random() * n), brandMax = BRAND_MAX }) {
+export function createKickoff({ store, league, random = (n) => Math.floor(Math.random() * n), brandMax = BRAND_MAX, signer = null }) {
   if (!isId(league)) throw new Error("the league id must be 64 hex digits");
 
   const fixture = async (match) => {
@@ -635,7 +637,17 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       // for this match is replaced by this one, just as a device replaces its own.
       const link = await store.get(`wallet-of:${player}`);
       if (link) for (const device of await devicesOf(link.wallet)) if (device !== player) await store.tableDelete(`sealed:${match}`, device);
-      return { match, fingerprint, receivedAt: now, closesAt: f.kickoff - CLOSES_BEFORE };
+      const closesAt = f.kickoff - CLOSES_BEFORE;
+      // The server's signed word that it took this one (see engine/src/taken.js). The phone keeps
+      // it: if this prediction is later missing from the locked bundle, it is the proof that
+      // Kickoff was given it in time.
+      const taken = signer ? { key: signer.publicKey, sig: await signer.sign({ league, match, player, fingerprint, receivedAt: now, closesAt }) } : null;
+      return { match, fingerprint, receivedAt: now, closesAt, ...(taken ? { taken } : {}) };
+    },
+
+    /** The public key the server signs with, or null if it signs nothing. Safe to show to anyone. */
+    signingKey() {
+      return signer?.publicKey ?? null;
     },
 
     /** What a player has sealed for a match, as the server holds it. */

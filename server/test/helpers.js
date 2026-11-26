@@ -17,10 +17,10 @@ export async function device() {
 }
 
 /** A server with a clock the test can move. */
-export function server({ adminKey = ADMIN_KEY, store = new MemoryStore(), brandMax } = {}) {
+export function server({ adminKey = ADMIN_KEY, store = new MemoryStore(), brandMax, signer = null } = {}) {
   const clock = { now: START };
   let n = 0;
-  const kickoff = createKickoff({ store, league: LEAGUE, random: () => 4821 + n++, ...(brandMax ? { brandMax } : {}) });
+  const kickoff = createKickoff({ store, league: LEAGUE, random: () => 4821 + n++, signer, ...(brandMax ? { brandMax } : {}) });
   const handle = createHandler({ kickoff, now: () => clock.now, adminKey });
   return {
     store, clock, kickoff, handle,
