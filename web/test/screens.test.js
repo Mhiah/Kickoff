@@ -133,8 +133,14 @@ test("each typeface file is small enough to go on chain in one piece", () => {
   }
 });
 
-test("until Kickoff is live, every screen with made-up data says so, and the group screen does not", () => {
-  for (const screen of [home(), league(null, ctx), recordScreen(), checkScreen(), matchScreen(), pick("ars-che", ctx)]) {
+test("the home page says its card is an example, and does not say Kickoff is not live", () => {
+  const { html } = home();
+  assert.match(html, /<p class="sample">The prediction card at the top is an example\.<\/p>/);
+  assert.ok(!/Nothing here is live yet|made-up/.test(html));
+});
+
+test("every screen showing made-up matches says so, and the group screen does not", () => {
+  for (const screen of [league(null, ctx), recordScreen(), checkScreen(), matchScreen(), pick("ars-che", ctx)]) {
     assert.match(screen.html, /Nothing here is live yet/);
   }
   // The group screen is real now, so it must not claim to be made up, or show the made-up group.

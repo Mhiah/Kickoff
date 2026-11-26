@@ -16,7 +16,7 @@
 import { COMPETITIONS, check, group, match, record, scores, voided, week } from "./data/sample.js";
 import { ON_CHAIN } from "./config.js";
 import { sits } from "./lib/groups.js";
-import { MARK, SAMPLE_NOTE, TOGGLE, comp, esc, stamp, titlebar } from "./lib/html.js";
+import { HOME_NOTE, MARK, SAMPLE_NOTE, TOGGLE, comp, esc, stamp, titlebar } from "./lib/html.js";
 import { GOAL_GOAL, RESULT, SCORE, decodePick } from "./engine/picks.js";
 import { BAND_KEYS, MARKETS, bandWords, pickWords, pointsFor } from "./lib/picks.js";
 import { standing } from "./lib/sync.js";
@@ -93,7 +93,7 @@ export function home() {
     <a class="btn quiet" href="#/check">See how to check it</a>
   </section>
 </div>
-${SAMPLE_NOTE}`;
+${HOME_NOTE}`;
   return { html, title: "Kickoff", public: true, wide: true };
 }
 
