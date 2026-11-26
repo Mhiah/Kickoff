@@ -28,7 +28,7 @@ It is built to know as little as it can, and to be able to cheat as little as it
 | Someone sends a pick in my name | Everything your device sends is signed with a key that never leaves it. The server refuses anything not signed by the key your player id was made from. |
 | The server changes my pick, or adds one after kickoff | The bundle is frozen ten minutes before the start and its fingerprint goes on X Layer. A changed bundle would not match it. |
 | I change my pick after seeing the score | To open a pick you must give the pick and the secret that produce exactly the fingerprint that was locked. |
-| The server leaves my pick out | It could. Your receipt is the proof yours was included, and you can fetch it as soon as picks are locked. |
+| The server leaves my pick out | It could, but not quietly. It signs a note for every sealed pick it takes, and your phone keeps it: Kickoff's own signature that yours was handed in on time. Your receipt is the proof yours was included, and you can fetch it as soon as picks are locked. |
 
 ## How a device proves it is itself
 
@@ -105,6 +105,7 @@ Anyone may ask:
 | Address | What comes back |
 | --- | --- |
 | `GET /api/fixtures` | Every match on Kickoff's list |
+| `GET /api/key` | The public key the server signs with. Safe to show to anyone |
 | `GET /api/groups/<code>` | A group and its members |
 | `GET /api/matches/<match>` | How many picks are in. After the start: who sealed one, and the picks that have been opened |
 | `GET /api/matches/<match>/receipt/<player>` | A player's proof their sealed pick was locked |
@@ -186,7 +187,7 @@ The host's settings decide everything. None of them is in the code:
 | Setting | What it is |
 | --- | --- |
 | `KV_REST_API_URL` and `KV_REST_API_TOKEN` | The database's address and token. Vercel adds these itself when a database is connected. |
-| `KICKOFF_ADMIN_KEY` | The robot's key. If it is not set, the robot's addresses are switched off. |
+| `KICKOFF_ADMIN_KEY` | The robot's key. If it is not set, the robot's addresses are switched off. The key the server signs with is worked out from it, so without it nothing is signed. |
 | `KICKOFF_LEAGUE` | Kickoff's id on X Layer. Until Kickoff is live there, a stand-in is used. |
 
 Every record's name starts with `kickoff:`, so the database can be shared with another project
@@ -209,11 +210,13 @@ is not allowed to send from another site.
 | File | What it is |
 | --- | --- |
 | `src/kickoff.js` | The rules: groups, sealed picks, freezing, receipts, opening |
+| `src/signing.js` | The key the server signs with, worked out from the key it already holds |
 | `src/http.js` | The addresses, and who may use each |
 | `src/store.js` | Keeping things in memory, for the tests and your own computer |
 | `src/redis-store.js` | Keeping things in the real database |
 | `src/web.js` | The server as a web host runs it, built from the host's settings |
 | `bin/dev.js` | The server on your own computer |
+| `bin/key.js` | Prints the public key the server signs with |
 | `test/` | The tests |
 
 ## Honest limits
@@ -223,10 +226,11 @@ is not allowed to send from another site.
 - **The database is shared** with another of the owner's projects, on a free plan. Kickoff's
   records are kept apart by their names.
 - **The website only uses it for groups so far.** A sealed pick still stays on the device.
-- **A receipt is not signed.** Kickoff could deny having issued one. Signing receipts is still to do.
 - **The server could leave a pick out of a bundle.** A player can check for their receipt as soon as
-  picks are locked, but by then it is too late to add the pick. This is the one thing a player has
-  to trust the server for, and it is said plainly here.
+  picks are locked, but by then it is too late to add the pick. What the player does hold is the
+  note the server signed when it took the pick, so Kickoff cannot deny having been given it. The
+  key it signs with is worked out from `KICKOFF_ADMIN_KEY`: if that is ever changed, `SERVER_KEY`
+  in `web/config.js` has to be changed to match, and the "Server's public key" action prints it.
 - **The server's table is not yet checked against X Layer on the website.** The points come from
   the published circuits, but the Check screen that rebuilds the table from X Layer is still to do.
 - **The table of everyone is worked out again whenever anything changes.** That is fine for

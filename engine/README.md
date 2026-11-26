@@ -292,6 +292,7 @@ npm test
 | `src/picks.js` | What a pick is for each sport, and how it is written as one byte |
 | `src/seal.js` | Sealing a pick: the fingerprint and the salt |
 | `src/bundle.js` | The bundle, its root, receipts, and the value that goes on chain |
+| `src/taken.js` | The server's signed note that it took a sealed pick, and checking one |
 | `src/open.js` | Opening a pick and deciding whether it counts |
 | `src/circuit.js` | Reading a TapeOut circuit and working out its answer, in JavaScript |
 | `src/score.js` | Scoring an opened pick with the circuits, and turning a real score into a result |
@@ -308,6 +309,7 @@ npm test
 | `src/bytes.js` | Small helpers for raw bytes, and SHA-256 from the platform |
 | `src/index.js` | Everything, in one place to import from |
 | `bin/table.js` | The command that prints a league's table from X Layer |
+| `bin/taken.js` | The command that checks a signed note |
 | `scripts/season-on-chain.js` | The season rehearsal on a private copy of X Layer |
 | `scripts/vectors.js` | Plays out a small fixed league and writes down every value, for the chain rehearsal to check |
 | `vectors/league.json` | Those values. Made by the script, not by hand. |

@@ -170,6 +170,9 @@ Nothing below needs a wallet, an account or Kickoff's permission.
 3. **The scoring rules.** Circuits 6, 7 and 8 on the processor are the files in
    [`circuits/out/`](circuits/out/). `python3 circuits/check.py` runs each one on every possible
    prediction and result.
+4. **A signed note.** `node engine/bin/taken.js note.json --key <SERVER_KEY>` says whether Kickoff's
+   server signed a note that it took a sealed prediction. `SERVER_KEY` is in
+   [`web/config.js`](web/config.js), and the server gives the same key at `/api/key`.
 
 ## TapeOut, plainly
 
@@ -203,10 +206,10 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | Football's three predictions | The three new circuits (result, goal goal, exact score) on every possible case with both evaluators, and through the engine, the server and the website's own tests | 67,072 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)). Published on X Layer as circuits 9, 10 and 11 for 0.005905 OKB, against 0.005880 in fees that the free look gave |
 | The first three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
 | The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
-| The prediction engine | 160 tests. Twenty-three try to cheat, and eight have an X Layer node lie about what is on chain, three of them in ways only a second node can catch | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
-| The website | 92 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
+| The prediction engine | 167 tests. Twenty-six try to cheat, and eight have an X Layer node lie about what is on chain, three of them in ways only a second node can catch | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
+| The website | 100 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 23 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
-| The server | 98 tests. They take a name somebody has, link a wallet that did not sign, send predictions in someone else's name, play old requests back, open a different prediction from the one sealed, and use the robot's addresses without its key. They also check that a match gives points only once it was locked on X Layer | All pass; every one is refused ([details](server/README.md)) |
+| The server | 104 tests. They take a name somebody has, link a wallet that did not sign, send predictions in someone else's name, play old requests back, open a different prediction from the one sealed, and use the robot's addresses without its key. They also check that a match gives points only once it was locked on X Layer, and that the server signs for every sealed prediction it takes | All pass; every one is refused ([details](server/README.md)) |
 | The robot | 79 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, a hundred players on one match, a lock it slept through, its notes when it needs a person, putting the website on X Layer, and going live without paying for anything twice | All pass ([details](robot/README.md)) |
 | The robot on a copy of X Layer | The robot's own code announcing, locking, recording results and publishing opened predictions through TapeOut's real contracts, signing with `cast`, then the leaderboard rebuilt from the chain alone | 11 of 11 checks passed on the first run ([rehearsal 6](docs/REHEARSAL-RESULTS.md)). It has grown since. The latest run has a hundred players who seal a prediction and never come back: the robot opens all hundred after kickoff and publishes them in 4 pieces. It also plays a football match as its three predictions, replaced on the list by the robot's own rules, locked, opened and scored, and read back from the chain as 5, 1 and 0 points. 28 of 28 checks pass |
 | What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
@@ -224,11 +227,11 @@ results.
 | 1 | Project setup: this README, the folders, the licence | Done |
 | 2 | The scoring circuits, and the checker that tests every possible case | Done, and published on X Layer as circuits 6, 7 and 8, with football's three predictions as circuits 9, 10 and 11. |
 | 3 | Proving the TapeOut parts on a private copy of X Layer | Done. Rehearsals 1 to 4 and the fees report, 29 tests against the real contracts. |
-| 4 | The prediction engine and the leaderboard builder | Done, 160 tests, with a fifth rehearsal that plays a season on chain and reads it back. The reader asks two X Layer nodes, run by different people, and both have to agree. |
+| 4 | The prediction engine and the leaderboard builder | Done, 167 tests, with a fifth rehearsal that plays a season on chain and reads it back. The reader asks two X Layer nodes, run by different people, and both have to agree. |
 | 5 | The website's screens | Done, with real matches and real numbers. |
 | 6 | Sealing a prediction for real, on the player's own device | Done. |
 | 7 | The fixtures feed | Done, and running live against the real feeds. |
-| 8 | Kickoff's server: groups, names, and sealed predictions until they are locked | Done, 98 tests, and online with a real database. Groups of up to 30, one name for each player, signed requests, and points only for matches that were locked on X Layer. |
+| 8 | Kickoff's server: groups, names, and sealed predictions until they are locked | Done, 104 tests, and online with a real database. Groups of up to 30, one name for each player, signed requests, a signed note for every sealed prediction it takes, and points only for matches that were locked on X Layer. |
 | 9 | The robot: keeps the list of matches, locks predictions before kickoff and posts results on X Layer | Done and running live, 79 tests. After kickoff it opens every prediction from its locked copy, so no player has to come back. It publishes a match's opened predictions in as many pieces as they need, tells the server how each lock went, and opens a note when its wallet runs low or a lock was missed. |
 | 10 | Joining it up: real fixtures and real leaderboards on the website | Done. The League and My record screens show real numbers: a leaderboard of everyone who plays and one of your group, both numbered from 1, with every point worked out by the scoring circuits. The Check screen is read from X Layer by the player's own browser: it shows when each of your predictions was locked, works out the group's points from what is on chain, puts them beside Kickoff's own, and says whether the order is the same. |
 | 11 | Going live on X Layer: the circuits and Kickoff's account | Done on 24 November 2026. The switch was rehearsed on a private copy first: a look that says the cost and sends nothing, and a go that needs the words GO LIVE. |
@@ -336,6 +339,11 @@ League, Champions League and NBA matches to predict.
 Ten minutes before a match starts, every sealed prediction for it is gathered into a **bundle**, and one
 fingerprint covering the whole bundle is written to Kickoff's mailbox on X Layer. X Layer stamps
 the time. Each player gets a **receipt** proving their sealed prediction is in the bundle.
+
+A player whose prediction was left out would have no receipt. So from the moment a phone hands a
+sealed prediction in, it also holds a **signed note** from Kickoff's server: Kickoff's own
+signature that it took that prediction, from that player, for that match, before predictions
+closed. The phone checks the signature and keeps the note.
 
 From then on nothing can be changed: a different prediction would not match its fingerprint, and a
 bundle written after kickoff is stamped late and never counts.
@@ -462,9 +470,14 @@ PUBLISH SITE, and a check that reads every file back).
   prediction does. It is published on X Layer with each match's opened predictions, where anyone can read it.
 - **Sealed predictions pass through Kickoff's server.** A player does not need a wallet, so the server gathers
   the fingerprints and Kickoff locks them. The server cannot read a prediction before kickoff and cannot
-  change one or add one afterwards, but it could leave one out. Each player's receipt is the proof
-  their prediction was included. The receipt is not signed yet, so Kickoff could deny having issued it.
-  Signing receipts is still to do.
+  change one or add one afterwards, but it could leave one out. It cannot do that quietly: the
+  server signs a note for every sealed prediction it takes, the phone checks the signature and
+  keeps the note, and a player left out of a bundle holds Kickoff's own signature that the
+  prediction was handed in on time. Three things this does not do yet. The note is kept in the
+  browser's storage, and there is no button to copy it out. A player who changed their prediction
+  holds a truly signed note for the earlier one as well, and Kickoff's only answer to that is the
+  bundle, which holds the later one. And the key the server signs with is vouched for by this
+  repository and the website, not yet announced from Kickoff's account on X Layer.
 - **Kickoff's robot could read a prediction early, and you are trusting it not to.** So that nobody
   has to come back after a match, each prediction travels with a copy locked to the robot's key. The
   server refuses to hand those copies over before kickoff, and the server and the robot's key are

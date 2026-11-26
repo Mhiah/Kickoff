@@ -13,8 +13,9 @@ export const ROBOT_KEY = "041c33b97024442f75b85016b7f6eed75964433da6f325076b9a73
 // short note saying so, and the phone checks that note against this key and keeps it. If the
 // prediction is later missing from what was locked on X Layer, the note is the player's proof that
 // Kickoff was given it in time. It is a public key: safe to show to anyone. The "Server's public
-// key" action prints it. If it were null, notes would not be asked for or checked.
-export const SERVER_KEY = null;
+// key" action prints it, and the server gives the same key at /api/key. If it were null, notes would
+// not be asked for or checked.
+export const SERVER_KEY = "042e1a588bfc4ce21784e8df3f822279f426f553104fe318c82fab6033f2496be088728c04f751c9e935b6f2ad367f79eab0ca40bfba9c9da862af3b578456ca80";
 
 // Where Kickoff is on X Layer. These are public: anyone can look them up.
 //   processor  the TapeOut processor Kickoff's circuits are published on

@@ -143,7 +143,8 @@ sent before kickoff, a changed pick is the one that gets locked, an offline phon
 so, a pick that never got through is marked as not counting, and if a changed pick never gets
 through, the earlier one that did is kept so it can still be opened. Three of them have the
 server cheat: it leaves a pick out, or hands back a receipt that does not prove the pick. The
-phone notices each time and says so. A match is only shown if the phone works out the same id
+phone notices each time and says so. Four more have it take a pick without properly signing for
+it, and one leaves a pick out after signing: the phone is left holding Kickoff's signature. A match is only shown if the phone works out the same id
 for it that the server gave.
 
 For picks, they confirm the fingerprint is exactly the one the engine works out from the same

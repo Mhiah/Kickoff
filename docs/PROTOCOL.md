@@ -181,6 +181,8 @@ Anyone who does this gets the same table. The rules of the game are in [RULES.md
   What a node says the mailbox and the site store hold is read from one node and asked for again
   from a second, run by somebody else, at the same block, and they have to agree, as TAP-10 says.
   Two nodes wrong in the same way would still pass.
-- **Receipts are not signed by the league yet.** A player dropped from a bundle can show their
-  receipt is for a different bundle from the one on chain, but the league could deny having issued
-  it.
+- **A league signs for each sealed pick it takes, with a key that is not on chain.** Kickoff's
+  server signs a short note every time it takes one (`engine/src/taken.js`), so a player dropped
+  from a bundle holds the league's own signature that the pick was handed in before picks closed.
+  The key is the server's, published in the repository and the website, not yet announced from the
+  league's account. A player who replaced a pick holds a signed note for the earlier one as well.
