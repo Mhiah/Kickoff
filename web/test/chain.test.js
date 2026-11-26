@@ -191,3 +191,57 @@ test("My record is each prediction, what you said, its stage and its points, and
   assert.match(html, /<div class="state ">Entered<\/div>/);
   assert.match(recordScreen(undefined, ctxWith(null)).html, /No predictions yet\./);
 });
+
+// ---- asking more than one node
+
+/** The same honest season held by two nodes, as two honest nodes of one chain would hold it. */
+async function twoNodes() {
+  const { inbox, files } = await honestSeason();
+  const site = Object.fromEntries(Object.entries(files).map(([match, file]) => [openingsPath(fromHex(match)), file]));
+  return [0, 1].map(() => new FakeNode({ league: LEAGUE, messages: inbox.messages, files: site }));
+}
+
+test("the browser asks two X Layer nodes, and the Check screen reads as it always has", async () => {
+  const [a, b] = await twoNodes();
+  const chain = createChain({ store: createStore(new FakeStorage()), nodes: [a.ask, b.ask], now: () => NOW });
+  await chain.refresh({ league, players: [ada, bola, chidi] });
+  assert.deepEqual(chain.view(league).nodes, { asked: 2, agreed: 2, down: [] });
+  const html = checkScreen(undefined, ctxWith(chain.view(league))).html;
+  assert.match(html, /Read at \d\d:\d\d, block [\d,]+\. 3 matches locked\./);
+  assert.ok(!/nodes?\b/.test(html.replace(/<[^>]+>/g, " ")), "how many nodes were asked is not put on the screen");
+});
+
+test("if the second node does not answer, the record is still read from the first", async () => {
+  const [a, b] = await twoNodes();
+  b.failOn = "eth_blockNumber";
+  const chain = createChain({ store: createStore(new FakeStorage()), nodes: [a.ask, b.ask], now: () => NOW });
+  await chain.refresh({ league, players: [ada] });
+  assert.equal(chain.unreachable, false);
+  assert.equal(chain.view(league).points[ada].points, 7);
+  assert.deepEqual(chain.view(league).nodes, { asked: 2, agreed: 1, down: ["node 2"] });
+});
+
+test("if two nodes disagree, nothing new is taken from either", async () => {
+  const [a, b] = await twoNodes();
+  const chain = createChain({ store: createStore(new FakeStorage()), nodes: [a.ask, b.ask], now: () => NOW });
+  await chain.refresh({ league, players: [ada] });
+  const before = JSON.stringify(chain.view(league));
+
+  a.entries.pop(); // one node now hides the last thing the league said
+  assert.equal(await chain.refresh({ league, players: [ada] }), false);
+  assert.deepEqual(chain.disagree, ["node 1", "node 2"]);
+  assert.equal(chain.unreachable, true, "the screen treats it as a read that did not work");
+  assert.equal(JSON.stringify(chain.view(league)), before, "what was read while they agreed is kept as it was");
+
+  // A phone that has never read the record, and meets two nodes that disagree, shows nothing at all.
+  const fresh = createChain({ store: createStore(new FakeStorage()), nodes: [a.ask, b.ask], now: () => NOW });
+  await fresh.refresh({ league, players: [ada] });
+  assert.equal(fresh.view(league), null);
+  assert.equal(fresh.unreachable, true);
+
+  // Once they agree again, reading carries on.
+  b.entries.pop();
+  await chain.refresh({ league, players: [ada] });
+  assert.equal(chain.disagree, null);
+  assert.equal(chain.unreachable, false);
+});

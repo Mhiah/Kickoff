@@ -177,9 +177,10 @@ Anyone who does this gets the same table. The rules of the game are in [RULES.md
   waiting for the league.
 - **Results are entered by the league.** They are checked for being possible, not for being true.
   A wrong result is visible to everyone, and so is every challenge to it.
-- **Kickoff's fetcher asks one node.** Every message is checked against the mailbox's fingerprint,
-  but the node is believed about what the mailbox stores. TAP-10 says to ask several independent
-  nodes and require them to agree. That is still to do.
+- **Kickoff's fetcher asks two nodes.** Every message is checked against the mailbox's fingerprint.
+  What a node says the mailbox and the site store hold is read from one node and asked for again
+  from a second, run by somebody else, at the same block, and they have to agree, as TAP-10 says.
+  Two nodes wrong in the same way would still pass.
 - **Receipts are not signed by the league yet.** A player dropped from a bundle can show their
   receipt is for a different bundle from the one on chain, but the league could deny having issued
   it.

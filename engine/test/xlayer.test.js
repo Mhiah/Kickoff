@@ -287,6 +287,92 @@ test("the same answers come back when the node is asked over the web", async () 
   }
 });
 
+// ---- asking more than one node
+
+const tableFrom = (...nodes) => tableFromXLayer({ nodes: nodes.map((n) => n.ask), league: LEAGUE, circuits: CIRCUITS });
+/** The same honest season, held by several nodes: what honest nodes of one chain are. */
+async function sameSeason(count) {
+  const { inbox, files } = await honestSeason();
+  const site = Object.fromEntries(Object.entries(files).map(([match, file]) => [openingsPath(fromHex(match)), file]));
+  return Array.from({ length: count }, () => ({ node: new FakeNode({ league: LEAGUE, messages: inbox.messages, files: site }), site }));
+}
+
+test("two nodes that agree: the table is built, and it says both were asked", async () => {
+  const [a, b] = await sameSeason(2);
+  const got = await tableFrom(a.node, b.node);
+  assert.deepEqual(lines(got.table), ["1 ada 7", "2 bola 4", "3 chidi 1"]);
+  assert.deepEqual(got.nodes, { asked: 2, agreed: 2, down: [] });
+  // The second node is only asked what cannot prove itself: what the contracts hold. Not the messages again.
+  assert.deepEqual([...new Set(b.node.asked)].sort(), ["eth_blockNumber", "eth_call"]);
+  assert.equal(b.node.asked.filter((m) => m === "eth_call").length, a.node.asked.filter((m) => m === "eth_call").length);
+  // One node alone still works, and says it was not checked against another.
+  assert.deepEqual((await table(a.node)).nodes, { asked: 1, agreed: 1, down: [] });
+});
+
+test("nodes at different heights are read at a block every one of them has", async () => {
+  const [a, b] = await sameSeason(2);
+  a.node.head += 40; // the first node is well ahead of the second
+  const got = await tableFrom(a.node, b.node);
+  assert.equal(got.block, b.node.head - 3);
+});
+
+test("LIE: a node that hides the newest message is consistent with itself, and is caught by the other node", async () => {
+  const [a, b] = await sameSeason(2);
+  a.node.entries.pop(); // the last thing the league said: a result, perhaps, or a dispute
+  // Alone, nobody could tell: the inbox it gives is whole and every message matches its fingerprint.
+  await assert.doesNotReject(table(a.node));
+  await assert.rejects(tableFrom(a.node, b.node), /two X Layer nodes gave different answers about the record at block \d+ \(node 1 and node 2\), so no table is built/);
+  // It makes no difference which of them is asked first.
+  await assert.rejects(tableFrom(b.node, a.node), /different answers/);
+});
+
+test("LIE: a node that changes when a message was sent is caught", async () => {
+  const [a, b] = await sameSeason(2);
+  b.node.entries[1] = { ...b.node.entries[1], timestamp: b.node.entries[1].timestamp + 3600 }; // a lock, made to look late
+  await assert.rejects(tableFrom(a.node, b.node), /different answers/);
+});
+
+test("LIE: a node that swaps a file of opened picks, fingerprint and all, is caught", async () => {
+  const [a, b] = await sameSeason(2);
+  const path = Object.keys(a.site)[0];
+  const forged = text(JSON.stringify({ ...JSON.parse(a.site[path]), openings: [] })); // the same match, with nobody's pick opened
+  a.node.files[path] = { bytes: forged, declared: await crypto.subtle.digest("SHA-256", forged).then((d) => new Uint8Array(d)), pieces: 1 };
+  await assert.doesNotReject(table(a.node), "alone, the swapped file passes: it matches the fingerprint the node gives for it");
+  await assert.rejects(tableFrom(a.node, b.node), /different answers/);
+});
+
+test("a node that is not answering is left out and named, and the table says it could not be checked", async () => {
+  const [a, b, c] = await sameSeason(3);
+  b.node.failOn = "eth_blockNumber";
+  const two = await tableFrom(a.node, b.node);
+  assert.deepEqual(lines(two.table), ["1 ada 7", "2 bola 4", "3 chidi 1"]);
+  assert.deepEqual(two.nodes, { asked: 2, agreed: 1, down: ["node 2"] });
+  // With a third node, the two that answer still check each other.
+  assert.deepEqual((await tableFrom(a.node, b.node, c.node)).nodes, { asked: 3, agreed: 2, down: ["node 2"] });
+  // If the first on the list is the one that is down, the next one is read from.
+  assert.deepEqual((await tableFrom(b.node, a.node, c.node)).nodes, { asked: 3, agreed: 2, down: ["node 1"] });
+});
+
+test("a node that goes quiet part way through the check is named as not answering, not as lying", async () => {
+  const [a, b] = await sameSeason(2);
+  b.node.failOn = "eth_call";
+  assert.deepEqual((await tableFrom(a.node, b.node)).nodes, { asked: 2, agreed: 1, down: ["node 2"] });
+});
+
+test("when no node answers there is no table", async () => {
+  const [a, b] = await sameSeason(2);
+  a.node.failOn = b.node.failOn = "eth_blockNumber";
+  await assert.rejects(tableFrom(a.node, b.node), /no X Layer node answered/);
+});
+
+test("the nodes built in are two, run by different people", () => {
+  assert.equal(XLAYER.nodes.length, 2);
+  assert.equal(XLAYER.nodes[0], XLAYER.node);
+  const hosts = XLAYER.nodes.map((n) => new URL(n));
+  assert.ok(hosts.every((u) => u.protocol === "https:"));
+  assert.notEqual(hosts[0].host.split(".").slice(-2).join("."), hosts[1].host.split(".").slice(-2).join("."));
+});
+
 test("the addresses built in are TapeOut's on X Layer", () => {
   assert.equal(XLAYER.chainId, 196);
   assert.equal(XLAYER.mailbox, "0xe61A9C7213a6Aa616C246a2B569e555B417b25ee".toLowerCase());

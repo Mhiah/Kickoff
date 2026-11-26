@@ -5,7 +5,9 @@
 //   node bin/table.js --circuit <processor address> <circuit number>
 //
 // Options:
-//   --node <address>      the X Layer node to ask (default https://rpc.xlayer.tech)
+//   --node <address>      an X Layer node to ask. Give it more than once to ask several, which
+//                         then have to agree. Default: https://rpc.xlayer.tech and
+//                         https://xlayer.drpc.org, run by different people.
 //   --mailbox <address>   TapeOut's mailbox (default: the one on X Layer)
 //   --sites <address>     TapeOut's site store (default: the one on X Layer)
 //   --json                print everything as JSON instead
@@ -19,12 +21,13 @@ import { BASKETBALL, SPORT_NAMES, XLAYER, isFootball, leagueOfCircuit, loadCircu
 const SPORT = SPORT_NAMES;
 
 function options(argv) {
-  const out = { node: XLAYER.node, mailbox: XLAYER.mailbox, sites: XLAYER.sites, json: false, rest: [] };
+  const out = { nodes: [], mailbox: XLAYER.mailbox, sites: XLAYER.sites, json: false, rest: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--json") out.json = true;
     else if (a === "--circuit") out.circuit = [argv[++i], argv[++i]];
-    else if (a === "--node" || a === "--mailbox" || a === "--sites") out[a.slice(2)] = argv[++i];
+    else if (a === "--node") out.nodes.push(argv[++i]);
+    else if (a === "--mailbox" || a === "--sites") out[a.slice(2)] = argv[++i];
     else if (a.startsWith("--")) throw new Error(`there is no option ${a}`);
     else out.rest.push(a);
   }
@@ -53,11 +56,20 @@ function lockText(match) {
   return `${match.lock.count} sealed picks locked ${ago} before kickoff`;
 }
 
+/** How many nodes were asked, and whether the record could be checked between them. */
+function nodesInWords(n) {
+  const down = n.down.length ? ` Not answering: ${n.down.join(", ")}.` : "";
+  if (n.asked === 1) return "1 X Layer node asked. Its answers were not checked against another.";
+  if (n.agreed === 1) return `${n.asked} X Layer nodes asked, but only 1 answered, so its answers could not be checked against another.${down}`;
+  return `${n.asked} X Layer nodes asked. ${n.agreed} answered, and they agree.${down}`;
+}
+
 async function main() {
   const opt = options(process.argv.slice(2));
+  if (opt.nodes.length === 0) opt.nodes = [...XLAYER.nodes];
   let league = opt.rest[0];
   if (opt.circuit) {
-    league = `0x${toHex(await leagueOfCircuit({ node: opt.node, mailbox: opt.mailbox, processor: opt.circuit[0], circuit: BigInt(opt.circuit[1]) }))}`;
+    league = `0x${toHex(await leagueOfCircuit({ node: opt.nodes[0], mailbox: opt.mailbox, processor: opt.circuit[0], circuit: BigInt(opt.circuit[1]) }))}`;
   }
   if (!league) {
     console.error("Give a league's id, or --circuit <processor address> <circuit number>.");
@@ -73,7 +85,7 @@ async function main() {
     goalgoal: await readFile(new URL("goalgoal.hex", dir), "utf8"),
     score: await readFile(new URL("score.hex", dir), "utf8"),
   });
-  const got = await tableFromXLayer({ node: opt.node, mailbox: opt.mailbox, sites: opt.sites, league, circuits });
+  const got = await tableFromXLayer({ nodes: opt.nodes, mailbox: opt.mailbox, sites: opt.sites, league, circuits });
 
   if (opt.json) {
     const plain = (key, value) => (value instanceof Uint8Array ? `0x${toHex(value)}` : typeof value === "bigint" ? value.toString() : value);
@@ -83,6 +95,7 @@ async function main() {
 
   console.log(`League ${league}`);
   console.log(`on chain ${got.chainId}, read at block ${got.block}. Its account is ${got.account}.`);
+  console.log(nodesInWords(got.nodes));
   console.log(`${got.messages.length} messages in its inbox, ${got.ignored.length} not believed.`);
 
   console.log("\nMATCHES");

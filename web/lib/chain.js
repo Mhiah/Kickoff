@@ -21,7 +21,7 @@ const hex = (x) => (typeof x === "string" ? x.toLowerCase().replace(/^0x/, "") :
  * @param read   what does the reading. Only tests give another.
  * @param now    a function giving the time in seconds
  */
-export function createChain({ store, node = XLAYER.node, read = tableFromXLayer, now = () => Math.floor(Date.now() / 1000) }) {
+export function createChain({ store, node = null, nodes = XLAYER.nodes, read = tableFromXLayer, now = () => Math.floor(Date.now() / 1000) }) {
   let circuits = null;
   const kept = () => {
     try {
@@ -33,8 +33,10 @@ export function createChain({ store, node = XLAYER.node, read = tableFromXLayer,
     return null;
   };
   const self = {
-    /** True if the last try could not reach X Layer. What is kept is then from an earlier read. */
+    /** True if the last try got nothing it could trust from X Layer. What is kept is then from an earlier read. */
     unreachable: false,
+    /** The two nodes that gave different answers about the record on the last read, or null. */
+    disagree: null,
     /**
      * What X Layer held when last read, or null if it has not been read for this league.
      * @returns {
@@ -60,7 +62,8 @@ export function createChain({ store, node = XLAYER.node, read = tableFromXLayer,
       const before = store.read(CHAIN_KEY);
       try {
         circuits ??= loadCircuits(PUBLISHED);
-        const built = await read({ node, league, circuits, players });
+        // Several nodes, run by different people, which have to agree. A single `node` is for tests.
+        const built = await read({ ...(node ? { node } : { nodes }), league, circuits, players });
         const txOf = new Map(built.messages.map((m) => [m.index, m.tx ?? null]));
         const matches = {};
         for (const m of built.matches) {
@@ -77,9 +80,13 @@ export function createChain({ store, node = XLAYER.node, read = tableFromXLayer,
           points[hex(row.player)] = { points: row.points, threes: row.threes, ones: row.ones };
           if (Number.isSafeInteger(row.joined)) joined[hex(row.player)] = row.joined;
         }
-        store.write(CHAIN_KEY, JSON.stringify({ league, at: now(), block: built.block, matches, points, joined }));
+        store.write(CHAIN_KEY, JSON.stringify({ league, at: now(), block: built.block, nodes: built.nodes ?? null, matches, points, joined }));
         self.unreachable = false;
-      } catch {
+        self.disagree = null;
+      } catch (error) {
+        // Nothing new is taken, whether no node answered or two of them disagreed. The screen says
+        // the same short thing for both; which two disagreed is kept here for anyone looking closer.
+        self.disagree = error?.nodesDisagree ?? null;
         self.unreachable = true;
       }
       return store.read(CHAIN_KEY) !== before;

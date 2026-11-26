@@ -154,8 +154,9 @@ of the website). [TapeOut, plainly](#tapeout-plainly) says what each one does he
 
 Nothing below needs a wallet, an account or Kickoff's permission.
 
-1. **In a browser.** Open the site, from either address above, and go to the **Check** tab. Your own browser asks an X Layer
-   node for the league's record and works the points out again with the published scoring rules.
+1. **In a browser.** Open the site, from either address above, and go to the **Check** tab. Your own browser asks two X Layer
+   nodes, run by different people, for the league's record, makes sure they agree, and works the
+   points out again with the published scoring rules.
    It shows when each of your predictions was locked, your group's points from X Layer beside Kickoff's
    own, and whether the order is the same.
 2. **With one command.** This rebuilds the whole leaderboard from X Layer and nothing else:
@@ -202,8 +203,8 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | Football's three predictions | The three new circuits (result, goal goal, exact score) on every possible case with both evaluators, and through the engine, the server and the website's own tests | 67,072 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)). Published on X Layer as circuits 9, 10 and 11 for 0.005905 OKB, against 0.005880 in fees that the free look gave |
 | The first three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
 | The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
-| The prediction engine | 151 tests. Twenty-three try to cheat, and five have the X Layer node lie about what is on chain | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
-| The website | 89 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
+| The prediction engine | 160 tests. Twenty-three try to cheat, and eight have an X Layer node lie about what is on chain, three of them in ways only a second node can catch | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
+| The website | 92 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 23 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
 | The server | 98 tests. They take a name somebody has, link a wallet that did not sign, send predictions in someone else's name, play old requests back, open a different prediction from the one sealed, and use the robot's addresses without its key. They also check that a match gives points only once it was locked on X Layer | All pass; every one is refused ([details](server/README.md)) |
 | The robot | 79 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, a hundred players on one match, a lock it slept through, its notes when it needs a person, putting the website on X Layer, and going live without paying for anything twice | All pass ([details](robot/README.md)) |
@@ -223,7 +224,7 @@ results.
 | 1 | Project setup: this README, the folders, the licence | Done |
 | 2 | The scoring circuits, and the checker that tests every possible case | Done, and published on X Layer as circuits 6, 7 and 8, with football's three predictions as circuits 9, 10 and 11. |
 | 3 | Proving the TapeOut parts on a private copy of X Layer | Done. Rehearsals 1 to 4 and the fees report, 29 tests against the real contracts. |
-| 4 | The prediction engine and the leaderboard builder | Done, 151 tests, with a fifth rehearsal that plays a season on chain and reads it back. Still to do: asking several nodes instead of one. |
+| 4 | The prediction engine and the leaderboard builder | Done, 160 tests, with a fifth rehearsal that plays a season on chain and reads it back. The reader asks two X Layer nodes, run by different people, and both have to agree. |
 | 5 | The website's screens | Done, with real matches and real numbers. |
 | 6 | Sealing a prediction for real, on the player's own device | Done. |
 | 7 | The fixtures feed | Done, and running live against the real feeds. |
@@ -488,9 +489,14 @@ PUBLISH SITE, and a check that reads every file back).
   X Layer, but groups, names and sealed predictions go through the same server as the other
   address. It is also a copy: after the site changes, it shows the older pages until the changed
   files are sent again.
-- **The leaderboard reader asks one X Layer node.** It checks every message against the mailbox's own
-  fingerprint, but it believes that node about what the mailbox holds. TapeOut's own rule is to
-  ask several nodes and require them to agree. That is still to do.
+- **The leaderboard reader asks two X Layer nodes, and both have to agree.** Every message is
+  checked against the mailbox's own fingerprint. What the mailbox and the site store hold is read
+  from one node (OKX's, rpc.xlayer.tech) and asked for again from a second run by somebody else
+  (dRPC's, xlayer.drpc.org), at the same block, and any difference stops everything. That protects
+  against one node being wrong or lying. It does not protect against both being wrong in the same
+  way. If the second node is not answering, the record is read from the first alone. The Check tab
+  does not say how many nodes it asked: the one-command rebuild does. If the two disagree, the Check
+  tab shows nothing new and says X Layer could not be reached just now.
 - **The free feeds have edges.** The football plan gives scores after a delay, which is fine for
   final results. It does not cover the Europa League. The WNBA is out of season, so it shows no games until its next season starts.
 - **The feed's saved test examples are built from the feeds' documentation,** not captured from

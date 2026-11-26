@@ -228,10 +228,13 @@ every tree from 1 to 17 leaves is checked to have a proof that works only for it
   players who have their own TapeOut identity are a later step.
 - **A league decides when to publish the opened picks.** Until it does, the chain shows a bundle
   was locked but not who is in it. A player can publish their own opening without waiting.
-- **The fetcher asks one node.** It checks every message against the mailbox's fingerprint, but it
-  believes that node about what the mailbox stores. A node that lied could claim the inbox is
-  shorter than it is. TapeOut's own rule is to ask several independent nodes and require them to
-  agree. That is still to do. Until then, use a node you trust.
+- **The fetcher asks two nodes, and they have to agree.** It checks every message against the
+  mailbox's fingerprint. What it cannot check that way is what a node says the mailbox and the
+  site store hold: a node that lied could claim the inbox is shorter than it is. So every such
+  answer from the first node is asked for again from each other node, at the same block, and one
+  difference stops everything. The two built in are run by different people. A node that is not
+  answering is left out and named, and with only one answering the result says it was not
+  cross-checked. `--node`, given more than once, chooses your own.
 
 ## The engine and the chain agree
 

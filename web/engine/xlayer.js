@@ -35,6 +35,10 @@ import { readLeague } from "./reader.js";
 export const XLAYER = Object.freeze({
   chainId: 196,
   node: "https://rpc.xlayer.tech",
+  // Nodes run by different people. The record is read from the first and then checked, answer by
+  // answer, against the others (see tableFromXLayer). rpc.xlayer.tech is OKX's own, and
+  // xlayer.drpc.org is dRPC's. Both answer a web page in any browser.
+  nodes: Object.freeze(["https://rpc.xlayer.tech", "https://xlayer.drpc.org"]),
   mailbox: "0xe61a9c7213a6aa616c246a2b569e555b417b25ee",
   sites: "0xd6efb7adcc9c83dc4924ad56f6a8e4e969b9adb6",
 });
@@ -143,7 +147,10 @@ async function mailboxLogs(rpc, mailbox, leagueTopic, blockNumber) {
  *   block      the block everything was read at
  *   messages   the inbox, in the form reader.js takes
  */
-export async function fetchLeague({ node, mailbox = XLAYER.mailbox, league }) {
+/**
+ * @param block  the block to read at. Left out, the node's latest.
+ */
+export async function fetchLeague({ node, mailbox = XLAYER.mailbox, league, block: readAt = null }) {
   const rpc = connect(node);
   const id = id32(league, "league");
   const { chainId, account } = parseLeagueId(id);
@@ -153,7 +160,7 @@ export async function fetchLeague({ node, mailbox = XLAYER.mailbox, league }) {
   }
 
   // Everything is read as it stood at one block, so the list and the messages cannot disagree.
-  const block = Number(BigInt(await rpc("eth_blockNumber", [])));
+  const block = readAt ?? Number(BigInt(await rpc("eth_blockNumber", [])));
   const at = quantity(block);
   const [counted] = decode(["uint256"], await ask(rpc, mailbox, "inboxCount(bytes32)", [id], at));
   const count = Number(counted);
@@ -245,9 +252,13 @@ export async function fetchSiteFile({ node, sites = XLAYER.sites, account, path,
  *   files   for each match with a result: { match, path, found } and, if the file could not be
  *           used, why
  */
-export async function tableFromXLayer({ node = XLAYER.node, mailbox = XLAYER.mailbox, sites = XLAYER.sites, league, circuits, players = [] }) {
-  const rpc = connect(node);
-  const inbox = await fetchLeague({ node: rpc, mailbox, league });
+export async function tableFromXLayer({ node = XLAYER.node, nodes = null, mailbox = XLAYER.mailbox, sites = XLAYER.sites, league, circuits, players = [] }) {
+  // One node, as before, or several that have to agree (see below).
+  const asked = (nodes?.length ? nodes : [node]).map((n, i) => ({ name: nameOf(n, i), rpc: connect(n) }));
+  const start = await commonBlock(asked);
+  const first = start.up[0];
+  const rpc = recording(first.rpc);
+  const inbox = await fetchLeague({ node: rpc, mailbox, league, block: start.block });
   const { matches } = await readLeague({ league: inbox.league, account: inbox.account, messages: inbox.messages });
 
   const openingsFiles = {};
@@ -277,5 +288,93 @@ export async function tableFromXLayer({ node = XLAYER.node, mailbox = XLAYER.mai
     circuits,
     players,
   });
-  return { ...built, account: inbox.account, chainId: inbox.chainId, block: inbox.block, messages: inbox.messages, files };
+  const checked = await crossCheck({ first, others: start.up.slice(1), calls: rpc.calls, block: inbox.block });
+  const nodesSaid = { asked: asked.length, agreed: checked.agreed, down: [...start.down, ...checked.down] };
+  return { ...built, account: inbox.account, chainId: inbox.chainId, block: inbox.block, messages: inbox.messages, files, nodes: nodesSaid };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Asking more than one node
+//
+// A node is somebody's computer, and a table built from one node's answers is only as honest as
+// that node. Most of what is read proves itself: a message has to match the mailbox's fingerprint
+// of it, and a site file has to match the fingerprint stored with it. What cannot prove itself is
+// what the node says the mailbox and the site store HOLD: how many messages, who sent each and
+// when, and each file's fingerprint. Those are the node's answers to questions put to a contract
+// (eth_call), and a node could make them up.
+//
+// So every such answer the first node gave is asked for again from each other node, at the same
+// block, and has to come back the same, byte for byte. A node that is not answering is left out
+// and named. A node that answers differently stops everything: no table is built.
+
+/** How many blocks behind the slowest node to read at, so that every node has the block. */
+const BLOCKS_BACK = 3;
+
+const nameOf = (node, i) => {
+  if (typeof node !== "string") return `node ${i + 1}`;
+  try {
+    return new URL(node).host;
+  } catch {
+    return node;
+  }
+};
+
+/** Which nodes are answering, and a block that all of them have. With one node, its latest. */
+async function commonBlock(asked) {
+  if (asked.length === 1) return { up: asked, down: [], block: null };
+  const heights = await Promise.all(asked.map((n) => n.rpc("eth_blockNumber", []).then((h) => Number(BigInt(h)), () => null)));
+  const up = asked.filter((_, i) => heights[i] !== null);
+  const down = asked.filter((_, i) => heights[i] === null).map((n) => n.name);
+  if (up.length === 0) throw new Error("no X Layer node answered");
+  const lowest = Math.min(...heights.filter((h) => h !== null));
+  return { up, down, block: up.length > 1 ? Math.max(0, lowest - BLOCKS_BACK) : lowest };
+}
+
+/** A node that keeps every answer it gives to a question put to a contract. */
+function recording(rpc) {
+  const calls = [];
+  const asking = async (method, params = []) => {
+    const result = await rpc(method, params);
+    if (method === "eth_call") calls.push({ params, result });
+    return result;
+  };
+  asking.calls = calls;
+  return asking;
+}
+
+/** How many questions are put to a checking node at once. */
+const AT_ONCE = 6;
+
+async function crossCheck({ first, others, calls, block }) {
+  let agreed = 1;
+  const down = [];
+  for (const other of others) {
+    let answered = true;
+    for (let i = 0; i < calls.length && answered; i += AT_ONCE) {
+      const batch = calls.slice(i, i + AT_ONCE);
+      const theirs = await Promise.all(
+        batch.map((call) =>
+          other.rpc("eth_call", call.params).then(
+            (result) => ({ result }),
+            // A contract refusing a question the first node answered is a different answer, not silence.
+            (error) => (refused(error) ? { result: null } : { silent: true }),
+          ),
+        ),
+      );
+      if (theirs.some((t) => t.silent)) {
+        answered = false;
+        break;
+      }
+      const differs = theirs.some((t, k) => t.result === null || String(t.result).toLowerCase() !== String(batch[k].result).toLowerCase());
+      if (differs) {
+        throw Object.assign(
+          new Error(`two X Layer nodes gave different answers about the record at block ${block} (${first.name} and ${other.name}), so no table is built`),
+          { nodesDisagree: [first.name, other.name] },
+        );
+      }
+    }
+    if (answered) agreed++;
+    else down.push(other.name);
+  }
+  return { agreed, down };
 }
