@@ -111,7 +111,7 @@ Then open `http://localhost:8787` in a browser. `--matches` puts a few made-up m
 server's list, the first closing in five minutes, so a pick can be followed all the way: sent,
 closed, and (after the robot's part is done by hand) locked.
 
-## No sign-up and no wallet
+## No sign-up, and a wallet is optional
 
 The first time someone plays, their phone makes its own key and keeps the private half in the
 browser. That key is the player. Everything the phone sends to Kickoff is signed with it.

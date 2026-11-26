@@ -25,12 +25,12 @@
 // Times are in seconds. Ids, fingerprints and secrets are 64 hex digits.
 
 import {
-  BASKETBALL_HEX, ENVELOPE_BYTES, FOOTBALL_HEX, TENNIS_HEX,
+  ENVELOPE_BYTES, PUBLISHED, SPORTS, TENNIS, decodeResult,
   buildBundle, fingerprintOf, fromHex, loadCircuits, receiptFor, scorePick, toHex, verifyWalletLink, writeOpenings, decodePick,
 } from "../../engine/src/index.js";
 
 /** The scoring circuits, the same ones that are published on X Layer. Every point on a table comes from them. */
-const CIRCUITS = loadCircuits({ football: FOOTBALL_HEX, basketball: BASKETBALL_HEX, tennis: TENNIS_HEX });
+const CIRCUITS = loadCircuits(PUBLISHED);
 
 /** Picks close this many seconds before a match starts. */
 export const CLOSES_BEFORE = 10 * 60;
@@ -224,7 +224,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
   // never scores for anyone. Scoring the same pick twice writes the same thing twice.
 
   const scoreOne = async (f, player, pickByte) => {
-    const points = scorePick({ circuits: CIRCUITS, sport: f.sport, pickByte, result: decodePick(f.sport, f.resultByte) });
+    const points = scorePick({ circuits: CIRCUITS, sport: f.sport, pickByte, result: decodeResult(f.sport, f.resultByte) });
     await store.tableSet(`points:${f.id}`, player, points);
     await store.tableSet(`played:${player}`, f.id, { pickByte, points });
   };
@@ -796,7 +796,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       let added = 0;
       let updated = 0;
       for (const f of fixtures) {
-        if (!isId(f?.id) || !Number.isSafeInteger(f.kickoff) || typeof f.label !== "string" || ![1, 2].includes(f.sport) || !COMPETITIONS.includes(f.comp)) {
+        if (!isId(f?.id) || !Number.isSafeInteger(f.kickoff) || typeof f.label !== "string" || !SPORTS.includes(f.sport) || f.sport === TENNIS || !COMPETITIONS.includes(f.comp)) {
           refuse(400, "One of the matches is not in the right form.");
         }
         const before = await store.tableGet("fixtures", f.id);

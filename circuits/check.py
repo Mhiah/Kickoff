@@ -1,4 +1,4 @@
-"""Checks Kickoff's three scoring circuits against the written rules, on every possible case.
+"""Checks Kickoff's scoring circuits against the written rules, on every possible case.
 
 Run from the repository root:
 
@@ -60,7 +60,23 @@ def tennis_expected(b: list[int]) -> int:
         player[b[0]], number(b[1:3]) + 2, player[b[3]], number(b[4:6]) + 2, 5 if b[6] else 3)
 
 
-EXPECTED = {"football": football_expected, "basketball": basketball_expected, "tennis": tennis_expected}
+def result_expected(b: list[int]) -> int:
+    said = ("home", "draw", "away", "not a prediction")[number(b[0:2])]
+    return rules.result_points(said, number(b[2:6]), number(b[6:10]))
+
+
+def goalgoal_expected(b: list[int]) -> int:
+    return rules.goal_goal_points(bool(b[0]), number(b[1:5]), number(b[5:9]))
+
+
+def score_expected(b: list[int]) -> int:
+    return rules.score_points(number(b[0:4]), number(b[4:8]), number(b[8:12]), number(b[12:16]))
+
+
+EXPECTED = {
+    "football": football_expected, "basketball": basketball_expected, "tennis": tennis_expected,
+    "result": result_expected, "goalgoal": goalgoal_expected, "score": score_expected,
+}
 
 
 # ---- the check itself ----

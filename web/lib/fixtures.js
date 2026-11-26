@@ -8,12 +8,40 @@
 // (the competition, the two sides and the start time). So a pick is always sealed for the match
 // the screen shows, whatever a server says.
 
-import { BASKETBALL, FOOTBALL } from "../engine/picks.js";
+import { BASKETBALL, FOOTBALL, FOOTBALL_MARKETS } from "../engine/picks.js";
 import { matchIdOf } from "./picks.js";
 
 const FIXTURES_KEY = "kickoff-fixtures";
 const SPORT = { football: FOOTBALL, basketball: BASKETBALL };
 const HOUR = 3600;
+const REPLACED = "now three predictions";
+
+/**
+ * A football match is three predictions, and so three matches on the list, with the same teams
+ * and the same kickoff. This ties them together: each is told its `group` (their ids, in the
+ * order result, goal goal, exact score), and the first is the `lead`, the one a list of matches
+ * shows. Every other match is a group of one and its own lead.
+ */
+export function together(fixtures) {
+  const groups = new Map();
+  for (const [id, f] of Object.entries(fixtures)) {
+    if (!FOOTBALL_MARKETS.includes(f.sport)) {
+      f.group = [id];
+      f.lead = true;
+      continue;
+    }
+    const key = `${f.comp}|${f.home}|${f.away}|${f.kickoff}`;
+    groups.set(key, [...(groups.get(key) ?? []), id]);
+  }
+  for (const ids of groups.values()) {
+    ids.sort((a, b) => FOOTBALL_MARKETS.indexOf(fixtures[a].sport) - FOOTBALL_MARKETS.indexOf(fixtures[b].sport));
+    ids.forEach((id, i) => {
+      fixtures[id].group = ids;
+      fixtures[id].lead = i === 0;
+    });
+  }
+  return fixtures;
+}
 
 /**
  * @param store         from createStore() in picks.js
@@ -43,10 +71,14 @@ export function createFixtures({ store, client, competitions, sample }) {
       const matchIds = {};
       for (const f of d?.fixtures ?? []) {
         const competition = competitions[f?.comp];
-        if (!competition || SPORT[competition.sport] !== f.sport || !Number.isSafeInteger(f.kickoff)) continue;
+        if (!competition || !Number.isSafeInteger(f.kickoff)) continue;
+        const market = competition.sport === "football" && FOOTBALL_MARKETS.includes(f.sport);
+        if (SPORT[competition.sport] !== f.sport && !market) continue;
+        // A football match first listed as one prediction, whose place the three have taken.
+        if (f.state === "void" && f.note === REPLACED) continue;
         if (typeof f.home !== "string" || typeof f.away !== "string" || typeof f.id !== "string") continue;
         if (f.kickoff < now - 3 * HOUR || f.kickoff > now + 8 * 24 * HOUR) continue;
-        const fixture = { comp: f.comp, home: f.home, away: f.away, kickoff: f.kickoff, state: f.state, real: true };
+        const fixture = { comp: f.comp, home: f.home, away: f.away, kickoff: f.kickoff, state: f.state, real: true, sport: f.sport };
         // How locking this match's picks on X Layer went, once Kickoff's robot has said.
         if (f.lock === "locked" || f.lock === "missed") fixture.lock = f.lock;
         let id;
@@ -59,11 +91,23 @@ export function createFixtures({ store, client, competitions, sample }) {
         fixtures[id] = fixture;
         matchIds[id] = id;
       }
+      together(fixtures);
       if (Object.keys(fixtures).length > 0) return { real: true, league: d.league, fixtures, matchIds };
 
-      const made = sample.fixtures(now);
+      // Made-up matches, shown until a real one is on the list. A football one is three
+      // predictions here too: the first keeps the match's own key, so its link stays the same.
+      const made = {};
+      for (const [id, fixture] of Object.entries(sample.fixtures(now))) {
+        if (competitions[fixture.comp]?.sport !== "football") {
+          made[id] = fixture;
+          continue;
+        }
+        FOOTBALL_MARKETS.forEach((sport, i) => {
+          made[i === 0 ? id : `${id}.${sport}`] = { ...fixture, sport };
+        });
+      }
       for (const [id, fixture] of Object.entries(made)) matchIds[id] = await matchIdOf(sample.league, fixture, competitions);
-      return { real: false, league: sample.league, fixtures: made, matchIds };
+      return { real: false, league: sample.league, fixtures: together(made), matchIds };
     },
     /** Ask the server for its list. Returns true if what is kept changed. Offline, nothing changes. */
     async refresh() {

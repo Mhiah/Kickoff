@@ -17,8 +17,8 @@ import { COMPETITIONS, check, group, match, record, scores, voided, week } from 
 import { ON_CHAIN } from "./config.js";
 import { sits } from "./lib/groups.js";
 import { MARK, SAMPLE_NOTE, TOGGLE, comp, esc, stamp, titlebar } from "./lib/html.js";
-import { decodePick } from "./engine/picks.js";
-import { BAND_KEYS, bandWords, pickWords } from "./lib/picks.js";
+import { GOAL_GOAL, RESULT, SCORE, decodePick } from "./engine/picks.js";
+import { BAND_KEYS, MARKETS, bandWords, pickWords, pointsFor } from "./lib/picks.js";
 import { standing } from "./lib/sync.js";
 import { ordinal, placeName, standings } from "./lib/standings.js";
 import { EMPTY } from "./lib/table.js";
@@ -28,7 +28,12 @@ const table = standings(scores);
 const you = table.find((row) => row.name === group.you);
 const startWord = (f) => (COMPETITIONS[f.comp].sport === "basketball" ? "tip-off" : "kickoff");
 const yourPick = (ctx, id) => ctx.picks[ctx.matchIds[id]] ?? null;
-const inOrder = (ctx) => Object.keys(ctx.fixtures).sort((a, b) => ctx.fixtures[a].kickoff - ctx.fixtures[b].kickoff);
+// A football match is three predictions (result, goal goal, exact score), each a match of its own
+// on the list. `group` is their ids and the first is the `lead`: the one a list of matches shows.
+const groupOf = (ctx, id) => ctx.fixtures[id]?.group ?? [id];
+/** Every prediction this player has made on a match: up to three for football, one otherwise. */
+const yourPicks = (ctx, id) => groupOf(ctx, id).map((m) => ({ id: m, entry: yourPick(ctx, m), f: ctx.fixtures[m] ?? ctx.fixtures[id] })).filter((p) => p.entry);
+const inOrder = (ctx) => Object.keys(ctx.fixtures).filter((id) => ctx.fixtures[id].lead !== false).sort((a, b) => ctx.fixtures[a].kickoff - ctx.fixtures[b].kickoff);
 const teams = (f) => `${esc(f.home)} v ${esc(f.away)}`;
 const pointsCell = (points) => `<div class="points ${points === 0 ? "zero" : ""}">${points}</div>`;
 
@@ -67,7 +72,7 @@ export function home() {
     <div class="glass" style="margin-top:14px">
       <div class="row"><div class="grow"><div class="title" style="margin:0">Football</div>
         <div class="comps">${comp("pl")}${comp("cl")}</div>
-        <div class="sub">The exact score gets 3 points. The right winner or a draw gets 1.</div></div></div>
+        <div class="sub">Three predictions a match: the result and goal goal for 1 point each, the exact score for 3.</div></div></div>
       <div class="row"><div class="grow"><div class="title" style="margin:0">Basketball</div>
         <div class="comps">${comp("nba")}${comp("wnba")}</div>
         <div class="sub">The winner gets 1 point. Add 2 if you also get how much they win by.</div></div></div>
@@ -97,9 +102,10 @@ ${SAMPLE_NOTE}`;
 function fixtureRow(ctx, id) {
   const f = ctx.fixtures[id];
   let action;
-  const mine = yourPick(ctx, id);
-  const stands = mine ? standing(mine, f, ctx.now) : null;
-  if (stands === "waiting" || stands === "missed" || stands === "problem") action = `<a class="sealed-box unsent" href="#/pick/${id}" aria-label="Your prediction is sealed but has not reached Kickoff. See why.">Not entered</a>`;
+  const all = yourPicks(ctx, id);
+  const mine = all.length > 0;
+  const stuck = all.some((p) => ["waiting", "missed", "problem"].includes(standing(p.entry, p.f, ctx.now)));
+  if (stuck) action = `<a class="sealed-box unsent" href="#/pick/${id}" aria-label="Your prediction is sealed but has not reached Kickoff. See why.">Not entered</a>`;
   else if (mine) action = `<a class="sealed-box" href="#/pick/${id}" aria-label="Your prediction is sealed. See it or change it.">Sealed</a>`;
   else if (hasClosed(ctx.now, f.kickoff)) action = `<span class="small muted">Closed</span>`;
   else action = `<a class="btn small go" href="#/pick/${id}">Predict</a>`;
@@ -108,7 +114,7 @@ function fixtureRow(ctx, id) {
 
 function weekHtml(ctx) {
   const ids = inOrder(ctx);
-  const picked = ids.filter((id) => yourPick(ctx, id)).length;
+  const picked = ids.filter((id) => yourPicks(ctx, id).length).length;
   const total = ctx.real ? ids.length : week.total;
   const dayNames = [...new Set(ids.map((id) => dayLabel(ctx.fixtures[id].kickoff)))];
   const days = dayNames
@@ -157,7 +163,7 @@ function playedHtml(limit) {
  */
 export function nextUp(ctx, plays = null) {
   const open = inOrder(ctx).filter((id) => !hasClosed(ctx.now, ctx.fixtures[id].kickoff) && (!plays || plays.includes(ctx.fixtures[id].comp)));
-  return open.find((id) => !yourPick(ctx, id)) ?? open[0] ?? null;
+  return open.find((id) => !yourPicks(ctx, id).length) ?? open[0] ?? null;
 }
 
 /** The card that says what to do next: the next match, when its picks close, and a button to pick it. */
@@ -170,7 +176,7 @@ function nextCard(ctx, nextId) {
     <div class="when">${esc(dayLabel(next.kickoff))}, ${clock(next.kickoff)}.</div>
     <span class="clock">Predictions close in ${esc(howLong(ctx.now, closesAt(next.kickoff)))}</span>
   </div>
-  <div class="stub"><a class="btn go" href="#/pick/${nextId}">${yourPick(ctx, nextId) ? "See your prediction" : "Make your prediction"}</a></div>
+  <div class="stub"><a class="btn go" href="#/pick/${nextId}">${yourPicks(ctx, nextId).length ? "See your prediction" : "Make your prediction"}</a></div>
 </div>`;
 }
 
@@ -213,7 +219,7 @@ function leagueReal(ctx) {
   const s = ctx.standings ?? EMPTY;
   const g = ctx.mine.group;
   const ids = inOrder(ctx).filter((id) => !g || g.plays.includes(ctx.fixtures[id].comp));
-  const picked = ids.filter((id) => yourPick(ctx, id)).length;
+  const picked = ids.filter((id) => yourPicks(ctx, id).length).length;
   const nextId = nextUp(ctx, g?.plays ?? null);
   const next = nextId ? ctx.fixtures[nextId] : null;
   const closesIn = next ? howLong(ctx.now, closesAt(next.kickoff)) : "";
@@ -236,7 +242,7 @@ ${titlebar({
 
 <div class="tiles">
   <div class="glass tile"><small>Your place</small><b>${s.you.place ? ordinal(s.you.place) : "–"}</b><span>${s.you.place ? `of ${people(s.everyone.players)}` : "after your first prediction"}</span></div>
-  <div class="glass tile"><small>Your points</small><b>${s.you.points}</b><span>${s.you.threes} spot on, ${s.you.ones} right winner</span></div>
+  <div class="glass tile"><small>Your points</small><b>${s.you.points}</b><span>${s.you.threes} for 3 points, ${s.you.ones} for 1</span></div>
   <div class="glass tile"><small>Predicted this week</small><b>${picked} of ${ids.length}</b><span>predict as many as you like</span></div>
   <div class="glass tile"><small>Next to close</small><b>${next ? esc(closesIn) : "Nothing open"}</b><span>${next ? teams(next) : "new matches arrive each week"}</span></div>
 </div>
@@ -246,7 +252,7 @@ ${next ? `<div class="phone-only">${nextCard(ctx, nextId)}</div>` : ""}
 <div class="chips parts phone-only" role="group" aria-label="What to show"><button type="button" data-part="matches" aria-pressed="${part === "matches"}">Matches</button><button type="button" data-part="table" aria-pressed="${part === "table"}">Leaderboard</button></div>
 
 <div class="cols" data-show="${part}">
-  <section data-part-of="matches">${weekHtml({ ...ctx, fixtures: Object.fromEntries(ids.map((id) => [id, ctx.fixtures[id]])) })}</section>
+  <section data-part-of="matches">${weekHtml({ ...ctx, fixtures: Object.fromEntries(ids.flatMap((id) => groupOf(ctx, id)).map((id) => [id, ctx.fixtures[id]])) })}</section>
   <section data-part-of="table">
     <h2>Leaderboard</h2>
     <div class="chips" role="group" aria-label="Which leaderboard"><button type="button" data-board="everyone" aria-pressed="${board === "everyone"}">Everyone</button><button type="button" data-board="group" aria-pressed="${board === "group"}">My group</button></div>
@@ -262,7 +268,7 @@ ${next ? `<div class="phone-only">${nextCard(ctx, nextId)}</div>` : ""}
 export function league(_, ctx) {
   if (ctx.real) return leagueReal(ctx);
   const ids = inOrder(ctx);
-  const picked = ids.filter((id) => yourPick(ctx, id)).length;
+  const picked = ids.filter((id) => yourPicks(ctx, id).length).length;
   const nextId = nextUp(ctx);
   const next = nextId ? ctx.fixtures[nextId] : null;
   const closesIn = next ? howLong(ctx.now, closesAt(next.kickoff)) : "";
@@ -290,7 +296,7 @@ ${
     <div class="when">${esc(dayLabel(next.kickoff))}, ${clock(next.kickoff)}.</div>
     <span class="clock">Predictions close in ${esc(closesIn)}</span>
   </div>
-  <div class="stub"><a class="btn go" href="#/pick/${nextId}">${yourPick(ctx, nextId) ? "See your prediction" : "Make your prediction"}</a></div>
+  <div class="stub"><a class="btn go" href="#/pick/${nextId}">${yourPicks(ctx, nextId).length ? "See your prediction" : "Make your prediction"}</a></div>
 </div>`
     : ""
 }
@@ -366,9 +372,87 @@ function standingMark(entry, f, ctx) {
   }
 }
 
-export function pick(id, ctx) {
+/** The three predictions of a football match, each with the question it asks. */
+const QUESTIONS = { [RESULT]: "How does it end?", [GOAL_GOAL]: "Do both teams score?", [SCORE]: "What will the score be?" };
+const pointWords = (sport) => `${pointsFor(sport)} ${pointsFor(sport) === 1 ? "point" : "points"}`;
+
+/** The controls for one of a football match's three predictions. `entry` is what was sealed before, if anything. */
+function marketControls(sport, f, entry) {
+  const head = `<h3>${MARKETS[sport]}<small>${pointWords(sport)}</small></h3><p class="ask">${QUESTIONS[sport]}</p>`;
+  if (sport === RESULT) {
+    const said = entry?.pick.result;
+    const one = (value, words, small) => `<button type="button" class="choice" data-result="${value}" aria-pressed="${said === value}">${words}<small>${small}</small></button>`;
+    return `${head}<div class="choices three" role="group" aria-label="How does it end" data-optional>${one("home", esc(f.home), "win")}${one("draw", "Draw", "level")}${one("away", esc(f.away), "win")}</div>`;
+  }
+  if (sport === GOAL_GOAL) {
+    const said = entry ? (entry.pick.both ? "yes" : "no") : null;
+    const one = (value, words, small) => `<button type="button" class="choice" data-both="${value}" aria-pressed="${said === value}">${words}<small>${small}</small></button>`;
+    return `${head}<div class="choices" role="group" aria-label="Do both teams score" data-optional>${one("yes", "Yes", "Goal Goal")}${one("no", "No", "one side or neither")}</div>`;
+  }
+  const goals = entry ? [entry.pick.home, entry.pick.away] : ["–", "–"];
+  return `${head}<div data-score>
+      ${[f.home, f.away]
+        .map(
+          (team, i) => `<div class="score"><span class="team">${esc(team)}</span>
+        <div class="stepper"><button type="button" data-step="-1" aria-label="One fewer for ${esc(team)}">−</button><output aria-label="${esc(team)}'s goals">${goals[i]}</output><button type="button" data-step="1" aria-label="One more for ${esc(team)}">+</button></div></div>`,
+        )
+        .join("")}
+      <button type="button" class="link small" data-clear-score>No exact score</button></div>`;
+}
+
+/** A football match: its three predictions on one screen. Make one, two or all three. */
+function markets(id, ctx) {
   const f = ctx.fixtures[id];
+  const group = groupOf(ctx, id).map((m) => ({ id: m, f: ctx.fixtures[m], entry: yourPick(ctx, m) }));
+  const mine = group.filter((g) => g.entry);
+  const closed = hasClosed(ctx.now, f.kickoff);
+  const editing = !closed && (mine.length === 0 || ctx.editing === id);
+  const notKept = ctx.lasting ? "" : `<div class="note warn" style="margin-top:14px"><b>Private window.</b> These predictions will be lost when you close it.</div>`;
+
+  let body;
+  if (editing) {
+    body = `
+<div class="glass picker" data-picker="markets">${group.map((g) => `<div class="market" data-market="${g.f.sport}">${marketControls(g.f.sport, f, g.entry)}</div>`).join("")}</div>
+<ul class="rules"><li>Make one, two or all three. Each is scored by itself.</li><li>It is the score after 90 minutes. Extra time and penalties do not count.</li></ul>
+<button type="button" class="btn go" data-seal="${id}">${mine.length ? "Seal my new predictions" : "Seal my predictions"}</button>
+<p class="after" data-note-out role="status">No other player can see them before kickoff. You can change them until predictions close.</p>`;
+  } else if (mine.length) {
+    // Where each one stands. They are sent and locked together, so one word usually covers all three.
+    const marks = mine.map((g) => standingMark(g.entry, g.f, ctx));
+    const together = marks.every((m) => m === marks[0]);
+    const last = Math.max(...mine.map((g) => g.entry.sealedAt));
+    const line = (g) =>
+      `<div class="said-row"><span class="what">${MARKETS[g.f.sport]}</span><b class="${g.entry ? "" : "none"}">${g.entry ? esc(g.f.sport === GOAL_GOAL ? (g.entry.pick.both ? "Yes" : "No") : pickWords(g.entry, f)) : "No prediction"}</b></div>${g.entry && !together ? marks[mine.indexOf(g)] : ""}`;
+    body = `
+<div class="glass sealed" role="status">
+  <div class="small muted">Your predictions</div>
+  ${group.map(line).join("")}
+  <div class="small muted" style="margin-top:10px">Sealed at ${clock(last)} on ${esc(dayLabel(last))}. No other player can see them.</div>
+  ${together ? marks[0] : ""}
+</div>
+${closed ? "" : `<button type="button" class="btn quiet" data-change="${id}" style="margin-top:14px">Change my predictions</button>`}
+${notKept}`;
+  } else {
+    body = `<div class="note" style="margin-top:6px">Predictions for this match have closed.</div>`;
+  }
+
+  const html = `
+<a class="back" href="#/league">Back to the league</a>
+<div class="head">
+  ${titlebar({ before: comp(f.comp), heading: teams(f), headingClass: "under" })}
+  <div class="muted" style="margin-top:6px">${esc(dayLabel(f.kickoff))}, kickoff ${clock(f.kickoff)}</div>
+  <span class="clock">${closed ? "Predictions have closed" : `Predictions close at ${clock(closesAt(f.kickoff))}, in ${esc(howLong(ctx.now, closesAt(f.kickoff)))}`}</span>
+</div>
+${body}
+${f.real ? "" : SAMPLE_NOTE}`;
+  return { html, title: `${f.home} v ${f.away} on Kickoff`, tab: "league" };
+}
+
+export function pick(id, ctx) {
+  let f = ctx.fixtures[id];
   if (!f) return league(null, ctx);
+  // One of a football match's three predictions: they share a screen, reached by the first.
+  if (f.group?.length > 1) return markets(f.group[0], ctx);
   const start = startWord(f);
   const football = COMPETITIONS[f.comp].sport === "football";
   const entry = yourPick(ctx, id);
@@ -607,7 +691,7 @@ function checkReal(ctx) {
         .map(([match, entry]) => ({ entry, f: ctx.fixtures[match], lock: chain.matches[match]?.lock }))
         .filter((p) => p.f && p.lock)
         .sort((a, b) => b.f.kickoff - a.f.kickoff)
-        .map((p) => `<div class="row"><div class="grow">${comp(p.f.comp)}<div class="title">${teams(p.f)}</div>${lockLine(p.lock, p.f.kickoff, p.entry)}</div></div>`)
+        .map((p) => `<div class="row"><div class="grow">${comp(p.f.comp)}<div class="title">${teams(p.f)}</div>${MARKETS[p.f.sport] ? `<div class="sub">${MARKETS[p.f.sport]}</div>` : ""}${lockLine(p.lock, p.f.kickoff, p.entry)}</div></div>`)
     : [];
   const read = chain ? `<p class="fine muted">Read at ${clock(chain.at)}, block ${chain.block.toLocaleString("en-GB")}. ${locked} ${locked === 1 ? "match" : "matches"} locked.${ctx.chainUnreachable ? " X Layer could not be reached just now." : ""}</p>` : "";
   const html = `
@@ -696,7 +780,7 @@ function joinForm(mine) {
 }
 
 const OFFLINE_NOTE = `<div class="note warn" style="margin-top:14px"><b>Kickoff could not be reached.</b> This is what this phone last saw. It will catch up when you are back online.</div>`;
-const DEVICE_NOTE = `<div class="note" style="margin-top:16px"><b>No sign-up and no wallet.</b> This phone and browser become your player. Use the same ones each time, and do not clear the browser's saved data, or Kickoff will not know it is you.</div>`;
+const DEVICE_NOTE = `<div class="note" style="margin-top:16px"><b>No sign-up.</b> A wallet is optional: you can link one. This phone and browser become your player. Use the same ones each time, and do not clear the browser's saved data, or Kickoff will not know it is you.</div>`;
 
 /** For someone on a new phone: linking the wallet they linked before brings their groups back. */
 const WALLET_BACK = `<div class="wallet-row"><span class="muted">Linked a wallet before?</span><button type="button" class="btn small quiet" data-link-wallet>Bring my groups back</button></div>

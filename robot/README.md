@@ -8,7 +8,7 @@ Kickoff's robot: the program that does by itself what nobody should have to do b
 > ([the run](https://github.com/Mhiah/Kickoff/actions/runs/45319717010)).
 > **Also running live, since 24 November 2026:** its work on X Layer. It locks each match's sealed
 > picks before kickoff, records each result, and publishes the opened picks, through TapeOut's
-> mailbox and site store. It is rehearsed on a private copy of X Layer on every change. 69 tests.
+> mailbox and site store. It is rehearsed on a private copy of X Layer on every change. 73 tests.
 
 ## What it does now
 

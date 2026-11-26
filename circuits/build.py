@@ -1,4 +1,4 @@
-"""Builds Kickoff's three scoring circuits and writes them to circuits/out/.
+"""Builds Kickoff's scoring circuits and writes them to circuits/out/.
 
 Run from the repository root:
 
@@ -11,6 +11,9 @@ Every circuit has two outputs. Read together they are the points for one pick:
 
     points = output 0 + 2 x output 1      so the only possible totals are 0, 1 and 3
 
+A rule that only ever gives 1 point (Result, Goal Goal) keeps output 1 at 0. A rule that only ever
+gives 3 (Exact score) sets both outputs together.
+
 What goes into each circuit, bit by bit, is listed in circuits/README.md.
 """
 from __future__ import annotations
@@ -19,7 +22,7 @@ import hashlib
 import json
 import pathlib
 
-from gates import Net
+from gates import ZERO, Net
 
 OUT = pathlib.Path(__file__).parent / "out"
 
@@ -48,6 +51,54 @@ def football() -> Net:
     )
 
     net.set_outputs([right_result, exact])
+    return net
+
+
+def result() -> Net:
+    """Football, the Result prediction. Inputs (10): your result (2 bits: 0 home, 1 draw, 2 away),
+    real home goals, real away goals (4 bits each). 1 point for the right result. A "3" in the two
+    result bits is not a prediction and scores 0."""
+    net = Net(10)
+    low, high = net.inp(0), net.inp(1)
+    real_home, real_away = bits(net, 2, 4), bits(net, 6, 4)
+
+    said_home = net.and_(net.not_(low), net.not_(high))
+    said_draw = net.and_(low, net.not_(high))
+    said_away = net.and_(net.not_(low), high)
+
+    home_win, level = net.greater(real_home, real_away), net.same(real_home, real_away)
+    away_win = net.and_(net.not_(home_win), net.not_(level))
+
+    right = net.or_(net.and_(said_home, home_win), net.and_(said_draw, level), net.and_(said_away, away_win))
+
+    net.set_outputs([right, ZERO])
+    return net
+
+
+def goalgoal() -> Net:
+    """Football, the Goal Goal prediction. Inputs (9): your answer (1 bit: 1 means both sides
+    score), real home goals, real away goals (4 bits each). 1 point for the right answer."""
+    net = Net(9)
+    said_both = net.inp(0)
+    real_home, real_away = bits(net, 1, 4), bits(net, 5, 4)
+
+    both_scored = net.and_(net.or_(*real_home), net.or_(*real_away))
+
+    net.set_outputs([net.same_bit(said_both, both_scored), ZERO])
+    return net
+
+
+def score() -> Net:
+    """Football, the Exact score prediction. Inputs (16), laid out as the football circuit's: your
+    home goals, your away goals, real home goals, real away goals. 3 points for the exact score
+    and nothing for anything else."""
+    net = Net(16)
+    my_home, my_away = bits(net, 0, 4), bits(net, 4, 4)
+    real_home, real_away = bits(net, 8, 4), bits(net, 12, 4)
+
+    exact = net.and_(net.same(my_home, real_home), net.same(my_away, real_away))
+
+    net.set_outputs([exact, exact])
     return net
 
 
@@ -89,7 +140,7 @@ def tennis() -> Net:
     return net
 
 
-CIRCUITS = {"football": football, "basketball": basketball, "tennis": tennis}
+CIRCUITS = {"football": football, "basketball": basketball, "tennis": tennis, "result": result, "goalgoal": goalgoal, "score": score}
 
 
 def main() -> None:

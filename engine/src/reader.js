@@ -34,7 +34,7 @@ import { equal, id32, toHex } from "./bytes.js";
 import { lockRef } from "./bundle.js";
 import { matchId, matchInfoOf } from "./match.js";
 import { parseMessage } from "./messages.js";
-import { decodePick } from "./picks.js";
+import { decodeResult } from "./picks.js";
 
 export const CHALLENGE_WINDOW = 24 * 60 * 60;
 
@@ -100,7 +100,7 @@ export async function readLeague({ league, account, messages }) {
       const entry = { index: m.index, givenAt: m.timestamp, state: parsed.state };
       if (parsed.state === "final") {
         try {
-          entry.result = decodePick(match.fixture.sport, parsed.resultByte, matchInfoOf(match.fixture));
+          entry.result = decodeResult(match.fixture.sport, parsed.resultByte, matchInfoOf(match.fixture));
           entry.resultByte = parsed.resultByte;
         } catch {
           ignore(m, "a result that cannot happen in this kind of match");

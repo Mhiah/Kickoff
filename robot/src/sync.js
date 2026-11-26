@@ -17,7 +17,7 @@ import { AHEAD, BEHIND, plan } from "./fixtures.js";
  * @returns a report: { ok, dryRun, from, to, fetched, added, updated, calledOff, unchanged, problems }
  */
 export async function syncFixtures({ server, adminKey, keys, now, dryRun = false, fetch = globalThis.fetch }) {
-  const report = { ok: true, dryRun, from: day(now, -BEHIND), to: day(now, AHEAD), fetched: {}, added: [], updated: [], calledOff: [], unchanged: 0, problems: [] };
+  const report = { ok: true, dryRun, from: day(now, -BEHIND), to: day(now, AHEAD), fetched: {}, added: [], updated: [], calledOff: [], replaced: [], unchanged: 0, problems: [] };
 
   const list = await fetch(`${server}/api/fixtures`).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) })).catch(() => null);
   if (!list || list.status !== 200 || !Array.isArray(list.body?.fixtures)) {
@@ -37,6 +37,7 @@ export async function syncFixtures({ server, adminKey, keys, now, dryRun = false
   report.added = changes.added;
   report.updated = changes.updated;
   report.calledOff = changes.calledOff;
+  report.replaced = changes.replaced;
   report.unchanged = changes.unchanged;
   for (const u of changes.updated.filter((x) => x.refused)) report.problems.push(`${u.label}: the feed now says "${u.to}" for a match already finished as "${u.from}". Left as it was.`);
 
@@ -73,6 +74,7 @@ export function inWords(report) {
   if (report.added.length > 40) lines.push(`  + and ${report.added.length - 40} more`);
   for (const u of report.updated.filter((x) => !x.refused)) lines.push(`  ~ ${u.label}: ${u.from} -> ${u.to}`);
   for (const label of report.calledOff) lines.push(`  x ${label}: moved, so the old time is off`);
+  for (const label of report.replaced ?? []) lines.push(`  x ${label}: was one prediction, now three (result, goal goal, exact score)`);
   if (report.problems.length) lines.push("Problems:");
   for (const p of report.problems) lines.push(`  ! ${p}`);
   return lines.join("\n");

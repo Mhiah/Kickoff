@@ -37,14 +37,22 @@ const orNull = async (work) => {
   }
 };
 
+/**
+ * The scoring circuits, in the order they are published. The first three went up when Kickoff
+ * went live. The last three are football's three predictions, added later: publishing again only
+ * sends the ones that are not there yet.
+ */
+export const SCORING = ["football", "basketball", "tennis", "result", "goalgoal", "score"];
+const WORDS = { result: "football result", goalgoal: "football goal goal", score: "football exact score" };
+
 /** The league's circuit first, then the scoring circuits, in the order they are published. */
 function wanted(circuits) {
   return [
     { name: "league", what: "the league's own circuit", netlist: clean(ONE_GATE), nIn: 1, nOut: 1 },
-    ...["football", "basketball", "tennis"].map((name) => {
+    ...SCORING.map((name) => {
       const c = circuits[name];
       if (!c) throw new Error(`the ${name} circuit is missing`);
-      return { name, what: `the ${name} scoring circuit`, netlist: clean(c.netlist), nIn: c.inputs, nOut: c.outputs };
+      return { name, what: `the ${WORDS[name] ?? name} scoring circuit`, netlist: clean(c.netlist), nIn: c.inputs, nOut: c.outputs };
     }),
   ].map((c) => ({ ...c, gates: c.netlist.length / 14 }));
 }

@@ -15,14 +15,14 @@
 //   label                 the rest  for example "Arsenal v Chelsea", as plain text
 
 import { concat, id32, sha256, text, u64 } from "./bytes.js";
-import { BASKETBALL, FOOTBALL, TENNIS } from "./picks.js";
+import { SPORTS, TENNIS } from "./picks.js";
 
 const TAG = text("kickoff/match/v1");
 export const MAX_LABEL_BYTES = 80;
 
 /** Check the facts about a match and return them tidied. Throws if they cannot be a match. */
 export function checkFixture({ sport, kickoff, bestOf = 0, label }) {
-  if (![FOOTBALL, BASKETBALL, TENNIS].includes(sport)) throw new RangeError("unknown sport");
+  if (!SPORTS.includes(sport)) throw new RangeError("unknown sport");
   if (!Number.isSafeInteger(kickoff) || kickoff <= 0) throw new RangeError("kickoff must be a time in whole seconds");
   if (sport === TENNIS ? bestOf !== 3 && bestOf !== 5 : bestOf !== 0) {
     throw new RangeError("best of must be 3 or 5 for tennis and 0 for the other sports");

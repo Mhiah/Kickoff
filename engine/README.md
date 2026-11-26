@@ -70,7 +70,7 @@ Every one of these must hold. The first that fails is the reason given.
 
 ## Scoring: the same circuits that go on chain
 
-The engine does not have its own copy of the scoring rules. It reads the three circuit files in
+The engine does not have its own copy of the scoring rules. It reads the circuit files in
 [`circuits/out/`](../circuits/out/), the ones that get published on chain, and runs them. So the
 points the website shows are worked out by the same gates a TapeOut processor uses.
 

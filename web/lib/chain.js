@@ -8,7 +8,7 @@
 // The last answer is kept on the device so a screen can be drawn at once.
 
 import { toHex } from "../engine/bytes.js";
-import { BASKETBALL_HEX, FOOTBALL_HEX, TENNIS_HEX } from "../engine/published.js";
+import { PUBLISHED } from "../engine/published.js";
 import { loadCircuits } from "../engine/score.js";
 import { XLAYER, tableFromXLayer } from "../engine/xlayer.js";
 
@@ -59,7 +59,7 @@ export function createChain({ store, node = XLAYER.node, read = tableFromXLayer,
     async refresh({ league, players = [] }) {
       const before = store.read(CHAIN_KEY);
       try {
-        circuits ??= loadCircuits({ football: FOOTBALL_HEX, basketball: BASKETBALL_HEX, tennis: TENNIS_HEX });
+        circuits ??= loadCircuits(PUBLISHED);
         const built = await read({ node, league, circuits, players });
         const txOf = new Map(built.messages.map((m) => [m.index, m.tx ?? null]));
         const matches = {};

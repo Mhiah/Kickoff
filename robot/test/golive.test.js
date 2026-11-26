@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 
 import { decode, encode, selector } from "../../engine/src/abi.js";
 import { fromHex, leagueId, toHex } from "../../engine/src/index.js";
-import { GAS_FLOOR, OKB, goLive, inOkb, lookAtGoingLive, lookInWords } from "../src/golive.js";
+import { GAS_FLOOR, OKB, SCORING, goLive, inOkb, lookAtGoingLive, lookInWords } from "../src/golive.js";
 import { ONE_GATE, TRANSFER } from "../src/xlayer.js";
 
 const PROCESSOR = "0x39e44dba62811e87fde122ca4d6c082568a384d0";
@@ -23,12 +23,12 @@ const GAS = 10_000_000_000_000n; // what the stand-in charges for each transacti
 
 const manifest = JSON.parse(readFileSync(new URL("../../circuits/out/manifest.json", import.meta.url), "utf8"));
 const CIRCUITS = Object.fromEntries(
-  ["football", "basketball", "tennis"].map((name) => [
+  SCORING.map((name) => [
     name,
     { netlist: readFileSync(new URL(`../../circuits/out/${name}.hex`, import.meta.url), "utf8").trim(), inputs: manifest[name].inputs, outputs: manifest[name].outputs },
   ]),
 );
-const GATES = 1 + manifest.football.gates + manifest.basketball.gates + manifest.tennis.gates;
+const GATES = 1 + SCORING.reduce((sum, name) => sum + manifest[name].gates, 0);
 
 const word = (n) => BigInt(n).toString(16).padStart(64, "0");
 const accountFor = (id) => `0x${createHash("sha256").update(`${PROCESSOR}/${id}`).digest("hex").slice(0, 40)}`;
@@ -117,14 +117,14 @@ function standIn({ existing = 4, holds = OKB, price = 0n } = {}) {
   return s;
 }
 
-const ALL_FEES = 4n * (FLAT + TAPEOUT) + OPEN; // 0.08784 OKB
+const ALL_FEES = 7n * (FLAT + TAPEOUT) + OPEN; // 0.09372 OKB: the league, the six scoring circuits, and opening the account
 
 test("a look says what is still to do and what it costs, and sends nothing", async () => {
   const x = standIn();
   const look = await lookAtGoingLive({ ...x.settings, wallet: WALLET });
-  assert.deepEqual(look.steps.map((s) => `${s.does} ${s.name}`), ["publish league", "open account", "publish football", "publish basketball", "publish tennis"]);
+  assert.deepEqual(look.steps.map((s) => `${s.does} ${s.name}`), ["publish league", "open account", "publish football", "publish basketball", "publish tennis", "publish result", "publish goalgoal", "publish score"]);
   assert.equal(look.fee, ALL_FEES);
-  assert.equal(inOkb(look.fee), "0.087840 OKB");
+  assert.equal(inOkb(look.fee), "0.093720 OKB");
   assert.equal(look.gas, GAS_FLOOR);
   assert.equal(look.need, ALL_FEES + GAS_FLOOR);
   assert.equal(look.short, 0n);
@@ -133,26 +133,49 @@ test("a look says what is still to do and what it costs, and sends nothing", asy
   assert.deepEqual(x.sent, []);
 
   const words = lookInWords(look, { serverLeague: look.league.id });
-  assert.match(words, /TapeOut's fees in all: +0\.087840 OKB/);
+  assert.match(words, /TapeOut's fees in all: +0\.093720 OKB/);
   assert.match(words, /The wallet holds enough\./);
   assert.match(words, /That is the league Kickoff's server is already set up for\./);
   assert.match(lookInWords(look, { serverLeague: "ab".repeat(32) }), /NOT THE LEAGUE KICKOFF'S SERVER IS SET UP FOR/);
 });
 
-test("going live publishes the league first, opens its account, then the three scoring circuits", async () => {
+test("going live publishes the league first, opens its account, then the scoring circuits", async () => {
   const x = standIn();
   const said = [];
   const done = await goLive({ ...x.settings, sender: x.sender, say: (line) => said.push(line) });
-  assert.deepEqual(done.did, ["league", "account", "football", "basketball", "tennis"]);
-  assert.deepEqual(done.have, { league: 5, football: 6, basketball: 7, tennis: 8 });
+  assert.deepEqual(done.did, ["league", "account", "football", "basketball", "tennis", "result", "goalgoal", "score"]);
+  assert.deepEqual(done.have, { league: 5, football: 6, basketball: 7, tennis: 8, result: 9, goalgoal: 10, score: 11 });
   assert.equal(done.opened, true);
   assert.deepEqual(done.steps, []);
   assert.equal(x.paid, ALL_FEES, "TapeOut was paid exactly what the look said");
-  assert.equal(done.spent, ALL_FEES + 9n * GAS);
+  assert.equal(done.spent, ALL_FEES + 15n * GAS);
   assert.equal(x.held, 0n, "no transistors bought and left over");
   assert.equal(x.circuits.get(6).netlist, CIRCUITS.football.netlist);
-  assert.equal(said.length, 5);
+  assert.equal(said.length, 8);
   assert.match(lookInWords(done), /Kickoff is live\. There is nothing left to do and nothing to pay\./);
+});
+
+test("football's three predictions are published beside what is already live, and nothing else is touched", async () => {
+  // Kickoff as it went live: the league (circuit 5) with its account open, and football,
+  // basketball and tennis as circuits 6, 7 and 8.
+  const x = standIn();
+  for (const [id, netlist] of [[5, "00000002000002"], [6, CIRCUITS.football.netlist], [7, CIRCUITS.basketball.netlist], [8, CIRCUITS.tennis.netlist]]) x.circuits.set(id, { owner: WALLET, netlist });
+  x.opened.add(5);
+
+  const look = await lookAtGoingLive({ ...x.settings, wallet: WALLET });
+  assert.deepEqual(look.steps.map((s) => `${s.does} ${s.name}`), ["publish result", "publish goalgoal", "publish score"]);
+  assert.equal(look.fee, 3n * (FLAT + TAPEOUT));
+  assert.equal(inOkb(look.fee), "0.005880 OKB");
+  assert.equal(look.league.circuit, 5, "the league is still circuit 5");
+
+  const done = await goLive({ ...x.settings, sender: x.sender });
+  assert.deepEqual(done.did, ["result", "goalgoal", "score"]);
+  assert.deepEqual(done.have, { league: 5, football: 6, basketball: 7, tennis: 8, result: 9, goalgoal: 10, score: 11 });
+  assert.equal(x.paid, 3n * (FLAT + TAPEOUT), "only the three new circuits were paid for");
+  assert.equal(x.opened.size, 1, "no second account was opened");
+  assert.equal(x.circuits.get(9).netlist, CIRCUITS.result.netlist);
+  assert.equal(x.circuits.get(10).netlist, CIRCUITS.goalgoal.netlist);
+  assert.equal(x.circuits.get(11).netlist, CIRCUITS.score.netlist);
 });
 
 test("going live a second time sends nothing and pays nothing", async () => {
@@ -185,7 +208,7 @@ test("after a failure half way, running it again finishes the job and nothing is
     x.failAt = null;
     const done = await goLive({ ...x.settings, sender: x.sender });
     assert.deepEqual(done.steps, [], `finished after failing at transaction ${failAt}`);
-    assert.deepEqual(done.have, { league: 5, football: 6, basketball: 7, tennis: 8 });
+    assert.deepEqual(done.have, { league: 5, football: 6, basketball: 7, tennis: 8, result: 9, goalgoal: 10, score: 11 });
     assert.equal(x.paid, ALL_FEES, `paid once for each thing after failing at transaction ${failAt}`);
     assert.equal(x.held, 0n);
     assert.equal(x.opened.size, 1);

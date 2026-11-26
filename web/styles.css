@@ -217,6 +217,17 @@ body.public .tabs { display: none; }
 .choice small { display: block; font-weight: 400; color: var(--muted); font-size: 13.5px; }
 .choice[aria-pressed="true"] { background: var(--ink); color: var(--paper); box-shadow: none; }
 .choice[aria-pressed="true"] small { color: inherit; opacity: 0.75; }
+.picker h3 small { font-weight: 400; color: var(--muted); font-size: 14px; margin-left: 8px; }
+.picker .ask { margin: -6px 0 10px; font-size: 15px; color: var(--muted); }
+.market + .market { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--hair); }
+.choices.three { grid-template-columns: repeat(3, 1fr); }
+.choice { overflow-wrap: anywhere; }
+[data-clear-score] { margin-top: 6px; }
+.said-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.said-row + .said-row { border-top: 1px solid var(--hair); }
+.said-row .what { color: var(--muted); font-size: 15px; }
+.said-row b { font-size: 21px; text-align: right; }
+.said-row b.none { font-size: 15px; font-weight: 400; color: var(--muted); }
 .rules { margin: 16px 0 20px; font-size: 15px; }
 .rules li { margin-left: 18px; padding: 2px 0; }
 .after { margin-top: 14px; font-size: 14.5px; color: var(--muted); }

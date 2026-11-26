@@ -6,7 +6,7 @@ Written notes for the project.
   sport.
 - [PROTOCOL.md](PROTOCOL.md): exactly what a league puts on chain, and the rules for reading it back
   and rebuilding the table without asking Kickoff.
-- [CHECK-RESULTS.md](CHECK-RESULTS.md): the results of checking the three scoring circuits against
+- [CHECK-RESULTS.md](CHECK-RESULTS.md): the results of checking the scoring circuits against
   those rules on every possible case. Written by `python3 circuits/check.py`.
 
 - [REHEARSAL-RESULTS.md](REHEARSAL-RESULTS.md): what happened when the X Layer rehearsals were run

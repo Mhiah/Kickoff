@@ -100,7 +100,7 @@ test("the first person on Kickoff is 1st, with no points, and nothing on the scr
   assert.deepEqual(rowsOf(html, "everyone"), ["1 mya 0 (you)"]);
   assert.deepEqual(rowsOf(html, "group"), ["1 mya 0 (you)"]);
   assert.deepEqual(tile(html, "Your place"), ["1st", "of 1 player"]);
-  assert.deepEqual(tile(html, "Your points"), ["0", "0 spot on, 0 right winner"]);
+  assert.deepEqual(tile(html, "Your points"), ["0", "0 for 3 points, 0 for 1"]);
   assert.deepEqual(tile(html, "Predicted this week"), ["0 of 2", "predict as many as you like"]);
   assert.match(html, /Nothing played yet\./);
   assert.match(html, /<h1[^>]*>League<\/h1>/);
@@ -167,7 +167,7 @@ test("whoever joins next is 2nd; whoever scores more goes above; My group is onl
   assert.match(html, /<div class="title">Arsenal 2 – 1 Chelsea<\/div><div class="sub">You said 0 – 0<\/div><\/div><div class="points zero">0<\/div>/);
   html = await jerkson.league();
   assert.deepEqual(tile(html, "Your place"), ["1st", "of 3 players"]);
-  assert.deepEqual(tile(html, "Your points"), ["3", "1 spot on, 0 right winner"]);
+  assert.deepEqual(tile(html, "Your points"), ["3", "1 for 3 points, 0 for 1"]);
   assert.match(html, /You said 2 – 1<\/div><\/div><div class="points ">3<\/div>/);
 
   // My record says the same, in full.
@@ -225,7 +225,7 @@ test("a match that was not locked on X Layer in time: the prediction says so pla
   assert.deepEqual(box(record, "Total won"), ["0", "0 spot on"]);
   assert.deepEqual(box(record, "Win rate"), ["–", "of 0 played"]);
   const html = await mya.league();
-  assert.deepEqual(tile(html, "Your points"), ["0", "0 spot on, 0 right winner"]);
+  assert.deepEqual(tile(html, "Your points"), ["0", "0 for 3 points, 0 for 1"]);
   assert.ok(html.includes(said), "the League screen's list of finished predictions says it too");
 
   // Later the match has dropped off the website's list of matches. It is still there, and still explained.

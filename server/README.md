@@ -56,7 +56,7 @@ does the locking and tells the server how it went for each match: locked, or mis
 scores once three things are true: the match was locked, it has a result, and the pick has been
 opened. Whichever happens last does the scoring. A match whose lock was missed never scores for
 anyone, any points already given for it are taken back, and each player who picked it is shown
-why. This keeps Kickoff's own tables the same as the ones anyone can rebuild from X Layer. The points come from Kickoff's three scoring circuits, the same ones that are
+why. This keeps Kickoff's own tables the same as the ones anyone can rebuild from X Layer. The points come from Kickoff's scoring circuits, the same ones that are
 published on X Layer, which the server carries as text in `src/circuits.js`. A test fails if that
 copy ever differs from the published files.
 

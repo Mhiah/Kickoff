@@ -1,11 +1,13 @@
 # circuits
 
-Kickoff's three scoring rules as TapeOut circuits, and the checker that proves they match the
+Kickoff's scoring rules as TapeOut circuits, and the checker that proves they match the
 written rules in [docs/RULES.md](../docs/RULES.md).
 
 > [!NOTE]
-> These circuits are built and checked off chain. They are **not published on X Layer yet**, so
-> there is no processor address or circuit ID. Those are added here when they exist.
+> Football, basketball and tennis are published on X Layer as circuits 6, 7 and 8 of processor
+> `0x39e44dba62811e87fde122ca4d6c082568a384d0`. Result, Goal Goal and Score, football's three
+> predictions, are built and checked here and are published beside them next. Their circuit IDs
+> are added here when they exist.
 
 ## What a scoring circuit is
 
@@ -24,13 +26,20 @@ Every circuit has two outputs:
 
 **Points = output 0 + 2 x output 1.** So the only totals a circuit can give are 0, 1 and 3.
 
-## The three circuits
+## The circuits
 
 | Circuit | Inputs | Outputs | Gates | Size | Cases checked |
 | --- | --- | --- | --- | --- | --- |
 | Football | 16 | 2 | 148 | 1,036 bytes | 65,536 (all of them) |
 | Basketball | 6 | 2 | 20 | 140 bytes | 64 (all of them) |
 | Tennis | 7 | 2 | 37 | 259 bytes | 128 (all of them) |
+| Result | 10 | 2 | 61 | 427 bytes | 1,024 (all of them) |
+| Goal Goal | 9 | 2 | 26 | 182 bytes | 512 (all of them) |
+| Score | 16 | 2 | 55 | 385 bytes | 65,536 (all of them) |
+
+The last three are football's three predictions: the result, goal goal and the exact score. Each
+is scored by its own circuit. "Football" is the older single football prediction (the exact score,
+with 1 point for the right result), which the first matches were played under.
 
 The circuits themselves are the `.hex` files in [`out/`](out/), in TapeOut's circuit format
 (TAP-02). `out/manifest.json` lists the size and fingerprint of each.
@@ -58,6 +67,32 @@ Packed into two bytes, the first byte is your pick and the second is the real sc
 | 3-1 | 2-1 | `0x1312` | `0x01` | 1 |
 | 1-1 | 2-1 | `0x1112` | `0x00` | 0 |
 | 0-2 | 2-1 | `0x2012` | `0x00` | 0 |
+
+### Result (10 inputs)
+
+| Bits | What it is |
+| --- | --- |
+| 0 to 1 | Your result: 0 home win, 1 draw, 2 away win. 3 is not a prediction and scores 0 |
+| 2 to 5 | Real home goals (0 to 15) |
+| 6 to 9 | Real away goals (0 to 15) |
+
+1 point for the right result. Output 1 is always 0, so the circuit can only give 0 or 1.
+
+### Goal Goal (9 inputs)
+
+| Bits | What it is |
+| --- | --- |
+| 0 | Your answer: 1 if you say both teams score, 0 if you say they do not |
+| 1 to 4 | Real home goals (0 to 15) |
+| 5 to 8 | Real away goals (0 to 15) |
+
+1 point for the right answer. Both teams score when each has at least one goal. Output 1 is
+always 0.
+
+### Score (16 inputs)
+
+Laid out exactly as Football above: your home goals, your away goals, real home goals, real away
+goals. 3 points for the exact score and nothing otherwise: both outputs are 1 together, or both 0.
 
 ### Basketball (6 inputs)
 
@@ -115,7 +150,7 @@ The latest results are in [docs/CHECK-RESULTS.md](../docs/CHECK-RESULTS.md).
 You need Python 3.11 or newer. Nothing else to install. From the repository root:
 
 ```
-python3 circuits/build.py     # builds the three circuits into circuits/out/
+python3 circuits/build.py     # builds the circuits into circuits/out/
 python3 circuits/check.py     # checks every possible case, writes the results
 ```
 
@@ -124,8 +159,8 @@ python3 circuits/check.py     # checks every possible case, writes the results
 | File | What it is |
 | --- | --- |
 | `gates.py` | A small builder that turns ordinary logic (and, or, equal, greater than) into NAND gates in TapeOut's format |
-| `build.py` | The three rules written with that builder |
-| `rules.py` | The same three rules as plain code, used as the answer sheet |
+| `build.py` | The rules written with that builder |
+| `rules.py` | The same rules as plain code, used as the answer sheet |
 | `tap02.py` | Kickoff's own reader and evaluator for TapeOut circuits, written separately from the builder |
 | `check.py` | The checker |
 | `third_party/` | TapeOut's official reference evaluator, copied unchanged, with its source and licence |

@@ -43,5 +43,50 @@
     "damaged_copies_made": 37,
     "damaged_copies_caught": 37,
     "problems": []
+  },
+  "result": {
+    "inputs": 10,
+    "gates": 61,
+    "bytes": 427,
+    "sha256": "454f021b85cc2794f057707dfe5c9eeb664d668f62ecac601419291554b92cdc",
+    "cases_checked": 1024,
+    "cases_wrong_kickoff_evaluator": 0,
+    "cases_wrong_tapeout_reference_evaluator": 0,
+    "cases_scoring_0": 768,
+    "cases_scoring_1": 256,
+    "cases_scoring_3": 0,
+    "damaged_copies_made": 61,
+    "damaged_copies_caught": 61,
+    "problems": []
+  },
+  "goalgoal": {
+    "inputs": 9,
+    "gates": 26,
+    "bytes": 182,
+    "sha256": "6f682fbf847288ed300520f1ffebd85134de7842b72f9f7254a1b4f4c08d731d",
+    "cases_checked": 512,
+    "cases_wrong_kickoff_evaluator": 0,
+    "cases_wrong_tapeout_reference_evaluator": 0,
+    "cases_scoring_0": 256,
+    "cases_scoring_1": 256,
+    "cases_scoring_3": 0,
+    "damaged_copies_made": 26,
+    "damaged_copies_caught": 26,
+    "problems": []
+  },
+  "score": {
+    "inputs": 16,
+    "gates": 55,
+    "bytes": 385,
+    "sha256": "49bf5d33c924f1e705b77c55b8bc71a6c787ac7b5fb6c986b969af75bcddb1bc",
+    "cases_checked": 65536,
+    "cases_wrong_kickoff_evaluator": 0,
+    "cases_wrong_tapeout_reference_evaluator": 0,
+    "cases_scoring_0": 65280,
+    "cases_scoring_1": 0,
+    "cases_scoring_3": 256,
+    "damaged_copies_made": 55,
+    "damaged_copies_caught": 55,
+    "problems": []
   }
 }

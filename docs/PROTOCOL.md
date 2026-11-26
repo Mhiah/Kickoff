@@ -31,7 +31,11 @@ passed off as another. Numbers are written biggest part first.
 | **A node of the bundle** | `0x01`, left (32), right (32) |
 | **The lock value** | `kickoff/lock/v1` (15 bytes), league (32), match (32), number of picks (8), bundle root (32) |
 
-Sport is 1 for football, 2 for basketball, 3 for tennis. Best of is 3 or 5 for tennis and 0 for the
+Sport is 1 for football, 2 for basketball, 3 for tennis. A football match is three predictions,
+and each is a match of its own with a sport number of its own: 4 for the result, 5 for goal goal
+and 6 for the exact score. They share the kickoff time and the label, so only the sport number
+tells their ids apart, and all three are given the same result. Sport 1 is the older single
+football prediction, which the first matches were played under. Best of is 3 or 5 for tennis and 0 for the
 other sports. The pick byte is laid out as that sport's scoring circuit expects, as shown in
 [circuits/README.md](../circuits/README.md).
 

@@ -22,6 +22,29 @@ def football_points(my_home: int, my_away: int, real_home: int, real_away: int) 
     return 1 if result(my_home, my_away) == result(real_home, real_away) else 0
 
 
+def result_points(my_result: str, real_home: int, real_away: int) -> int:
+    """Football, the Result prediction: 1 for saying how the match ends, otherwise 0.
+
+    my_result is "home", "draw" or "away". Anything else is not a prediction and scores 0."""
+    if real_home > real_away:
+        real = "home"
+    elif real_home < real_away:
+        real = "away"
+    else:
+        real = "draw"
+    return 1 if my_result == real else 0
+
+
+def goal_goal_points(my_both_score: bool, real_home: int, real_away: int) -> int:
+    """Football, the Goal Goal prediction: 1 for saying whether both sides score, otherwise 0."""
+    return 1 if my_both_score == (real_home > 0 and real_away > 0) else 0
+
+
+def score_points(my_home: int, my_away: int, real_home: int, real_away: int) -> int:
+    """Football, the Exact score prediction: 3 for the exact score, otherwise 0."""
+    return 3 if my_home == real_home and my_away == real_away else 0
+
+
 def basketball_points(my_winner: str, my_band: str, real_winner: str, real_band: str) -> int:
     """3 for the right winner and the right margin band, 1 for the right winner only, else 0.
 

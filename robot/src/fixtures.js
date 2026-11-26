@@ -9,7 +9,7 @@
 //   - a match that is moved to a new time is a new match with a new id. The old one is called off,
 //     and nobody scores for it.
 
-import { matchId, toHex } from "../../engine/src/index.js";
+import { FOOTBALL, FOOTBALL_MARKETS, GOAL_GOAL, RESULT, SCORE, matchId, toHex } from "../../engine/src/index.js";
 
 /** How far ahead matches are put on the list, and how far back results are still looked for, in days. */
 export const AHEAD = 7;
@@ -50,14 +50,46 @@ const comparable = (f) => {
  *   updated    matches whose state or score changed: [{ label, from, to }]
  *   calledOff  matches the feed has moved to another time, so the old one is off: [label]
  */
+/** Predictions close this long before kickoff, in seconds. The same number as the server's. */
+const CLOSES_BEFORE = 10 * 60;
+const MARKET_TAGS = { [RESULT]: "result", [GOAL_GOAL]: "goalgoal", [SCORE]: "score" };
+const REPLACED = "now three predictions";
+
+/**
+ * A football match is three predictions: the result, goal goal and the exact score. Each is a
+ * match of its own on Kickoff's list, with its own id, and all three share the teams, the time
+ * and the result. This turns the feed's one football match into those three.
+ *
+ * The first football matches were listed as ONE prediction (the exact score). One of those that
+ * has already closed, or finished, is left to play out as it was. One that is still open is
+ * replaced by the three (see plan() below).
+ */
+async function asListed(league, feed, byId, now) {
+  const out = [];
+  for (const m of feed) {
+    if (m.sport !== FOOTBALL) {
+      out.push(m);
+      continue;
+    }
+    const old = byId.get(toHex(await matchId(league, { sport: FOOTBALL, kickoff: m.kickoff, bestOf: 0, label: m.label })));
+    if (old && old.state !== "void" && (old.state === "final" || now >= old.kickoff - CLOSES_BEFORE)) {
+      out.push(m);
+      continue;
+    }
+    for (const sport of FOOTBALL_MARKETS) out.push({ ...m, sport, feedId: `${m.feedId}:${MARKET_TAGS[sport]}` });
+  }
+  return out;
+}
+
 export async function plan({ league, feed, listed, now }) {
-  const wanted = await withIds(league, feed);
   const byId = new Map(listed.map((f) => [f.id, f]));
+  const wanted = await withIds(league, await asListed(league, feed, byId, now));
   const put = [];
   const added = [];
   const updated = [];
   const calledOff = [];
-  let unchanged = 0;
+  const replaced = [];
+  const same_ = new Set(); // matches with nothing to change: a football match's three lines count once
 
   for (const w of wanted) {
     const have = byId.get(w.id);
@@ -76,19 +108,32 @@ export async function plan({ league, feed, listed, now }) {
       put.push(w);
       updated.push({ label: w.label, from: `${have.state} ${have.score ?? ""}`.trim(), to: `${w.state} ${w.score ?? ""}`.trim() });
     } else {
-      unchanged++;
+      same_.add(`${w.label}|${w.kickoff}`);
     }
   }
 
   // A match the feed still has, under the same name of its own, but at a different time: it has
   // been moved. The one on the list at the old time is called off.
   const nowAt = new Map(wanted.map((w) => [w.feedId, w.id]));
+  const wantedIds = new Set(wanted.map((w) => w.id));
   for (const have of listed) {
     const movedTo = nowAt.get(have.feedId);
     if (movedTo && movedTo !== have.id && have.state !== "void" && have.state !== "final") {
       put.push({ ...comparable(have), state: "void", note: "moved to another time", score: undefined, resultByte: undefined });
       calledOff.push(have.label);
+    } else if (have.sport === FOOTBALL && !wantedIds.has(have.id) && have.state !== "void" && have.state !== "final" && now < have.kickoff - CLOSES_BEFORE) {
+      // A football match listed the older way, as one prediction, and still open: the three
+      // predictions have taken its place. Nobody scores for the old one.
+      put.push({ ...comparable(have), state: "void", note: REPLACED, score: undefined, resultByte: undefined });
+      replaced.push(have.label);
     }
   }
-  return { put: put.map((f) => JSON.parse(JSON.stringify(f))), added, updated, calledOff, unchanged };
+  // A football match is three lines on the list and one match to a person: say each once.
+  const once = (labels) => [...new Set(labels)];
+  const seen = new Set();
+  const updatedOnce = updated.filter((u) => {
+    const key = `${u.label}|${u.from}|${u.to}|${u.refused ?? ""}`;
+    return seen.has(key) ? false : (seen.add(key), true);
+  });
+  return { put: put.map((f) => JSON.parse(JSON.stringify(f))), added: once(added), updated: updatedOnce, calledOff: once(calledOff), replaced: once(replaced), unchanged: same_.size };
 }

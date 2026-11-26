@@ -1,6 +1,6 @@
 # The rules of Kickoff, in plain words
 
-These are the rules every league plays by. The scoring parts of this page are what the three
+These are the rules every league plays by. The scoring parts of this page are what the
 scoring circuits in [circuits/](../circuits/) are built from, so if a rule here changes, the circuit for it has to be rebuilt
 and published again as a new circuit. A circuit that is already published can never be changed.
 
@@ -8,8 +8,10 @@ and published again as a new circuit. A circuit that is already published can ne
 
 **Making a prediction**
 
-- One prediction per player per match.
-- You can change your predict as many times as you like before the match starts. The last one you
+- One prediction per player per match in basketball. In football a match has three predictions:
+  the result, goal goal and the exact score. A player can make one, two or all three, and each
+  is sealed, locked and scored by itself.
+- You can change your prediction as many times as you like before the match starts. The last one you
   made before kickoff is the one that counts.
 - Predictions are sealed. Nobody can see anyone else's prediction before the match starts, including the league
   host.
@@ -35,9 +37,11 @@ and published again as a new circuit. A circuit that is already published can ne
 
 **Scoring**
 
-- Every sport gives 0, 1 or 3 points for a match. 3 is the most anyone can get from one match.
-- The bonus points only count when the winner is right. A right margin or a right number of sets
-  with the wrong winner scores 0.
+- Every prediction gives 0, 1 or 3 points.
+- A basketball match gives at most 3. A football match gives at most 5: 1 for the result, 1 for
+  goal goal and 3 for the exact score.
+- In basketball the bonus points only count when the winner is right. A right margin with the
+  wrong winner scores 0.
 
 **Matches that do not finish**
 
@@ -47,29 +51,38 @@ and published again as a new circuit. A circuit that is already published can ne
 
 ## Football
 
-**What you predict:** the exact score, as home goals and away goals.
+**What you predict:** up to three things about each match. Make one, two or all three.
+
+| Prediction | What you say | Points if you are right |
+| --- | --- | --- |
+| **Result** | How the match ends: home win, draw or away win | 1 |
+| **Goal Goal** | Whether both teams score: yes or no | 1 |
+| **Exact score** | The score, as home goals and away goals | 3 |
+
+Each is scored by itself. A right result with the wrong exact score is 1 point from Result and
+nothing from Exact score.
 
 **Which score counts:** the score at the end of normal time, which is 90 minutes plus stoppage
 time. Extra time and penalty shootouts do not count. A cup match that is 1-1 after 90 minutes is a
 1-1 draw in Kickoff, whoever goes through.
 
-**Points**
-
-| Your prediction | Points |
-| --- | --- |
-| The exact score | 3 |
-| The right result (home win, draw or away win) but the wrong score | 1 |
-| The wrong result | 0 |
-
 **Examples.** The match ends 2-1 to the home team.
 
 | You predicted | Points | Why |
 | --- | --- | --- |
-| 2-1 | 3 | Exact score |
-| 1-0 | 1 | Home win, wrong score |
-| 3-1 | 1 | Home win, wrong score |
-| 1-1 | 0 | You predicted a draw |
-| 0-2 | 0 | You predicted an away win |
+| Result: home win | 1 | The home team won |
+| Result: draw | 0 | It was not a draw |
+| Goal Goal: yes | 1 | Both teams scored |
+| Goal Goal: no | 0 | Both teams scored |
+| Exact score: 2-1 | 3 | Exact score |
+| Exact score: 1-0 | 0 | Right winner, wrong score. The winner is what Result is for |
+| All three: home win, yes, 2-1 | 5 | 1 + 1 + 3 |
+
+Goal Goal is "no" when one team or neither scores: 1-0 and 0-0 are both "no".
+
+**The first matches.** Until 26 November 2026 a football match had one prediction, the exact
+score, which gave 3 points for the exact score and 1 for the right result with the wrong score.
+Matches played under that rule keep the points it gave them.
 
 **The limit:** each side's goals run from 0 to 15. A side that scores more than 15 is recorded
 as 15.

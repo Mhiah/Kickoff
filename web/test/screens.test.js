@@ -149,7 +149,7 @@ test("with no group yet, the group screen offers to start one or join one", () =
   const both = groupScreen(undefined, ctx).html;
   assert.match(both, /data-form="start"/);
   assert.match(both, /data-form="join"/);
-  assert.match(both, /No sign-up and no wallet/);
+  assert.match(both, /<b>No sign-up\.<\/b> A wallet is optional: you can link one\./);
   assert.ok(!groupScreen("start", ctx).html.includes('data-form="join"'));
   assert.ok(!groupScreen("join", ctx).html.includes('data-form="start"'));
   // Someone already in a group can still start or join another, and get back.

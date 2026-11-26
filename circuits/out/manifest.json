@@ -19,5 +19,26 @@
     "gates": 37,
     "bytes": 259,
     "sha256": "28d758b254c1193a1d80d7f4695545a20563bb86d6258379de6dc8fa077c11be"
+  },
+  "result": {
+    "inputs": 10,
+    "outputs": 2,
+    "gates": 61,
+    "bytes": 427,
+    "sha256": "454f021b85cc2794f057707dfe5c9eeb664d668f62ecac601419291554b92cdc"
+  },
+  "goalgoal": {
+    "inputs": 9,
+    "outputs": 2,
+    "gates": 26,
+    "bytes": 182,
+    "sha256": "6f682fbf847288ed300520f1ffebd85134de7842b72f9f7254a1b4f4c08d731d"
+  },
+  "score": {
+    "inputs": 16,
+    "outputs": 2,
+    "gates": 55,
+    "bytes": 385,
+    "sha256": "49bf5d33c924f1e705b77c55b8bc71a6c787ac7b5fb6c986b969af75bcddb1bc"
   }
 }

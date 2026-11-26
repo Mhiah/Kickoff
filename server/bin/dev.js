@@ -13,7 +13,7 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BASKETBALL, FOOTBALL, matchId, toHex } from "../../engine/src/index.js";
+import { BASKETBALL, FOOTBALL, FOOTBALL_MARKETS, matchId, toHex } from "../../engine/src/index.js";
 import { createHandler } from "../src/http.js";
 import { createKickoff } from "../src/kickoff.js";
 import { MemoryStore } from "../src/store.js";
@@ -38,7 +38,10 @@ if (process.argv.includes("--matches")) {
   const fixtures = [];
   for (const [comp, sport, competition, home, away, kickoffAt] of made) {
     const label = `${competition}: ${home} v ${away}`;
-    fixtures.push({ id: toHex(await matchId(LEAGUE, { sport, kickoff: kickoffAt, bestOf: 0, label })), feedId: `dev:${home}`, comp, sport, kickoff: kickoffAt, label, home, away, state: "scheduled" });
+    // A football match goes on the list as its three predictions: result, goal goal, exact score.
+    for (const kind of sport === FOOTBALL ? FOOTBALL_MARKETS : [sport]) {
+      fixtures.push({ id: toHex(await matchId(LEAGUE, { sport: kind, kickoff: kickoffAt, bestOf: 0, label })), feedId: `dev:${home}:${kind}`, comp, sport: kind, kickoff: kickoffAt, label, home, away, state: "scheduled" });
+    }
   }
   await kickoff.putFixtures({ fixtures });
   console.log(`${fixtures.length} made-up matches are on the list. Picks for the first close in ${minutes} minutes.`);

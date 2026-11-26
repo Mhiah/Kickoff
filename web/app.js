@@ -1,6 +1,7 @@
 // Kickoff's website. No build step and nothing to install: plain files a browser runs as they are.
 
 import { ROBOT_KEY, SERVER } from "./config.js";
+import { GOAL_GOAL, RESULT, SCORE } from "./engine/picks.js";
 import { COMPETITIONS, SAMPLE_LEAGUE, sampleFixtures } from "./data/sample.js";
 import { createDevice } from "./lib/device.js";
 import { createChain } from "./lib/chain.js";
@@ -78,6 +79,17 @@ async function draw({ keepPlace = false } = {}) {
 /** The pick as the controls on the screen now show it, or null if it is not finished. */
 function pickOnScreen() {
   const picker = view.querySelector("[data-picker]");
+  // A football match: up to three predictions, by their kind. One left empty is not made.
+  if (picker.dataset.picker === "markets") {
+    const chosen = {};
+    const result = picker.querySelector('[data-result][aria-pressed="true"]')?.dataset.result;
+    if (result) chosen[RESULT] = { result };
+    const both = picker.querySelector('[data-both][aria-pressed="true"]')?.dataset.both;
+    if (both) chosen[GOAL_GOAL] = { both: both === "yes" };
+    const goals = [...picker.querySelectorAll("[data-score] output")].map((o) => o.textContent);
+    if (goals.length === 2 && goals.every((g) => /^\d+$/.test(g))) chosen[SCORE] = { home: Number(goals[0]), away: Number(goals[1]) };
+    return Object.keys(chosen).length ? chosen : null;
+  }
   if (picker.dataset.picker === "football") {
     const [home, away] = [...picker.querySelectorAll("output")].map((o) => Number(o.textContent));
     return { home, away };
@@ -105,24 +117,43 @@ document.addEventListener("click", async (event) => {
 
   // Making a pick: the score steppers and the one-of-several choices.
   if (target.matches("[data-step]")) {
+    // An exact score that has not been started shows "–" for both sides: the first press starts it at 0 – 0.
+    const block = target.closest("[data-score]");
+    for (const o of block?.querySelectorAll("output") ?? []) if (!/^\d+$/.test(o.textContent)) o.textContent = "0";
     const output = target.parentElement.querySelector("output");
     output.textContent = Math.min(15, Math.max(0, Number(output.textContent) + Number(target.dataset.step)));
     return;
   }
+  if (target.matches("[data-clear-score]")) {
+    for (const o of target.closest("[data-score]").querySelectorAll("output")) o.textContent = "–";
+    return;
+  }
   if (target.matches(".choice")) {
-    for (const other of target.parentElement.querySelectorAll(".choice")) other.setAttribute("aria-pressed", String(other === target));
+    // Where a choice may be left unmade, pressing the chosen one again takes it back.
+    const undo = target.parentElement.matches("[data-optional]") && target.getAttribute("aria-pressed") === "true";
+    for (const other of target.parentElement.querySelectorAll(".choice")) other.setAttribute("aria-pressed", String(other === target && !undo));
     return;
   }
   if (target.matches("[data-seal]")) {
+    const several = view.querySelector("[data-picker]").dataset.picker === "markets";
     const chosen = pickOnScreen();
     if (!chosen) {
-      say(target, "Choose who wins and by how many points first.");
+      say(target, several ? "Make at least one of the three first." : "Choose who wins and by how many points first.");
       return;
     }
     const ctx = await context();
     const fixture = ctx.fixtures[target.dataset.seal];
     try {
-      await seal({ store, league: ctx.league, fixture, competitions: COMPETITIONS, pick: chosen, now: ctx.now, player: ctx.mine.player });
+      if (several) {
+        // Each prediction is sealed by itself. One that has not changed is left exactly as it was.
+        for (const id of fixture.group) {
+          const one = ctx.fixtures[id];
+          const pick = chosen[one.sport];
+          const before = ctx.picks[ctx.matchIds[id]];
+          if (!pick || (before && JSON.stringify(before.pick) === JSON.stringify(pick))) continue;
+          await seal({ store, league: ctx.league, fixture: one, competitions: COMPETITIONS, pick, now: ctx.now, player: ctx.mine.player });
+        }
+      } else await seal({ store, league: ctx.league, fixture, competitions: COMPETITIONS, pick: chosen, now: ctx.now, player: ctx.mine.player });
       editing = null;
       await draw();
       carry(); // send it, without making the player wait

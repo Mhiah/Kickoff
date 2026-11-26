@@ -13,19 +13,20 @@
 //   "kickoff/pick/v1"   15 bytes   so this can never be confused with any other kind of fingerprint
 //   league              32 bytes
 //   match               32 bytes
-//   sport                1 byte    1 football, 2 basketball, 3 tennis
+//   sport                1 byte    1 football, 2 basketball, 3 tennis, and football's three
+//                                  predictions: 4 result, 5 goal goal, 6 exact score
 //   pick                 1 byte    as written by picks.js
 //   player              32 bytes
 //   salt                32 bytes
 
 import { concat, id32, randomBytes, sha256, text } from "./bytes.js";
-import { encodePick } from "./picks.js";
+import { SPORTS, encodePick } from "./picks.js";
 
 const TAG = text("kickoff/pick/v1");
 
 /** Work out the fingerprint of a pick whose byte and salt are already known. */
 export async function fingerprintOf({ league, match, sport, pickByte, player, salt }) {
-  if (!Number.isInteger(sport) || sport < 1 || sport > 3) throw new RangeError("unknown sport");
+  if (!SPORTS.includes(sport)) throw new RangeError("unknown sport");
   if (!Number.isInteger(pickByte) || pickByte < 0 || pickByte > 255) throw new RangeError("pick must be one byte");
   return sha256(
     concat(

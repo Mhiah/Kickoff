@@ -90,8 +90,10 @@ test("until real matches are on Kickoff's list, the made-up ones are shown and s
   await ada.carry();
   const c = await ada.ctx();
   assert.equal(c.real, false);
-  assert.deepEqual(Object.keys(c.fixtures).sort(), Object.keys(sampleFixtures(NOW)).sort());
-  await ada.seal("ars-che", { home: 2, away: 1 });
+  // Each made-up match is there, and a football one as its three predictions.
+  assert.deepEqual(Object.keys(c.fixtures).filter((id) => c.fixtures[id].lead).sort(), Object.keys(sampleFixtures(NOW)).sort());
+  assert.deepEqual(c.fixtures["ars-che"].group, ["ars-che", "ars-che.5", "ars-che.6"]);
+  await ada.seal("ars-che", { result: "home" });
   assert.equal(await ada.carry(), false, "a prediction for a made-up match is not sent anywhere");
   assert.ok(!online.net.sent.some((s) => s.url === "/api/picks"));
   assert.ok(!(await ada.screen("ars-che")).includes('class="state'), "a made-up prediction has no sent or locked mark");

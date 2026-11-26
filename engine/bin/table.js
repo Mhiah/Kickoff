@@ -14,9 +14,9 @@
 
 import { readFile } from "node:fs/promises";
 
-import { BASKETBALL, FOOTBALL, XLAYER, leagueOfCircuit, loadCircuits, tableFromXLayer, toHex } from "../src/index.js";
+import { BASKETBALL, SPORT_NAMES, XLAYER, isFootball, leagueOfCircuit, loadCircuits, tableFromXLayer, toHex } from "../src/index.js";
 
-const SPORT = { [FOOTBALL]: "football", [BASKETBALL]: "basketball", 3: "tennis" };
+const SPORT = SPORT_NAMES;
 
 function options(argv) {
   const out = { node: XLAYER.node, mailbox: XLAYER.mailbox, sites: XLAYER.sites, json: false, rest: [] };
@@ -38,7 +38,7 @@ function resultText(match) {
   if (match.state === "void") return "void: nobody scores";
   if (match.state !== "final") return "no result yet";
   const r = match.result;
-  if (match.sport === FOOTBALL) return `${r.home}-${r.away}`;
+  if (isFootball(match.sport)) return `${r.home}-${r.away}`;
   if (match.sport === BASKETBALL) {
     const margin = { A: "1 to 5", B: "6 to 10", C: "11 to 15", D: "16 or more" }[r.band];
     return `${r.winner} win by ${margin}`;
@@ -69,6 +69,9 @@ async function main() {
     football: await readFile(new URL("football.hex", dir), "utf8"),
     basketball: await readFile(new URL("basketball.hex", dir), "utf8"),
     tennis: await readFile(new URL("tennis.hex", dir), "utf8"),
+    result: await readFile(new URL("result.hex", dir), "utf8"),
+    goalgoal: await readFile(new URL("goalgoal.hex", dir), "utf8"),
+    score: await readFile(new URL("score.hex", dir), "utf8"),
   });
   const got = await tableFromXLayer({ node: opt.node, mailbox: opt.mailbox, sites: opt.sites, league, circuits });
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Going live on X Layer: the one-off work that makes the robot's wallet a league and publishes
-// Kickoff's three scoring circuits.
+// Kickoff's scoring circuits.
 //
 //   node robot/bin/golive.js look                    read X Layer and say what is still to do and
 //                                                    what it costs. Sends nothing, pays nothing.
@@ -18,7 +18,7 @@
 import { appendFileSync, readFileSync } from "node:fs";
 
 import { XLAYER } from "../../engine/src/index.js";
-import { goLive, inOkb, lookAtGoingLive, lookInWords } from "../src/golive.js";
+import { SCORING, goLive, inOkb, lookAtGoingLive, lookInWords } from "../src/golive.js";
 import { castSender } from "../src/xlayer.js";
 
 /** TapeOut on X Layer: a processor anyone may publish on, with free transistors, and the contract that opens accounts. */
@@ -48,7 +48,7 @@ const processor = (process.env.KICKOFF_PROCESSOR || SHARED_PROCESSOR).toLowerCas
 const server = (process.env.KICKOFF_SERVER ?? "").replace(/\/+$/, "");
 const manifest = JSON.parse(readFileSync(new URL("../../circuits/out/manifest.json", import.meta.url), "utf8"));
 const circuits = Object.fromEntries(
-  ["football", "basketball", "tennis"].map((name) => [
+  SCORING.map((name) => [
     name,
     { netlist: readFileSync(new URL(`../../circuits/out/${name}.hex`, import.meta.url), "utf8").trim(), inputs: manifest[name].inputs, outputs: manifest[name].outputs },
   ]),
@@ -84,7 +84,7 @@ try {
   say("For the robot's settings and the hackathon form:");
   say(`  KICKOFF_PROCESSOR   ${done.processor}`);
   say(`  KICKOFF_CIRCUIT     ${done.have.league}`);
-  say(`  scoring circuits    football ${done.have.football}, basketball ${done.have.basketball}, tennis ${done.have.tennis}`);
+  say(`  scoring circuits    ${SCORING.map((name) => `${name} ${done.have[name]}`).join(", ")}`);
   finish(0);
 } catch (error) {
   say(`PROBLEM: ${error.message}`);

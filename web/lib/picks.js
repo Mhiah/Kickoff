@@ -8,7 +8,7 @@
 
 import { fromHex, toHex } from "../engine/bytes.js";
 import { matchId } from "../engine/match.js";
-import { BASKETBALL, FOOTBALL } from "../engine/picks.js";
+import { BASKETBALL, FOOTBALL, GOAL_GOAL, RESULT, SCORE } from "../engine/picks.js";
 import { sealPick } from "../engine/seal.js";
 import { hasClosed } from "./time.js";
 
@@ -21,7 +21,9 @@ const PICKS_KEY = "kickoff-picks";
  */
 export function fixtureFacts(fixture, competitions) {
   const competition = competitions[fixture.comp];
-  return { sport: SPORT[competition.sport], kickoff: fixture.kickoff, bestOf: 0, label: `${competition.name}: ${fixture.home} v ${fixture.away}` };
+  // A football match is three predictions, each a match of its own with its own kind (`sport`):
+  // the result, goal goal, the exact score. A fixture that says which one it is, is that one.
+  return { sport: fixture.sport ?? SPORT[competition.sport], kickoff: fixture.kickoff, bestOf: 0, label: `${competition.name}: ${fixture.home} v ${fixture.away}` };
 }
 
 /** A match's id, as hex. */
@@ -130,6 +132,13 @@ export const bandWords = (band) => BANDS[band];
 
 /** A pick in words: "2 – 1", or "Knicks by 6 to 10". */
 export function pickWords(entry, fixture) {
-  if (entry.sport === FOOTBALL) return `${entry.pick.home} – ${entry.pick.away}`;
+  if (entry.sport === FOOTBALL || entry.sport === SCORE) return `${entry.pick.home} – ${entry.pick.away}`;
+  if (entry.sport === RESULT) return entry.pick.result === "draw" ? "Draw" : `${entry.pick.result === "home" ? fixture.home : fixture.away} win`;
+  if (entry.sport === GOAL_GOAL) return `Goal Goal: ${entry.pick.both ? "yes" : "no"}`;
   return `${entry.pick.winner === "home" ? fixture.home : fixture.away} by ${BANDS[entry.pick.band]}`;
 }
+
+/** The three predictions of a football match, by their kind, with the name each goes by. */
+export const MARKETS = { [RESULT]: "Result", [GOAL_GOAL]: "Goal Goal", [SCORE]: "Exact score" };
+/** The most points one prediction of this kind can give. */
+export const pointsFor = (sport) => (sport === RESULT || sport === GOAL_GOAL ? 1 : 3);
