@@ -166,6 +166,18 @@ export function nextUp(ctx, plays = null) {
   return open.find((id) => !yourPicks(ctx, id).length) ?? open[0] ?? null;
 }
 
+/**
+ * The words "Remind my group" copies, for pasting into the group's own chat: the group's next
+ * match, when its predictions close, the group's code and where to play. Kickoff sends nothing
+ * itself. Null if no match the group plays is open.
+ */
+export function reminderFor(ctx, g) {
+  const id = inOrder(ctx).find((id) => !hasClosed(ctx.now, ctx.fixtures[id].kickoff) && g.plays.includes(ctx.fixtures[id].comp));
+  if (!id) return null;
+  const f = ctx.fixtures[id];
+  return `${f.home} v ${f.away} kicks off ${dayLabel(f.kickoff)} at ${clock(f.kickoff)}. Predictions close at ${clock(closesAt(f.kickoff))}. Our group's code is ${g.code}. Make yours on Kickoff${ctx.site ? `: ${ctx.site}` : "."}`;
+}
+
 /** The card that says what to do next: the next match, when its picks close, and a button to pick it. */
 function nextCard(ctx, nextId) {
   const next = ctx.fixtures[nextId];
@@ -818,6 +830,8 @@ ${DEVICE_NOTE}`;
   const isStarter = brand ? false : starter ? sits(starter, mine.player) : g.startedBy === mine.player;
   const count = playersWord(brand ? (g.players ?? g.members.length) : g.members.length);
   const nextId = nextUp(ctx, g.plays);
+  // In a group of friends, anyone can copy a reminder to paste into the group's chat.
+  const reminder = brand ? null : reminderFor(ctx, g);
   const plays = Object.keys(COMPETITIONS)
     .map((key) => {
       const on = g.plays.includes(key);
@@ -851,7 +865,8 @@ ${brand && g.prize ? `<p class="sub prize"><b>Prize:</b> ${esc(g.prize)}</p>` : 
 ${mine.offline ? OFFLINE_NOTE : ""}
 
 ${nextId ? `${nextCard(ctx, nextId)}
-<p class="say-so"><a class="link" href="#/league">See every match</a></p>` : `<div class="note" style="margin-top:14px">No matches are open for this group right now. New ones arrive by themselves.</div>`}
+${reminder ? `<div class="remind"><a class="link" href="#/league">See every match</a><button type="button" class="btn small quiet" data-copy="${esc(reminder)}" data-then="Reminder copied. Paste it in your group chat.">Remind my group</button></div>
+<p class="say-so muted" data-copy-out role="status"></p>` : `<p class="say-so"><a class="link" href="#/league">See every match</a></p>`}` : `<div class="note" style="margin-top:14px">No matches are open for this group right now. New ones arrive by themselves.</div>`}
 
 <div class="glass invite"><div><small class="muted">Invite code</small><b>${esc(g.code)}</b></div><button type="button" class="btn small go" data-copy="${esc(g.code)}">Copy</button></div>
 <p class="sub">${brand ? 'Anyone with this code can join. They choose "Join with a code" on Kickoff.' : 'Send this code to your friends. They choose "Join with a code" on Kickoff.'}</p>

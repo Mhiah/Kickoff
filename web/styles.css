@@ -316,6 +316,8 @@ h1.under { margin-top: 6px; }
 .form .btn { margin-top: 18px; }
 .form .btn[disabled] { opacity: 0.55; cursor: default; }
 .form .say-so:empty { display: none; }
+.remind { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 14.5px; }
+.remind + .say-so:empty { display: none; }
 .more { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 26px; font-size: 15.5px; }
 /* The League screen on a phone: the matches and the table take turns, chosen at the top. */
 .chips.parts { margin-top: 16px; }

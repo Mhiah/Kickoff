@@ -48,7 +48,9 @@ async function context() {
   const now = Math.floor(Date.now() / 1000);
   const { real, league, fixtures, matchIds } = await matches.view(now);
   const mine = await groups.view();
-  return { now, real, league, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine, standings: real ? table.view(mine.group?.code ?? null) : null, chain: real ? chain.view(league) : null, chainUnreachable: chain.unreachable, looking };
+  // Where this copy of Kickoff is open, for the reminder a player copies to their group.
+  const site = `${location.origin}${location.pathname.replace(/index\.html$/, "")}`;
+  return { now, site, real, league, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine, standings: real ? table.view(mine.group?.code ?? null) : null, chain: real ? chain.view(league) : null, chainUnreachable: chain.unreachable, looking };
 }
 
 async function draw({ keepPlace = false } = {}) {
@@ -246,6 +248,9 @@ document.addEventListener("click", async (event) => {
     try {
       await navigator.clipboard.writeText(target.dataset.copy);
       target.textContent = "Copied";
+      // A copy that needs a word on what to do with it says so on the line beneath.
+      const out = target.dataset.then ? target.parentElement.nextElementSibling : null;
+      if (out?.matches("[data-copy-out]")) out.textContent = target.dataset.then;
     } catch {
       target.textContent = "Could not copy";
     }

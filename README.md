@@ -97,6 +97,8 @@ costs nothing and brings their groups back on a new phone.
 - There are new real matches every week, in four competitions.
 - The leaderboard moves after every match, and nobody shares a place.
 - Your record keeps every prediction, the hits and the misses, so calling a result means something.
+- Anyone in a group can press "Remind my group" and paste a ready message into the group's own chat:
+  the next match, when predictions close, the group's code and the link. Kickoff sends nothing itself.
 
 ## How it earns
 
@@ -207,7 +209,7 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | The first three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
 | The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
 | The prediction engine | 167 tests. Twenty-six try to cheat, and eight have an X Layer node lie about what is on chain, three of them in ways only a second node can catch | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
-| The website | 101 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
+| The website | 104 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 23 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
 | The server | 104 tests. They take a name somebody has, link a wallet that did not sign, send predictions in someone else's name, play old requests back, open a different prediction from the one sealed, and use the robot's addresses without its key. They also check that a match gives points only once it was locked on X Layer, and that the server signs for every sealed prediction it takes | All pass; every one is refused ([details](server/README.md)) |
 | The robot | 79 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, a hundred players on one match, a lock it slept through, its notes when it needs a person, putting the website on X Layer, and going live without paying for anything twice | All pass ([details](robot/README.md)) |

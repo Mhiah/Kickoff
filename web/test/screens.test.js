@@ -7,7 +7,7 @@ import { readFileSync, statSync } from "node:fs";
 import { COMPETITIONS, group, match, record, scores, week } from "../data/sample.js";
 import { NOW, contextAt, sealOn } from "./helpers.js";
 import { ordinal, placeName, standings } from "../lib/standings.js";
-import { checkScreen, frame, groupScreen, home, league, matchScreen, pick, recordScreen } from "../screens.js";
+import { checkScreen, frame, groupScreen, home, league, matchScreen, pick, recordScreen, reminderFor } from "../screens.js";
 
 const file = (name) => new URL(`../${name}`, import.meta.url);
 // The styles with the comments taken out, so a word in a comment cannot fail or pass a check.
@@ -213,4 +213,48 @@ test("when Kickoff cannot be reached, the group screen says so and still shows w
   assert.match(html, /Kickoff could not be reached/);
   assert.match(html, /SUNDAYB-4821/);
   assert.ok(!groupScreen(undefined, inGroup).html.includes("could not be reached"));
+});
+
+// ---- "Remind my group"
+
+test("in a group of friends, Remind my group copies a ready message: the next match, when predictions close, the code and the link", () => {
+  const there = { ...inGroup, site: "https://kickoff.example/" };
+  const words = reminderFor(there, realGroup);
+  const next = Object.values(there.fixtures).filter((f) => there.now < f.kickoff - 600 && realGroup.plays.includes(f.comp)).sort((a, b) => a.kickoff - b.kickoff)[0];
+  assert.ok(words.startsWith(`${next.home} v ${next.away} kicks off `));
+  assert.match(words, /kicks off \w+day \d+ \w{3} at \d\d:\d\d\. Predictions close at \d\d:\d\d\. /);
+  assert.ok(words.includes(`Our group's code is ${realGroup.code}.`));
+  assert.ok(words.endsWith("Make yours on Kickoff: https://kickoff.example/"));
+  assert.ok(!/\bpick|\bbet|\bstake|\btable\b/i.test(words), "the words Kickoff does not use");
+
+  const html = groupScreen(undefined, there).html;
+  const button = html.match(/<button type="button" class="btn small quiet" data-copy="([^"]*)" data-then="Reminder copied\. Paste it in your group chat\.">Remind my group<\/button>/);
+  assert.ok(button, "the button is on the Group screen");
+  // What the button holds, once the browser has read it back, is exactly the message.
+  const unescaped = button[1].replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  assert.equal(unescaped, words);
+  assert.match(html, /<p class="say-so muted" data-copy-out role="status"><\/p>/);
+  assert.match(html, /See every match/);
+});
+
+test("Remind my group is not shown when nothing the group plays is open, or in a brand's group", () => {
+  // Every match has closed.
+  const late = { ...inGroup, now: Math.max(...Object.values(inGroup.fixtures).map((f) => f.kickoff)) };
+  assert.equal(reminderFor(late, realGroup), null);
+  assert.ok(!groupScreen(undefined, late).html.includes("Remind my group"));
+  // The group plays nothing that is on.
+  const none = { ...realGroup, plays: [] };
+  assert.equal(reminderFor(inGroup, none), null);
+  assert.ok(!groupScreen(undefined, { ...inGroup, mine: { ...inGroup.mine, group: none, groups: [none] } }).html.includes("Remind my group"));
+  // A brand's group is too big to be anyone's to remind.
+  const brand = { ...realGroup, brand: "A brand", players: 4000 };
+  assert.ok(!groupScreen(undefined, { ...inGroup, mine: { ...inGroup.mine, group: brand, groups: [brand] } }).html.includes("Remind my group"));
+  // Someone in no group has no button either.
+  assert.ok(!groupScreen(undefined, ctx).html.includes("Remind my group"));
+});
+
+test("a group name or code cannot break out of the reminder button", () => {
+  const odd = { ...realGroup, code: `X"><script>alert(1)</script>` };
+  const html = groupScreen(undefined, { ...inGroup, mine: { ...inGroup.mine, group: odd, groups: [odd] } }).html;
+  assert.ok(!html.includes("<script>alert(1)"));
 });
