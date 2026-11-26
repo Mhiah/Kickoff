@@ -13,15 +13,120 @@ X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during thi
 [![Server tests](https://github.com/Mhiah/Kickoff/actions/workflows/server.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/server.yml)
 [![Robot](https://github.com/Mhiah/Kickoff/actions/workflows/robot.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/robot.yml)
 
-> [!NOTE]
-> **Where this is today (26 November 2026).** Kickoff is live. The website shows real Premier
-> League, Champions League and NBA matches. Friends play in groups, with no wallet and no sign-up.
-> Kickoff's robot locks every match's sealed predictions on X Layer, through TapeOut, before kickoff,
-> opens them after kickoff so nobody has to come back, and anyone can check the record from their
-> own browser. The website itself is on X Layer too, at <https://5-2-409.tapekit.org>.
->
-> **Still to come:** prizes for groups run by brands, and a test with a real group of friends. The
-> section [Where the build is](#where-the-build-is) says exactly what exists.
+| | |
+| --- | --- |
+| Play it | <https://kickoff-two-xi.vercel.app> |
+| Play it from X Layer | <https://5-2-409.tapekit.org> |
+| TapeOut processor | `0x39e44dba62811e87fde122ca4d6c082568a384d0` (processor number 409) |
+| Circuit IDs | **5** is the league. **6**, **7** and **8** are the scoring rules for football, basketball and tennis. |
+| TapeOut features used | Circuits, a circuit's container, TapeSend and DeWEB, opened through a TapeKit gateway |
+| State | Live on X Layer since 24 November 2026. Real matches, real groups. No sign-up. A wallet is optional: you can link one. |
+
+[What it is](#what-kickoff-is) | [Who it is for](#who-it-is-for) | [How it earns](#how-it-earns) | [What makes it different](#what-makes-it-different) | [Live on X Layer](#live-on-x-layer) | [TapeOut](#tapeout-plainly) | [What has been checked](#what-has-been-checked-so-far) | [The build](#where-the-build-is) | [How it runs](#how-it-runs-piece-by-piece) | [Honest limits](#honest-limits) | [Try it](#try-it-yourself)
+
+## What Kickoff is
+
+Kickoff is a prediction game for football and basketball fans. You and your friends predict the
+results of real matches, such as Premier League games and NBA games, and a leaderboard shows who gets the
+most right.
+
+What makes it different from a spreadsheet or a group chat is that nobody can cheat. Your prediction is
+sealed before the match starts, so nobody can see it, copy it, or change it once the result is
+known. The points are worked out by a published rule that nobody can alter. And the whole record is
+kept on X Layer, where anyone can check it.
+
+### The problem it solves
+
+Every prediction league among friends or fans runs on trust. One person keeps the spreadsheet.
+They can add a late prediction, fix a score, or change the points rule halfway through the season, and
+nobody could prove it. And after every match, everyone claims they predicted it, while the predictions
+they got wrong quietly disappear.
+
+### How it works
+
+1. **You start a group or join one with a code.** No sign-up, and a wallet is optional. A group holds up to 30
+   friends. A group run by a brand holds up to 5,000.
+2. **Each week's real fixtures appear by themselves.** Nobody types them in.
+3. **Before a match, you make your prediction.** A football match has three: the result, goal
+   goal and the exact score. Make one, two or all three. It is sealed on your own phone, so no other player
+   can see it or copy it. That is all you ever have to do.
+4. **Ten minutes before kickoff, predictions close.** One fingerprint covering every sealed prediction is
+   written to X Layer, which stamps the time. A prediction only counts if it was locked there before
+   kickoff.
+5. **After the match, the result comes in by itself** and every prediction is opened by Kickoff's
+   robot. Nobody has to come back for that. Everyone is scored by the same fixed rule.
+6. **The leaderboards update:** one for your group and one for everyone who plays. Every prediction,
+   right or wrong, stays on your record for good.
+
+### The competitions and the points
+
+| Sport | Competitions | What you predict | Points |
+| --- | --- | --- | --- |
+| Football | Premier League, Champions League | Up to three things, after 90 minutes: the **Result** (home win, draw or away win), **Goal Goal** (do both teams score, yes or no) and the **Exact score** | 1 for the right result. 1 for the right goal goal answer. 3 for the exact score. Each is scored by itself. |
+| Basketball | NBA, WNBA | The winner and the winning margin, overtime included | 1 for the right winner, plus 2 more for the right margin: 1 to 5, 6 to 10, 11 to 15, or 16 or more. |
+
+A football match gives at most 5 points and a basketball match at most 3. The extra 2 in
+basketball only count when the winner is right. The first football matches, up to 26 November
+2026, had one prediction (the exact score, with 1 point for the right result). They keep the
+points that gave them.
+The full rules, with examples, are in [docs/RULES.md](docs/RULES.md).
+
+**Tennis comes later.** Its scoring rule is built and checked like the other two, but no free feed
+of tennis fixtures was found, so it is not offered yet.
+
+## Who it is for
+
+- **Friend groups** who already run a predictor league on a spreadsheet or a group chat.
+- **Fan communities** that want a leaderboard nobody argues about.
+- **Brands** that want to run a prediction campaign for their audience.
+
+**People who have never used crypto can play.** There is nothing to install and no sign-up: open
+the link, type a name, predict. **A wallet is optional.** People who have one can link it, which
+costs nothing and brings their groups back on a new phone.
+
+## How it reaches them
+
+- **Every group brings its own players.** A group is started in a few seconds and shared as a
+  code, in the group chat the friends already have.
+- **A brand brings its audience.** A group run by a brand is one code the brand posts to its
+  followers. It holds up to 5,000 players, shows who runs it and what the prize is, and has its own
+  leaderboard.
+
+## Why people come back
+
+- There are new real matches every week, in four competitions.
+- The leaderboard moves after every match, and nobody shares a place.
+- Your record keeps every prediction, the hits and the misses, so calling a result means something.
+
+## How it earns
+
+Brands pay to run sponsored groups with prizes, and private groups pay for extras.
+
+Kickoff is a prediction game and it is free to play. Players predict, and play for the
+leaderboard. Nobody puts money on a match.
+
+**Built:** groups run by brands. Kickoff starts one for a brand, with the brand's name and a line
+about the prize.
+
+**Not built yet:**
+
+- Paying a prize out to the winner.
+- A way for a brand to pay Kickoff for a sponsored group.
+- Paid extras for private groups.
+
+Today everything is free.
+
+## What makes it different
+
+- **No trusted organiser.** Nobody, including the person who started the group and Kickoff itself,
+  can change a prediction, a score or the leaderboard after kickoff.
+- **The rules are fixed in public.** Each sport's scoring rule is a published circuit that can
+  never be changed.
+- **Nobody enters the matches or the results.** They come from live sports data, so nobody in a
+  group can get one wrong on purpose.
+- **Anyone can check the leaderboard.** It is not kept in a private database. Anyone can read the record
+  on X Layer and rebuild the same leaderboard with one command.
+- **Your record is yours.** It shows hits and misses and cannot be edited.
 
 ## Live on X Layer
 
@@ -64,98 +169,85 @@ Nothing below needs a wallet, an account or Kickoff's permission.
    [`circuits/out/`](circuits/out/). `python3 circuits/check.py` runs each one on every possible
    prediction and result.
 
-## What Kickoff is
+## TapeOut, plainly
 
-Kickoff is a prediction game for football and basketball fans. You and your friends predict the
-results of real matches, such as Premier League games and NBA games, and a leaderboard shows who gets the
-most right.
+Kickoff is built on TapeOut, the protocol this hackathon is about. Think of TapeOut as a toolbox.
+These are the tools, what each one is in plain words, and the job it does in Kickoff.
 
-What makes it different from a spreadsheet or a group chat is that nobody can cheat. Your prediction is
-sealed before the match starts, so nobody can see it, copy it, or change it once the result is
-known. The points are worked out by a published rule that nobody can alter. And the whole record is
-kept on X Layer, where anyone can check it.
+| Tool | What it is in plain words | Its job in Kickoff |
+| --- | --- | --- |
+| **Circuit** | A tiny rule machine. You give it facts, it gives an answer, and once it is published nobody can change it. | The scoring rules: circuits 6, 7 and 8 for football, basketball and tennis, and three more for football's three predictions (result, goal goal, exact score), built and checked and published beside them next. Free for anyone to check. Circuit 5 is a one-gate circuit whose only job is to be the league. |
+| **Processor** | The workshop a circuit is published from. | Kickoff's circuits are on processor 409, a shared one that anyone may publish on. |
+| **Container** | An account that belongs to a circuit, so it can hold money and own a page. | Kickoff's own account on X Layer. Everything Kickoff says is said from it, and nothing said by any other account counts. |
+| **TapeSend** | A mailbox for those accounts, where every message is stamped with who sent it and when. | The public record: each match announced, each bundle of sealed predictions locked before kickoff, each result, and each dispute. |
+| **DeWEB** | A website stored on the blockchain, so it cannot be secretly changed. | Where the opened predictions are published after each match, with each player's joining time. The copy of the Kickoff site is there too, under the name `5.2.409.tape`. |
+| **TapeKit** | The checker that opens a DeWEB site and confirms it is genuine. | How a visitor opens the copy of the site on X Layer in an ordinary browser: <https://5-2-409.tapekit.org>. |
 
-### The problem it solves
+Not used: FabX (mining), which has no role in this product, and TapeCode. Kickoff writes to TapeOut
+with a small program of its own ([`robot/src/xlayer.js`](robot/src/xlayer.js)).
 
-Every prediction league among friends or fans runs on trust. One person keeps the spreadsheet.
-They can add a late prediction, fix a score, or change the points rule halfway through the season, and
-nobody could prove it. And after every match, everyone claims they predicted it, while the predictions
-they got wrong quietly disappear.
+TapeOut already has a published draft standard for sealed forecasts, TAP-12: a claim is sealed on
+chain, opened at a set time, then judged in public, so anyone can rebuild the same track record.
+That document leaves scoring and leaderboards for others to build. Kickoff is that layer.
 
-### How it works
+Not every part of Kickoff runs inside a circuit, and it does not need to. TapeOut is used where it
+gives the guarantee: sealed predictions, a fixed scoring rule and a permanent record. The pages you click
+through are an ordinary website, and the fixtures come from ordinary sports data.
 
-1. **You start a group or join one with a code.** No wallet and no sign-up. A group holds up to 30
-   friends. A group run by a brand holds up to 5,000.
-2. **Each week's real fixtures appear by themselves.** Nobody types them in.
-3. **Before a match, you make your prediction.** It is sealed on your own phone, so no other player
-   can see it or copy it. That is all you ever have to do.
-4. **Ten minutes before kickoff, predictions close.** One fingerprint covering every sealed prediction is
-   written to X Layer, which stamps the time. A prediction only counts if it was locked there before
-   kickoff.
-5. **After the match, the result comes in by itself** and every prediction is opened by Kickoff's
-   robot. Nobody has to come back for that. Everyone is scored by the same fixed rule.
-6. **The leaderboards update:** one for your group and one for everyone who plays. Every prediction,
-   right or wrong, stays on your record for good.
+## What has been checked so far
 
-### The competitions and the points
+| What | How it was checked | Result |
+| --- | --- | --- |
+| Football's three predictions | The three new circuits (result, goal goal, exact score) on every possible case with both evaluators, and through the engine, the server and the website's own tests | 67,072 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
+| The first three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
+| The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
+| The prediction engine | 151 tests. Twenty-three try to cheat, and five have the X Layer node lie about what is on chain | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
+| The website | 89 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
+| The fixtures feed | 23 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
+| The server | 98 tests. They take a name somebody has, link a wallet that did not sign, send predictions in someone else's name, play old requests back, open a different prediction from the one sealed, and use the robot's addresses without its key. They also check that a match gives points only once it was locked on X Layer | All pass; every one is refused ([details](server/README.md)) |
+| The robot | 73 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, a hundred players on one match, a lock it slept through, its notes when it needs a person, putting the website on X Layer, and going live without paying for anything twice | All pass ([details](robot/README.md)) |
+| The robot on a copy of X Layer | The robot's own code announcing, locking, recording results and publishing opened predictions through TapeOut's real contracts, signing with `cast`, then the leaderboard rebuilt from the chain alone | 11 of 11 checks passed on the first run ([rehearsal 6](docs/REHEARSAL-RESULTS.md)). It has grown since: the latest run has a hundred players who seal a prediction and never come back, the robot opens all hundred after kickoff and publishes them in 4 pieces, and 22 of 22 checks pass |
+| What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
+| Going live for real | Done on X Layer on 24 November 2026 by the robot's wallet, after the same steps were rehearsed on the copy | It cost 0.087878 OKB, as measured. The robot's next run confirmed it was working as the league |
+| The first real lock | 25 November 2026: the robot locked the sealed predictions of two Champions League matches on X Layer, 595 seconds before each kickoff, then recorded both results | The Check tab, in an ordinary browser, read both matches back from X Layer as locked |
+| The website on X Layer | Sent on 25 November 2026 by the robot's wallet, after a free look that gave the cost | 44 files for 0.001581 OKB against 0.001577 estimated. The address opens in a browser and shows the real matches |
 
-| Sport | Competitions | What you predict | Points |
+GitHub repeats the tests on every change, and the badges at the top of this page show the latest
+results.
+
+## Where the build is
+
+| Stage | What it is | State |
+| --- | --- | --- |
+| 1 | Project setup: this README, the folders, the licence | Done |
+| 2 | The scoring circuits, and the checker that tests every possible case | Done, and published on X Layer as circuits 6, 7 and 8. |
+| 3 | Proving the TapeOut parts on a private copy of X Layer | Done. Rehearsals 1 to 4 and the fees report, 29 tests against the real contracts. |
+| 4 | The prediction engine and the leaderboard builder | Done, 151 tests, with a fifth rehearsal that plays a season on chain and reads it back. Still to do: asking several nodes instead of one. |
+| 5 | The website's screens | Done, with real matches and real numbers. |
+| 6 | Sealing a prediction for real, on the player's own device | Done. |
+| 7 | The fixtures feed | Done, and running live against the real feeds. |
+| 8 | Kickoff's server: groups, names, and sealed predictions until they are locked | Done, 98 tests, and online with a real database. Groups of up to 30, one name for each player, signed requests, and points only for matches that were locked on X Layer. |
+| 9 | The robot: keeps the list of matches, locks predictions before kickoff and posts results on X Layer | Done and running live, 73 tests. After kickoff it opens every prediction from its locked copy, so no player has to come back. It publishes a match's opened predictions in as many pieces as they need, tells the server how each lock went, and opens a note when its wallet runs low or a lock was missed. |
+| 10 | Joining it up: real fixtures and real leaderboards on the website | Done. The League and My record screens show real numbers: a leaderboard of everyone who plays and one of your group, both numbered from 1, with every point worked out by the scoring circuits. The Check screen is read from X Layer by the player's own browser: it shows when each of your predictions was locked, works out the group's points from what is on chain, puts them beside Kickoff's own, and says whether the order is the same. |
+| 11 | Going live on X Layer: the circuits and Kickoff's account | Done on 24 November 2026. The switch was rehearsed on a private copy first: a look that says the cost and sends nothing, and a go that needs the words GO LIVE. |
+| 12 | The copy of the site on X Layer (DeWEB) | Done on 25 November 2026: <https://5-2-409.tapekit.org>. A look that is free, a go that needs the words PUBLISH SITE, and a check that reads every file back. |
+| 13 | A real test group with real people and real matches | Not started |
+| 14 | Players with a wallet, groups run by brands, and prizes | Partly done. A player who has a wallet can link it, which costs nothing: on a new phone, linking the same wallet brings their groups back. Other players are told only that a wallet is linked, never which one. Groups run by brands are built: up to 5,000 players, started only by Kickoff, with the brand's name, a prize line and a leaderboard of the top twenty and you. Paying prizes is not started. |
+| 15 | Demo video and submission | Not started |
+| 16 | Football as three predictions: result, goal goal and the exact score | Built and tested: three new scoring circuits checked on every possible case, each prediction sealed, locked and scored by itself, one screen for all three, and the robot lists every football match that way. The three new circuits are published on X Layer next. |
+
+**The scoring circuits**
+
+| Circuit | Gates | Cases checked | Cases wrong |
 | --- | --- | --- | --- |
-| Football | Premier League, Champions League | The exact score after 90 minutes | 3 for the exact score. 1 for the right winner, or for calling a draw, with the wrong score. 0 otherwise. |
-| Basketball | NBA, WNBA | The winner and the winning margin, overtime included | 1 for the right winner, plus 2 more for the right margin: 1 to 5, 6 to 10, 11 to 15, or 16 or more. |
+| Football | 148 | 65,536 (every possible case) | 0 |
+| Basketball | 20 | 64 (every possible case) | 0 |
+| Tennis | 37 | 128 (every possible case) | 0 |
+| Football result | 61 | 1,024 (every possible case) | 0 |
+| Football goal goal | 26 | 512 (every possible case) | 0 |
+| Football exact score | 55 | 65,536 (every possible case) | 0 |
 
-Every match gives at most 3 points. The extra 2 in basketball only count when the winner is right.
-The full rules, with examples, are in [docs/RULES.md](docs/RULES.md).
-
-**Tennis comes later.** Its scoring rule is built and checked like the other two, but no free feed
-of tennis fixtures was found, so it is not offered yet.
-
-### What makes it different
-
-- **No trusted organiser.** Nobody, including the person who started the group and Kickoff itself,
-  can change a prediction, a score or the leaderboard after kickoff.
-- **The rules are fixed in public.** Each sport's scoring rule is a published circuit that can
-  never be changed.
-- **Nobody enters the matches or the results.** They come from live sports data, so nobody in a
-  group can get one wrong on purpose.
-- **Anyone can check the leaderboard.** It is not kept in a private database. Anyone can read the record
-  on X Layer and rebuild the same leaderboard with one command.
-- **Your record is yours.** It shows hits and misses and cannot be edited.
-
-## Who it is for
-
-- **Friend groups** who already run a predictor league on a spreadsheet or a group chat.
-- **Fan communities** that want a leaderboard nobody argues about.
-- **Brands** that want to run a prediction campaign for their audience.
-
-**People who have never used crypto can play.** There is nothing to install, no wallet and no
-sign-up: open the link, type a name, prediction. **People who have a wallet can link it,** which costs
-nothing, is never required, and brings their groups back on a new phone.
-
-## How it reaches them
-
-- **Every group brings its own players.** A group is started in a few seconds and shared as a
-  code, in the group chat the friends already have.
-- **A brand brings its audience.** A group run by a brand is one code the brand posts to its
-  followers. It holds up to 5,000 players, shows who runs it and what the prize is, and has its own
-  leaderboard.
-
-## Why people come back
-
-- There are new real matches every week, in four competitions.
-- The leaderboard moves after every match, and nobody shares a place.
-- Your record keeps every prediction, the hits and the misses, so calling a result means something.
-
-## How it earns
-
-Brands pay to run sponsored groups with prizes, and private groups pay for extras.
-
-Kickoff is a prediction game and it is free to play. Players predict, and play for the
-leaderboard. Nobody puts money on a match.
-
-**Built:** groups run by brands. Kickoff starts one for a brand, with the brand's name and a line
-about the prize. **Not built yet:** paying a prize out, and any way for a brand or a group to pay
-Kickoff. Today everything is free.
+The processor address, the circuit IDs and the live link are in [Live on X Layer](#live-on-x-layer).
 
 ## How it runs, piece by piece
 
@@ -246,7 +338,7 @@ the time. Each player gets a **receipt** proving their sealed prediction is in t
 From then on nothing can be changed: a different prediction would not match its fingerprint, and a
 bundle written after kickoff is stamped late and never counts.
 
-Gathering the sealed predictions is the job of **Kickoff's server**. A player has no wallet, so each
+Gathering the sealed predictions is the job of **Kickoff's server**. A player does not need a wallet, so each
 device makes its own key and signs everything it sends, and the server refuses anything not signed
 by the right key. Before kickoff the server is only ever sent fingerprints and locked copies it
 cannot read, never a prediction it can see. More in [server/README.md](server/README.md).
@@ -276,9 +368,10 @@ The opened predictions for a match are published as one file on the league's own
 many pieces as the file needs. Nothing about a prediction in that file is taken on trust: every opened
 prediction has to prove itself against the lock that was written before kickoff.
 
-**State: live.** The three circuits are published on X Layer as circuits 6, 7 and 8, and were
-checked on every possible case before that. The robot writes each result and publishes the opened
-predictions. Kickoff's server scores with the same three circuits, and a test fails if its copy ever
+**State: live.** The first three circuits are published on X Layer as circuits 6, 7 and 8, and were
+checked on every possible case before that. The three for football's result, goal goal and exact
+score are checked the same way and are published beside them next. The robot writes each result and publishes the opened
+predictions. Kickoff's server scores with the same circuits, and a test fails if its copy ever
 differs from the published files.
 
 ### 5. The leaderboard is rebuilt from the record, never stored
@@ -346,55 +439,13 @@ site as it was when it was last sent. When the site changes, the robot's wallet 
 files again (the "Website on X Layer" workflow: a look that is free, a go that needs the words
 PUBLISH SITE, and a check that reads every file back).
 
-## TapeOut, plainly
-
-Kickoff is built on TapeOut, the protocol this hackathon is about. Think of TapeOut as a toolbox.
-These are the tools, what each one is in plain words, and the job it does in Kickoff.
-
-| Tool | What it is in plain words | Its job in Kickoff |
-| --- | --- | --- |
-| **Circuit** | A tiny rule machine. You give it facts, it gives an answer, and once it is published nobody can change it. | The scoring rules, one per sport: circuits 6, 7 and 8. Free for anyone to check. Circuit 5 is a one-gate circuit whose only job is to be the league. |
-| **Processor** | The workshop a circuit is published from. | Kickoff's circuits are on processor 409, a shared one that anyone may publish on. |
-| **Container** | An account that belongs to a circuit, so it can hold money and own a page. | Kickoff's own account on X Layer. Everything Kickoff says is said from it, and nothing said by any other account counts. |
-| **TapeSend** | A mailbox for those accounts, where every message is stamped with who sent it and when. | The public record: each match announced, each bundle of sealed predictions locked before kickoff, each result, and each dispute. |
-| **DeWEB** | A website stored on the blockchain, so it cannot be secretly changed. | Where the opened predictions are published after each match, with each player's joining time. The copy of the Kickoff site is there too, under the name `5.2.409.tape`. |
-| **TapeKit** | The checker that opens a DeWEB site and confirms it is genuine. | How a visitor opens the copy of the site on X Layer in an ordinary browser: <https://5-2-409.tapekit.org>. |
-
-Not used: FabX (mining), which has no role in this product, and TapeCode. Kickoff writes to TapeOut
-with a small program of its own ([`robot/src/xlayer.js`](robot/src/xlayer.js)).
-
-TapeOut already has a published draft standard for sealed forecasts, TAP-12: a claim is sealed on
-chain, opened at a set time, then judged in public, so anyone can rebuild the same track record.
-That document leaves scoring and leaderboards for others to build. Kickoff is that layer.
-
-Not every part of Kickoff runs inside a circuit, and it does not need to. TapeOut is used where it
-gives the guarantee: sealed predictions, a fixed scoring rule and a permanent record. The pages you click
-through are an ordinary website, and the fixtures come from ordinary sports data.
-
-## What has been checked so far
-
-| What | How it was checked | Result |
-| --- | --- | --- |
-| The three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
-| The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
-| The prediction engine | 143 tests. Twenty-three try to cheat, and five have the X Layer node lie about what is on chain | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
-| The website | 81 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
-| The fixtures feed | 23 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
-| The server | 94 tests. They take a name somebody has, link a wallet that did not sign, send predictions in someone else's name, play old requests back, open a different prediction from the one sealed, and use the robot's addresses without its key. They also check that a match gives points only once it was locked on X Layer | All pass; every one is refused ([details](server/README.md)) |
-| The robot | 69 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, a hundred players on one match, a lock it slept through, its notes when it needs a person, putting the website on X Layer, and going live without paying for anything twice | All pass ([details](robot/README.md)) |
-| The robot on a copy of X Layer | The robot's own code announcing, locking, recording results and publishing opened predictions through TapeOut's real contracts, signing with `cast`, then the leaderboard rebuilt from the chain alone | 11 of 11 checks passed on the first run ([rehearsal 6](docs/REHEARSAL-RESULTS.md)). It has grown since: the latest run has a hundred players who seal a prediction and never come back, the robot opens all hundred after kickoff and publishes them in 4 pieces, and 22 of 22 checks pass |
-| What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
-| Going live for real | Done on X Layer on 24 November 2026 by the robot's wallet, after the same steps were rehearsed on the copy | It cost 0.087878 OKB, as measured. The robot's next run confirmed it was working as the league |
-| The first real lock | 25 November 2026: the robot locked the sealed predictions of two Champions League matches on X Layer, 595 seconds before each kickoff, then recorded both results | The Check tab, in an ordinary browser, read both matches back from X Layer as locked |
-| The website on X Layer | Sent on 25 November 2026 by the robot's wallet, after a free look that gave the cost | 44 files for 0.001581 OKB against 0.001577 estimated. The address opens in a browser and shows the real matches |
-
-GitHub repeats the tests on every change, and the badges at the top of this page show the latest
-results.
-
 ## Honest limits
 
 - **It is new.** Kickoff went live on 24 November 2026 and very few people have played it. A test
   with a real group of friends is still to do.
+- **Football's three new scoring circuits are not on X Layer yet.** They are built, and checked on
+  every possible case, and Kickoff's server and the Check tab score with them. Until they are
+  published beside circuits 6, 7 and 8, their rules are in this repository and not yet on chain.
 - **One robot does the locking.** If it is late for a match, or its wallet has run dry, that
   match's predictions are not locked and nobody scores for it. The robot warns before its wallet runs
   low, but nothing stands in for it if it stops.
@@ -406,7 +457,7 @@ results.
 - **When a player joined is Kickoff's word.** Players level on points are ordered by who joined
   first. Joining happens on Kickoff, not on X Layer, so that time cannot prove itself the way a
   prediction does. It is published on X Layer with each match's opened predictions, where anyone can read it.
-- **Sealed predictions pass through Kickoff's server.** A player needs no wallet, so the server gathers
+- **Sealed predictions pass through Kickoff's server.** A player does not need a wallet, so the server gathers
   the fingerprints and Kickoff locks them. The server cannot read a prediction before kickoff and cannot
   change one or add one afterwards, but it could leave one out. Each player's receipt is the proof
   their prediction was included. The receipt is not signed yet, so Kickoff could deny having issued it.
@@ -451,37 +502,6 @@ results.
 - **TAP-12 is still a draft.** The standard Kickoff builds on may change.
 - **Nothing here is audited.**
 
-## Where the build is
-
-| Stage | What it is | State |
-| --- | --- | --- |
-| 1 | Project setup: this README, the folders, the licence | Done |
-| 2 | The scoring circuits, and the checker that tests every possible case | Done, and published on X Layer as circuits 6, 7 and 8. |
-| 3 | Proving the TapeOut parts on a private copy of X Layer | Done. Rehearsals 1 to 4 and the fees report, 29 tests against the real contracts. |
-| 4 | The prediction engine and the leaderboard builder | Done, 143 tests, with a fifth rehearsal that plays a season on chain and reads it back. Still to do: asking several nodes instead of one. |
-| 5 | The website's screens | Done, with real matches and real numbers. |
-| 6 | Sealing a prediction for real, on the player's own device | Done. |
-| 7 | The fixtures feed | Done, and running live against the real feeds. |
-| 8 | Kickoff's server: groups, names, and sealed predictions until they are locked | Done, 94 tests, and online with a real database. Groups of up to 30, one name for each player, signed requests, and points only for matches that were locked on X Layer. |
-| 9 | The robot: keeps the list of matches, locks predictions before kickoff and posts results on X Layer | Done and running live, 69 tests. After kickoff it opens every prediction from its locked copy, so no player has to come back. It publishes a match's opened predictions in as many pieces as they need, tells the server how each lock went, and opens a note when its wallet runs low or a lock was missed. |
-| 10 | Joining it up: real fixtures and real leaderboards on the website | Done. The League and My record screens show real numbers: a leaderboard of everyone who plays and one of your group, both numbered from 1, with every point worked out by the scoring circuits. The Check screen is read from X Layer by the player's own browser: it shows when each of your predictions was locked, works out the group's points from what is on chain, puts them beside Kickoff's own, and says whether the order is the same. |
-| 11 | Going live on X Layer: the circuits and Kickoff's account | Done on 24 November 2026. The switch was rehearsed on a private copy first: a look that says the cost and sends nothing, and a go that needs the words GO LIVE. |
-| 12 | The copy of the site on X Layer (DeWEB) | Done on 25 November 2026: <https://5-2-409.tapekit.org>. A look that is free, a go that needs the words PUBLISH SITE, and a check that reads every file back. |
-| 13 | A real test group with real people and real matches | Not started |
-| 14 | Players with a wallet, groups run by brands, and prizes | Partly done. A player who has a wallet can link it, which costs nothing and is never required: on a new phone, linking the same wallet brings their groups back. Other players are told only that a wallet is linked, never which one. Groups run by brands are built: up to 5,000 players, started only by Kickoff, with the brand's name, a prize line and a leaderboard of the top twenty and you. Paying prizes is not started. |
-| 15 | Demo video and submission | Not started |
-
-**The scoring circuits**
-
-| Circuit | Gates | Cases checked | Cases wrong |
-| --- | --- | --- | --- |
-| Football | 148 | 65,536 (every possible case) | 0 |
-| Basketball | 20 | 64 (every possible case) | 0 |
-| Tennis | 37 | 128 (every possible case) | 0 |
-
-The processor address, the circuit IDs and the live link are in [Live on X Layer](#live-on-x-layer),
-at the top of this page.
-
 ## Try it yourself
 
 You need Node 22 or newer. The circuit check also needs Python 3. Nothing has to be installed.
@@ -504,7 +524,7 @@ explained in [chain/README.md](chain/README.md) and [engine/README.md](engine/RE
 
 | Folder | What goes in it |
 | --- | --- |
-| `circuits/` | The three scoring circuits in TapeOut's format, and the checker. Start with [circuits/README.md](circuits/README.md) |
+| `circuits/` | The scoring circuits in TapeOut's format, and the checker. Start with [circuits/README.md](circuits/README.md) |
 | `chain/` | Rehearsals of the parts that touch X Layer, run on a private copy of it. Start with [chain/README.md](chain/README.md) |
 | `engine/` | The prediction engine: sealing, bundling, opening, scoring with the circuits, the leaderboard, and reading it all back from X Layer. Start with [engine/README.md](engine/README.md) |
 | `feed/` | The fixtures feed: real matches and results from live sports data. Start with [feed/README.md](feed/README.md) |
