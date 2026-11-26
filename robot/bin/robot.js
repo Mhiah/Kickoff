@@ -17,7 +17,7 @@ import { appendFileSync } from "node:fs";
 import { XLAYER, connect, leagueOfCircuit, toHex } from "../../engine/src/index.js";
 import { chainTick, newMemory } from "../src/chain.js";
 import { createOpener, envelopeKeysFrom } from "../src/envelope.js";
-import { createNotes, noteMissed, walletWatch } from "../src/notes.js";
+import { createNotes, noteChanged, noteMissed, walletWatch } from "../src/notes.js";
 import { createServer } from "../src/server.js";
 import { inWords, syncFixtures } from "../src/sync.js";
 import { watch } from "../src/watch.js";
@@ -48,11 +48,13 @@ if (command === "fixtures" && !dryRun && !canChange) {
 }
 
 /** One fixtures round. Prints its report, and on GitHub puts it on the run's page when there is news. */
+// Final scores the feed has given once and not yet twice. Kept for as long as the robot is awake.
+const pending = new Map();
 async function fixturesRound({ dry, hush }) {
-  const report = await syncFixtures({ server, adminKey, dryRun: dry, keys, now: clock() });
+  const report = await syncFixtures({ server, adminKey, dryRun: dry, keys, now: clock(), pending });
   const words = inWords(report);
   console.log(words);
-  const news = report.added.length + report.updated.length + report.calledOff.length + report.problems.length > 0;
+  const news = report.added.length + report.updated.length + report.calledOff.length + report.waiting.length + report.problems.length > 0;
   if (news || !hush) onGitHub(`### Matches, ${stamp()} UTC\n\n\`\`\`\n${words}\n\`\`\`\n`);
   return report;
 }
@@ -98,6 +100,8 @@ const notes = createNotes({ repo: process.env.GITHUB_REPOSITORY, token: process.
 let chainRound = null;
 let walletLook = null;
 let unnoted = []; // missed locks whose note could not be written yet
+let unnotedChanges = []; // changed results whose note could not be written yet
+const toldChanges = new Set(); // the changed results already taken to GitHub during this run
 const { KICKOFF_WALLET_KEY: walletKey, KICKOFF_PROCESSOR: processor, KICKOFF_CIRCUIT: circuit } = process.env;
 if (walletKey && processor && circuit) {
   try {
@@ -137,6 +141,11 @@ const tally = await watch({
   sync: async () => {
     const report = await fixturesRound({ dry: !canChange, hush: true });
     if (walletLook) await walletLook();
+    // A finished result the feed has changed since: kept as it was, and a person is told, once.
+    // The feed goes on saying it on every round, so each change is taken to GitHub once a run.
+    const fresh = report.updated.filter((u) => u.refused).map((u) => ({ label: u.label, from: u.from, to: u.to })).filter((c) => !toldChanges.has(`${c.label}|${c.from}|${c.to}`));
+    for (const c of fresh) toldChanges.add(`${c.label}|${c.from}|${c.to}`);
+    unnotedChanges = await noteChanged({ changed: [...unnotedChanges, ...fresh], notes, say });
     return report;
   },
   list: async () => (await kickoff.list()).fixtures,

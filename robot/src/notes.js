@@ -153,3 +153,38 @@ export async function noteMissed({ missed, notes, say = () => {} }) {
   }
   return left;
 }
+
+/** The note for a finished result the feed has since changed. Kickoff keeps the first one. */
+export function changedNote({ label, from, to, owner }) {
+  return {
+    title: `The feed changed a result: ${label}, ${from} to ${to}`,
+    once: true,
+    body: [
+      `${owner ? `@${owner} ` : ""}the sports feed has changed the result of **${label}** after Kickoff recorded it.`,
+      "",
+      `Kickoff recorded **${from}**. The feed now says **${to}**.`,
+      "",
+      "**Kickoff has kept the first result.** A result, once recorded, is never changed by the robot, so that nobody can alter one after the fact. The points for this match were worked out from the first result.",
+      "",
+      "**What to do:** look up the real score. If the first result was right, there is nothing to do. If it was wrong, the match needs a person to decide what happens to its points.",
+    ].join("\n"),
+  };
+}
+
+/**
+ * Open a note for each finished result the feed has changed. Each is noted once. Returns the ones
+ * whose note could not be written, to try again on the next round.
+ */
+export async function noteChanged({ changed, notes, say = () => {} }) {
+  const left = [];
+  for (const c of changed) {
+    if (!notes) continue;
+    try {
+      if (await notes.raise(changedNote({ ...c, owner: notes.owner }))) say(`A note about the feed changing the result of ${c.label} was opened on GitHub.`);
+    } catch (error) {
+      say(`The note about ${c.label} could not be written (${error.message}). It will be tried again.`);
+      left.push(c);
+    }
+  }
+  return left;
+}

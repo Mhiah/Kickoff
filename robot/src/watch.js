@@ -34,16 +34,19 @@ export async function watch({ until, now, sleep, sync, list, chain = null, memor
   let lastLook = -Infinity;
   let fixtures = [];
   let retryAt = Infinity;
+  let resyncAt = Infinity; // an early look at the feed, to confirm a final score it gave a few minutes ago
   const tally = { syncs: 0, looks: 0, problems: 0 };
 
   while (now() < until) {
     let t = now();
-    if (t - lastSync >= SYNC_EVERY) {
+    if (t - lastSync >= SYNC_EVERY || t >= resyncAt) {
       lastSync = t;
+      resyncAt = Infinity;
       tally.syncs++;
       try {
         const report = await sync();
         if (!report.ok) tally.problems++;
+        if (Number.isFinite(report.lookAgainAt)) resyncAt = Math.max(report.lookAgainAt, t + 1);
       } catch (error) {
         tally.problems++;
         say(`The list of matches could not be brought up to date this time (${error.message}).`);
@@ -81,7 +84,7 @@ export async function watch({ until, now, sleep, sync, list, chain = null, memor
     }
 
     t = now();
-    const wakes = [lastSync + SYNC_EVERY, until];
+    const wakes = [lastSync + SYNC_EVERY, resyncAt, until];
     if (chain) wakes.push(lastLook + LOOK_EVERY, retryAt, nextLock(fixtures, t, memory) ?? Infinity);
     const wake = Math.min(...wakes);
     // Sleep in short stretches, so a clock that jumps (a paused machine) cannot make it oversleep a lock.

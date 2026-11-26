@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { A_FULL_MATCH, LOW_WALLET, WALLET_TITLE, createNotes, inOkb, matchesLeft, missedNote, noteMissed, walletNote, walletWatch } from "../src/notes.js";
+import { A_FULL_MATCH, LOW_WALLET, WALLET_TITLE, changedNote, createNotes, inOkb, matchesLeft, missedNote, noteChanged, noteMissed, walletNote, walletWatch } from "../src/notes.js";
 
 const REPO = "Mhiah/Kickoff";
 const WALLET = "0x37ffd5b3e27dd5ce04945559def00b66d5841fc1";
@@ -143,4 +143,31 @@ test("a missed lock gets one note for its match, and never a second, even after 
   const later = { ...m, label: "WNBA: Liberty v Aces" };
   assert.deepEqual(await noteMissed({ missed: [later], notes, say: (line) => said.push(line) }), [later]);
   assert.match(said.at(-1), /could not be written \(GitHub answered 503\)/);
+});
+
+test("a result the feed changed after it was recorded gets one note, and Kickoff keeps the first", async () => {
+  const hub = github();
+  const notes = notesOn(hub);
+  const c = { label: "Champions League: Sporting CP v Man United", from: "final 2 – 3", to: "final 2 – 2" };
+  const note = changedNote({ ...c, owner: "Mhiah" });
+  assert.equal(note.title, "The feed changed a result: Champions League: Sporting CP v Man United, final 2 – 3 to final 2 – 2");
+  assert.match(note.body, /Kickoff recorded \*\*final 2 – 3\*\*\. The feed now says \*\*final 2 – 2\*\*\./);
+  assert.match(note.body, /\*\*Kickoff has kept the first result\.\*\*/);
+
+  const said = [];
+  assert.deepEqual(await noteChanged({ changed: [c], notes, say: (line) => said.push(line) }), []);
+  assert.equal(hub.issues.length, 1);
+  assert.deepEqual(said, ["A note about the feed changing the result of Champions League: Sporting CP v Man United was opened on GitHub."]);
+  // The robot sees the same change on every round. It is still one note, even once closed.
+  hub.issues[0].state = "closed";
+  await noteChanged({ changed: [c], notes });
+  assert.equal(hub.issues.length, 1);
+  // The feed changing it again is news.
+  await noteChanged({ changed: [{ ...c, to: "final 3 – 3" }], notes });
+  assert.equal(hub.issues.length, 2);
+  // With nowhere to write, or GitHub down, nothing is lost.
+  assert.deepEqual(await noteChanged({ changed: [c], notes: null }), []);
+  hub.down = true;
+  const again = { ...c, label: "NBA: Knicks v Bucks" };
+  assert.deepEqual(await noteChanged({ changed: [again], notes }), [again]);
 });

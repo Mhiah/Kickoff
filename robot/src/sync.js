@@ -5,7 +5,7 @@
 // never written to the report.
 
 import { day, fetchWeek } from "../../feed/src/index.js";
-import { AHEAD, BEHIND, plan } from "./fixtures.js";
+import { AHEAD, BEHIND, CONFIRM_AFTER, holdResults, plan } from "./fixtures.js";
 
 /**
  * @param server    Kickoff's server address
@@ -16,8 +16,13 @@ import { AHEAD, BEHIND, plan } from "./fixtures.js";
  * @param fetch     the function used to make web requests (the tests pass a stand-in)
  * @returns a report: { ok, dryRun, from, to, fetched, added, updated, calledOff, unchanged, problems }
  */
-export async function syncFixtures({ server, adminKey, keys, now, dryRun = false, fetch = globalThis.fetch }) {
-  const report = { ok: true, dryRun, from: day(now, -BEHIND), to: day(now, AHEAD), fetched: {}, added: [], updated: [], calledOff: [], replaced: [], unchanged: 0, problems: [] };
+/**
+ * @param pending  the final scores being waited on (see holdResults in fixtures.js), kept by the
+ *                 caller between rounds. A round with no memory of its own never records a final
+ *                 score: it only starts the wait. Null switches the waiting off.
+ */
+export async function syncFixtures({ server, adminKey, keys, now, dryRun = false, fetch = globalThis.fetch, pending = new Map(), wait = CONFIRM_AFTER }) {
+  const report = { ok: true, dryRun, from: day(now, -BEHIND), to: day(now, AHEAD), fetched: {}, added: [], updated: [], calledOff: [], replaced: [], waiting: [], lookAgainAt: null, unchanged: 0, problems: [] };
 
   const list = await fetch(`${server}/api/fixtures`).then(async (r) => ({ status: r.status, body: await r.json().catch(() => null) })).catch(() => null);
   if (!list || list.status !== 200 || !Array.isArray(list.body?.fixtures)) {
@@ -33,7 +38,11 @@ export async function syncFixtures({ server, adminKey, keys, now, dryRun = false
   // reason to stop the others.
   if (Object.values(feed.fetched).every((n) => n === null)) report.ok = false;
 
-  const changes = await plan({ league: list.body.league, feed: feed.matches, listed: list.body.fixtures, now });
+  // A final score is acted on only once the feed has given the same one twice, some minutes apart.
+  const held = pending ? holdResults({ feed: feed.matches, listed: list.body.fixtures, pending, now, wait }) : { feed: feed.matches, waiting: [], lookAgainAt: null };
+  report.waiting = held.waiting;
+  report.lookAgainAt = held.lookAgainAt;
+  const changes = await plan({ league: list.body.league, feed: held.feed, listed: list.body.fixtures, now });
   report.added = changes.added;
   report.updated = changes.updated;
   report.calledOff = changes.calledOff;
@@ -75,6 +84,9 @@ export function inWords(report) {
   for (const u of report.updated.filter((x) => !x.refused)) lines.push(`  ~ ${u.label}: ${u.from} -> ${u.to}`);
   for (const label of report.calledOff) lines.push(`  x ${label}: moved, so the old time is off`);
   for (const label of report.replaced ?? []) lines.push(`  x ${label}: was one prediction, now three (result, goal goal, exact score)`);
+  for (const w of report.waiting ?? []) {
+    lines.push(`  … ${w.label}: the feed says it finished ${w.score}${w.changedFrom ? `, where it said ${w.changedFrom} before` : ""}. Not recorded until the feed says so again.`);
+  }
   if (report.problems.length) lines.push("Problems:");
   for (const p of report.problems) lines.push(`  ! ${p}`);
   return lines.join("\n");

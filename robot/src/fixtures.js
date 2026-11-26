@@ -137,3 +137,47 @@ export async function plan({ league, feed, listed, now }) {
   });
   return { put: put.map((f) => JSON.parse(JSON.stringify(f))), added: once(added), updated: updatedOnce, calledOff: once(calledOff), replaced: once(replaced), unchanged: same_.size };
 }
+
+/** How long the feed has to keep saying the same final score before it is believed, in seconds. */
+export const CONFIRM_AFTER = 5 * 60;
+
+/**
+ * A final score is not believed the first time the feed gives it. A feed can call a match
+ * finished and correct the score a few minutes later, and a result, once recorded, is never
+ * changed. So the first time a match comes back finished, its score is only noted, and the match
+ * is passed on as still being played. When a later look, at least `wait` seconds on, gives the
+ * same score, it is passed on as finished. If the score has changed, the wait starts again.
+ *
+ * A match that is already finished on Kickoff's list is passed on untouched, and so is a match
+ * called off: only a score is waited for.
+ *
+ * @param pending  what is being waited on, kept between looks: feedId -> { resultByte, score, since }
+ * @returns {{ feed, waiting, lookAgainAt }}  the feed's matches to act on, the matches waited on,
+ *          and when the earliest of them can be confirmed (null if none)
+ */
+export function holdResults({ feed, listed, pending, now, wait = CONFIRM_AFTER }) {
+  const finished = new Set();
+  for (const f of listed) if (f.state === "final" && f.feedId) finished.add(f.feedId.replace(/:(result|goalgoal|score)$/, ""));
+  const waiting = [];
+  const out = feed.map((m) => {
+    if (m.state !== "final" || finished.has(m.feedId)) {
+      if (m.state !== "final") pending.delete(m.feedId);
+      return m;
+    }
+    const seen = pending.get(m.feedId);
+    if (seen && seen.resultByte === m.resultByte && seen.score === m.score) {
+      if (now - seen.since >= wait) {
+        pending.delete(m.feedId);
+        return m;
+      }
+    } else {
+      pending.set(m.feedId, { resultByte: m.resultByte, score: m.score, since: now, changedFrom: seen ? seen.score : undefined });
+    }
+    const held = pending.get(m.feedId);
+    waiting.push({ label: m.label, score: m.score, since: held.since, changedFrom: held.changedFrom });
+    const { score, result, resultByte, ...rest } = m;
+    return { ...rest, state: "live" };
+  });
+  const lookAgainAt = waiting.length ? Math.min(...waiting.map((w) => w.since + wait)) : null;
+  return { feed: out, waiting, lookAgainAt };
+}

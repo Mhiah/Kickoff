@@ -8,7 +8,7 @@ import { createKickoff } from "../../server/src/kickoff.js";
 import { MemoryStore } from "../../server/src/store.js";
 import { COMPETITIONS } from "../../web/data/sample.js";
 import { matchIdOf } from "../../web/lib/picks.js";
-import { plan, withIds } from "../src/fixtures.js";
+import { CONFIRM_AFTER, holdResults, plan, withIds } from "../src/fixtures.js";
 import { inWords, syncFixtures } from "../src/sync.js";
 
 const LEAGUE = "0000000000000000000000c424ad6fe8a46a34fa9b0610959beaba8a2c6b6982";
@@ -57,7 +57,9 @@ function world(matches = week()) {
     }
     return reply(404, {});
   };
-  w.run = (extra = {}) => syncFixtures({ server: SERVER, adminKey: ADMIN, keys: KEYS, now: clock.now, fetch: w.fetch, ...extra });
+  // Most checks here are about the list itself, so a final score is acted on at once (pending: null).
+  // The waiting has its own checks further down.
+  w.run = (extra = {}) => syncFixtures({ server: SERVER, adminKey: ADMIN, keys: KEYS, now: clock.now, fetch: w.fetch, pending: null, ...extra });
   // A football match is three lines on the list (result, goal goal, exact score): one match here.
   w.listed = async () => [...new Set((await kickoff.fixtures()).map((f) => `${f.label} | ${f.state}${f.score ? ` ${f.score}` : ""}`))];
   w.sent = () => w.asked.filter((a) => a.url.startsWith(SERVER) && a.method === "POST");
@@ -279,6 +281,83 @@ test("the three predictions of a football match all get the same result", async 
   await w.run();
   const three = (await w.kickoff.fixtures()).filter((f) => f.home === "Real Madrid");
   assert.deepEqual(three.map((f) => `${f.sport} ${f.state} ${f.score} ${f.resultByte}`).sort(), [`${RESULT} final 2 – 1 18`, `${GOAL_GOAL} final 2 – 1 18`, `${SCORE} final 2 – 1 18`]);
+});
+
+test("a final score is not recorded until the feed has said it twice, five minutes apart", async () => {
+  const w = world();
+  await w.run();
+  const pending = new Map();
+  const real = () => w.kickoff.fixtures().then((all) => all.filter((f) => f.home === "Real Madrid").map((f) => `${f.state} ${f.score ?? ""}`.trim()));
+
+  // The feed says it finished 2 – 3. That is only noted: on Kickoff the match is still being played.
+  w.clock.now = at("2026-11-25T22:10:00Z");
+  w.matches.cl = [footballMatch(3, "2026-11-25T20:00:00Z", "FINISHED", "Real Madrid", "Bayern", { winner: "AWAY_TEAM", fullTime: { home: 2, away: 3 } })];
+  const first = await w.run({ pending });
+  assert.deepEqual(first.waiting.map((x) => `${x.label} ${x.score}`), ["Champions League: Real Madrid v Bayern 2 – 3"]);
+  assert.equal(first.lookAgainAt, w.clock.now + CONFIRM_AFTER);
+  assert.deepEqual(await real(), ["live", "live", "live"]);
+  assert.match(inWords(first), /… Champions League: Real Madrid v Bayern: the feed says it finished 2 – 3\. Not recorded until the feed says so again\./);
+
+  // Four minutes on it is too soon to believe it, even though the feed says the same.
+  w.clock.now += 240;
+  assert.equal((await w.run({ pending })).waiting.length, 1);
+  assert.deepEqual(await real(), ["live", "live", "live"]);
+
+  // Then the feed corrects itself to 2 – 2. The wait starts again, from now, with the new score.
+  w.clock.now += 60;
+  w.matches.cl = [footballMatch(3, "2026-11-25T20:00:00Z", "FINISHED", "Real Madrid", "Bayern", { winner: "DRAW", fullTime: { home: 2, away: 2 } })];
+  const corrected = await w.run({ pending });
+  assert.deepEqual(corrected.waiting.map((x) => `${x.score} was ${x.changedFrom}`), ["2 – 2 was 2 – 3"]);
+  assert.equal(corrected.lookAgainAt, w.clock.now + CONFIRM_AFTER);
+  assert.deepEqual(await real(), ["live", "live", "live"]);
+
+  // Five minutes later the feed still says 2 – 2. Now it is recorded, for all three predictions.
+  w.clock.now += CONFIRM_AFTER;
+  const settled = await w.run({ pending });
+  assert.deepEqual([settled.waiting, settled.lookAgainAt, settled.problems], [[], null, []]);
+  assert.deepEqual(await real(), ["final 2 – 2", "final 2 – 2", "final 2 – 2"]);
+  assert.equal(pending.size, 0);
+
+  // After that it is a finished match like any other: nothing is waited for and nothing is sent.
+  w.clock.now += 1800;
+  const later = await w.run({ pending });
+  assert.deepEqual([later.waiting.length, later.updated.length], [0, 0]);
+});
+
+test("a round with no memory of its own never records a final score, and a match called off is not waited for", async () => {
+  const w = world();
+  await w.run();
+  w.clock.now = at("2026-11-25T22:30:00Z");
+  w.matches.cl = [footballMatch(3, "2026-11-25T20:00:00Z", "FINISHED", "Real Madrid", "Bayern", { winner: "HOME_TEAM", fullTime: { home: 2, away: 1 } })];
+  w.matches.pl[1] = footballMatch(2, "2026-11-29T14:00:00Z", "POSTPONED", "Man City", "Liverpool");
+  for (let i = 0; i < 3; i++) {
+    const report = await syncFixtures({ server: SERVER, adminKey: ADMIN, keys: KEYS, now: w.clock.now, fetch: w.fetch });
+    assert.equal(report.waiting.length, 1, "each such round only starts the wait");
+    w.clock.now += 600;
+  }
+  const listed = await w.kickoff.fixtures();
+  assert.ok(listed.filter((f) => f.home === "Real Madrid").every((f) => f.state === "live"));
+  assert.ok(listed.filter((f) => f.home === "Man City").every((f) => f.state === "void"), "a postponement is acted on at once");
+});
+
+test("holding a score: only an unfinished match is held, and what is passed on carries no score", () => {
+  const feed = [
+    { feedId: "a", label: "A", state: "final", score: "1 – 0", result: { home: 1, away: 0 }, resultByte: 1 },
+    { feedId: "b", label: "B", state: "final", score: "0 – 0", result: { home: 0, away: 0 }, resultByte: 0 },
+    { feedId: "c", label: "C", state: "void" },
+    { feedId: "d", label: "D", state: "scheduled" },
+  ];
+  // B is already finished on the list, as one of a football match's three predictions.
+  const listed = [{ feedId: "b:score", state: "final" }, { feedId: "a:result", state: "live" }];
+  const pending = new Map([["d", { resultByte: 5, score: "5 – 0", since: 0 }]]);
+  const out = holdResults({ feed, listed, pending, now: 1000 });
+  assert.deepEqual(out.feed[0], { feedId: "a", label: "A", state: "live" });
+  assert.deepEqual(out.feed.slice(1), feed.slice(1));
+  assert.deepEqual(out.waiting, [{ label: "A", score: "1 – 0", since: 1000, changedFrom: undefined }]);
+  assert.equal(out.lookAgainAt, 1000 + CONFIRM_AFTER);
+  assert.deepEqual([...pending.keys()], ["a"], "a match the feed no longer calls finished is forgotten");
+  // The same again five minutes on: passed through whole.
+  assert.deepEqual(holdResults({ feed, listed, pending, now: 1000 + CONFIRM_AFTER }).feed[0], feed[0]);
 });
 
 test("the report reads plainly", async () => {

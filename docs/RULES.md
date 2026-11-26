@@ -33,6 +33,8 @@ and published again as a new circuit. A circuit that is already published can ne
   can open it, and only after the match has started. What the robot opens is checked against what
   was locked on X Layer before kickoff, so the copy cannot be used to change a prediction.
 - A sealed prediction that cannot be opened scores 0 and shows on the player's record as "not opened".
+- A final score is recorded once the sports feed has given the same score twice, five minutes
+  apart. Once recorded, a result is never changed.
 - No prediction at all scores 0.
 
 **Scoring**

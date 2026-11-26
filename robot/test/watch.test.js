@@ -122,6 +122,23 @@ test("a failing feed does not stop the X Layer work, and is tried again next hal
   assert.equal(SYNC_EVERY, 1800);
 });
 
+test("when a final score is waiting to be confirmed, the feed is looked at again when the wait is over, not half an hour later", async () => {
+  const clock = { now: START };
+  const syncs = [];
+  await watch({
+    until: START + HOUR,
+    now: () => clock.now,
+    sleep: async (seconds) => { clock.now += seconds; },
+    sync: async () => {
+      syncs.push(clock.now - START);
+      // The first look finds a match the feed has just called finished. It can be confirmed in five minutes.
+      return { ok: true, lookAgainAt: syncs.length === 1 ? START + 300 : null };
+    },
+    list: async () => [],
+  });
+  assert.deepEqual(syncs, [0, 300, 300 + SYNC_EVERY]);
+});
+
 test("it stops when its time is up", async () => {
   const s = setup();
   await s.run(5.5);
