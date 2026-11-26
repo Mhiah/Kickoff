@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import {
-  BASKETBALL, FOOTBALL, basketballResult, buildBundle, encodePick, sealEnvelope, fromHex, loadCircuits, lockMessage, matchId, newDeviceKey, openingsPath, parseMessage, playerIdOf, readLeague,
+  BASKETBALL, FOOTBALL, FOOTBALL_MARKETS, GOAL_GOAL, RESULT, SCORE, basketballResult, buildBundle, encodePick, sealEnvelope, fromHex, loadCircuits, lockMessage, matchId, newDeviceKey, openingsPath, parseMessage, playerIdOf, readLeague,
   sealPick, signRequest, tableFromChain, toHex,
 } from "../../engine/src/index.js";
 import { createHandler } from "../../server/src/http.js";
@@ -15,6 +15,7 @@ import { createKickoff } from "../../server/src/kickoff.js";
 import { MemoryStore } from "../../server/src/store.js";
 import { CLOSES_BEFORE, SETTLE, TOO_LATE, chainTick, lockTime, newMemory, nextLock } from "../src/chain.js";
 import { createOpener, envelopeKeysFrom } from "../src/envelope.js";
+import { plan } from "../src/fixtures.js";
 import { PIECE, publishCalls } from "../src/xlayer.js";
 
 const LEAGUE = "0000000000000000000000c424ad6fe8a46a34fa9b0610959beaba8a2c6b6982";
@@ -83,7 +84,7 @@ async function world() {
     reports: [],
     async report(locks) {
       if (server.deaf) throw new Error("status 503: no answer");
-      server.reports.push(...locks.map((l) => `${Object.values(f).find((x) => x.id === l.match).home} ${l.state}`));
+      server.reports.push(...locks.map((l) => `${Object.values(f).find((x) => x.id === l.match)?.home ?? l.match.slice(0, 8)} ${l.state}`));
       return kickoff.putLocks({ locks });
     },
   };
@@ -648,4 +649,88 @@ test("the robot does not keep asking: X Layer is read only when needed, and open
   assert.equal(w.reads, afterLock, "X Layer was not read again: the robot already knew the match was locked");
   assert.equal(asked, 1, "the server was asked for opened picks once in those seven minutes");
   assert.equal(Object.keys(w.files).length, 1);
+});
+
+test("a football match as three predictions: replaced on the list, locked, opened by the robot, scored, and read back from the chain", async () => {
+  const w = await world();
+  w.opener = createOpener(ROBOT_KEY);
+  // On the list the older way, as one prediction, and still open.
+  const facts = { comp: "pl", home: "Liverpool", away: "Everton", kickoff: START + 10 * HOUR, label: "Premier League: Liverpool v Everton" };
+  const old = { ...facts, sport: FOOTBALL, feedId: "test:old", state: "scheduled", id: toHex(await matchId(LEAGUE, { sport: FOOTBALL, kickoff: facts.kickoff, bestOf: 0, label: facts.label })) };
+  await w.kickoff.putFixtures({ fixtures: [old] });
+
+  // The robot's own listing rules replace it with its three predictions.
+  w.clock.now = START + 8 * HOUR;
+  const fromFeed = { ...facts, sport: FOOTBALL, feedId: "test:old", state: "scheduled" };
+  const switched = await plan({ league: LEAGUE, feed: [fromFeed], listed: await w.kickoff.fixtures(), now: w.clock.now });
+  await w.kickoff.putFixtures({ fixtures: switched.put });
+  assert.deepEqual(switched.replaced, [facts.label]);
+  const listed = await w.kickoff.fixtures();
+  const three = Object.fromEntries(listed.filter((x) => x.label === facts.label && FOOTBALL_MARKETS.includes(x.sport)).map((x) => [x.sport, x]));
+  assert.deepEqual(Object.keys(three).map(Number), FOOTBALL_MARKETS);
+  assert.equal(listed.find((x) => x.id === old.id).state, "void");
+
+  // Ada makes all three, Bola only the result, Chidi goal goal and the exact score. Each sends a
+  // locked copy with the fingerprint, and no phone is seen again.
+  const said = [
+    { [RESULT]: { result: "home" }, [GOAL_GOAL]: { both: true }, [SCORE]: { home: 2, away: 1 } },
+    { [RESULT]: { result: "home" } },
+    { [GOAL_GOAL]: { both: false }, [SCORE]: { home: 1, away: 0 } },
+  ];
+  const players = [];
+  for (const picks of said) {
+    const key = await newDeviceKey();
+    const id = toHex(await playerIdOf(key.publicKey));
+    w.clock.now += 60;
+    for (const [sport, pick] of Object.entries(picks)) {
+      const fixture = three[sport];
+      const sealed = await sealPick({ league: LEAGUE, match: fixture.id, sport: fixture.sport, pick, player: id });
+      const envelope = await sealEnvelope({ to: lockedTo(ROBOT_KEY), league: LEAGUE, match: fixture.id, player: id, fingerprint: sealed.fingerprint, pickByte: sealed.pickByte, salt: sealed.salt });
+      const payload = { match: fixture.id, fingerprint: toHex(sealed.fingerprint), envelope };
+      const sent = await w.handle({ method: "POST", path: "/api/picks", headers: {}, body: await signRequest({ ...key, method: "POST", path: "/api/picks", payload, at: w.clock.now }) });
+      assert.equal(sent.status, 200, JSON.stringify(sent.body));
+    }
+    players.push(id);
+  }
+
+  // A few seconds after predictions close: each of the three is announced and locked.
+  w.clock.now = lockTime(three[RESULT]);
+  const locked = await w.tick();
+  assert.deepEqual(locked.problems, []);
+  assert.equal(locked.did.length, 6);
+  assert.equal(locked.did.filter((d) => d.includes("locked 2 sealed picks")).length, 3);
+  assert.deepEqual(w.kinds(), ["match", "lock", "match", "lock", "match", "lock"]);
+
+  // After kickoff the robot opens all six itself and publishes them.
+  w.clock.now = facts.kickoff + 60;
+  const started = await w.tick();
+  assert.deepEqual(started.problems, []);
+  assert.equal(started.did.filter((d) => d.endsWith("opened 2 sealed picks")).length, 3);
+  assert.equal(started.did.filter((d) => d.endsWith("published 2 opened picks")).length, 3);
+
+  // The feed says 2 – 1. The listing rules give that one result to all three, and the robot records each.
+  w.clock.now = facts.kickoff + 2 * HOUR;
+  const ended = await plan({ league: LEAGUE, feed: [{ ...fromFeed, state: "final", score: "2 – 1", result: { home: 2, away: 1 }, resultByte: encodePick(FOOTBALL, { home: 2, away: 1 }) }], listed: await w.kickoff.fixtures(), now: w.clock.now });
+  await w.kickoff.putFixtures({ fixtures: ended.put });
+  const recorded = await w.tick();
+  assert.deepEqual(recorded.problems, []);
+  assert.deepEqual(recorded.did, Array(3).fill("Premier League: Liverpool v Everton: result recorded (2 – 1)"));
+
+  // 1 + 1 + 3 for Ada, 1 for Bola, nothing for Chidi: on Kickoff, and rebuilt from the chain alone.
+  const onKickoff = [];
+  for (const id of players) onKickoff.push((await w.kickoff.table({ player: id, now: w.clock.now })).you.points);
+  assert.deepEqual(onKickoff, [5, 1, 0]);
+  const circuit = (name) => readFileSync(new URL(`../../circuits/out/${name}.hex`, import.meta.url), "utf8");
+  const circuits = loadCircuits(Object.fromEntries(["football", "basketball", "tennis", "result", "goalgoal", "score"].map((name) => [name, circuit(name)])));
+  const { table, matches, ignored } = await tableFromChain({ league: fromHex(LEAGUE), account: ACCOUNT, messages: w.inbox, openingsFiles: w.files, circuits });
+  assert.deepEqual(ignored, []);
+  assert.deepEqual(players.map((id) => table.find((row) => toHex(row.player) === id).points), [5, 1, 0]);
+  assert.deepEqual(matches.map((m) => m.sport).sort(), FOOTBALL_MARKETS, "the older single match was never written to the chain");
+
+  // The match that was called off as one prediction never costs the robot anything, then or later.
+  w.memory = newMemory();
+  w.clock.now += 600;
+  const before = w.inbox.length;
+  assert.deepEqual(await w.tick(), { did: [], problems: [], missed: [] });
+  assert.equal(w.inbox.length, before);
 });

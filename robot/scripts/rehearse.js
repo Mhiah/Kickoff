@@ -17,9 +17,15 @@
 //      locked copy of its pick with its fingerprint. Once the match starts the robot unlocks all
 //      hundred itself. They are far too many for one piece of the league's site, so the robot
 //      publishes the file in pieces.
+//   5c. THREE PREDICTIONS: a football match that was on the list the older way, as one
+//      prediction, is still open. The robot's own listing rules replace it with its three
+//      predictions: the result, goal goal and the exact score. Ada makes all three, Bola only
+//      the result, Chidi goal goal and the exact score. Their phones send locked copies and are
+//      not seen again. The robot locks each one, opens them after kickoff, records the result
+//      for each and publishes them.
 //   6. A second robot starts with no memory. It must write nothing.
 //   7. Everything is thrown away except the league's id. The table is rebuilt from the copy of
-//      X Layer alone. It has to come out as ada 6, bola 2, chidi 0, with all hundred of the crowd
+//      X Layer alone. It has to come out as ada 11, bola 3, chidi 0, with all hundred of the crowd
 //      scored, and players level on points in the order they joined.
 //
 // Usage:
@@ -32,7 +38,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 
 import {
-  BASKETBALL, FOOTBALL, XLAYER, basketballResult, buildBundle, connect, encodePick, fetchLeague, lockMessage, matchId, newDeviceKey, playerIdOf, sealPick,
+  BASKETBALL, FOOTBALL, FOOTBALL_MARKETS, GOAL_GOAL, RESULT, SCORE, XLAYER, basketballResult, buildBundle, connect, encodePick, fetchLeague, lockMessage, matchId, newDeviceKey, playerIdOf, sealPick,
   sealEnvelope, signRequest, tableFromXLayer, toHex, fromHex, loadCircuits, openingsPath,
 } from "../../engine/src/index.js";
 import { createHandler } from "../../server/src/http.js";
@@ -40,6 +46,7 @@ import { createKickoff } from "../../server/src/kickoff.js";
 import { MemoryStore } from "../../server/src/store.js";
 import { CLOSES_BEFORE, chainTick, lockTime, newMemory } from "../src/chain.js";
 import { createOpener, envelopeKeysFrom } from "../src/envelope.js";
+import { plan } from "../src/fixtures.js";
 import { PIECE, ask, becomeALeague, castSender, createChain, nodeSender } from "../src/xlayer.js";
 
 const DEFAULTS = {
@@ -131,6 +138,8 @@ const facts = {
   basketball: { comp: "nba", sport: BASKETBALL, home: "Knicks", away: "Bucks", kickoff: start + 3 * HOUR, label: "NBA: Knicks v Bucks" },
   nobody: { comp: "cl", sport: FOOTBALL, home: "Inter", away: "Barcelona", kickoff: start + 2 * HOUR, label: "Champions League: Inter v Barcelona" },
   crowd: { comp: "wnba", sport: BASKETBALL, home: "Liberty", away: "Aces", kickoff: start + 6 * HOUR, label: "WNBA: Liberty v Aces" },
+  // On the list the older way, as ONE football prediction. It is replaced by its three in 5c.
+  old: { comp: "pl", sport: FOOTBALL, home: "Liverpool", away: "Everton", kickoff: start + 10 * HOUR, label: "Premier League: Liverpool v Everton" },
 };
 const f = {};
 for (const [name, x] of Object.entries(facts)) f[name] = { id: toHex(await matchId(LEAGUE, { sport: x.sport, kickoff: x.kickoff, bestOf: 0, label: x.label })), feedId: `rehearsal:${name}`, state: "scheduled", ...x };
@@ -176,7 +185,7 @@ for (let i = 0; i < CROWD; i++) {
   if (answer.status !== 200) throw new Error(`a sealed pick from the crowd was refused: ${answer.body.error}`);
   crowd.push(phone);
 }
-say(` 2. four matches are on Kickoff's list. Ada, Bola and Chidi entered sealed picks for two of them, and a crowd of ${CROWD} for a third.`);
+say(` 2. five matches are on Kickoff's list. Ada, Bola and Chidi entered sealed picks for two of them, and a crowd of ${CROWD} for a third.`);
 
 // ------------------------------------------------------------------ the robot
 
@@ -286,6 +295,52 @@ const crowdOnChain = await ask(rpc, set.sites, "fileInfo(address,string)", [made
 say(`    on the copy of X Layer the file is ${Number(crowdOnChain[0]).toLocaleString("en-GB")} bytes in ${crowdOnChain[4]} pieces`);
 say(`    locking that match, publishing that file and recording its result cost ${okb(afterTwo - afterAll)}`);
 
+// ------------------------------------------------------------------ 5c. a football match as three predictions
+
+say(` 5c. Liverpool v Everton is on the list the older way, as one prediction, and is still open.`);
+clock.now = f.crowd.kickoff + 2 * HOUR + 600;
+// What the feed says about it, as the feed says it: one football match.
+const fromFeed = { feedId: f.old.feedId, comp: f.old.comp, sport: FOOTBALL, home: f.old.home, away: f.old.away, kickoff: f.old.kickoff, label: f.old.label, state: "scheduled" };
+const switched = await plan({ league: LEAGUE, feed: [fromFeed], listed: await kickoff.fixtures(), now: clock.now });
+const switchedOk = (await admin("/api/admin/fixtures", { fixtures: switched.put })).status === 200;
+const three = Object.fromEntries((await kickoff.fixtures()).filter((x) => x.label === f.old.label && FOOTBALL_MARKETS.includes(x.sport)).map((x) => [x.sport, x]));
+const oldNow = (await kickoff.fixtures()).find((x) => x.id === f.old.id);
+say(`    the robot's listing rules replaced it with ${Object.keys(three).length} predictions: the result, goal goal and the exact score`);
+
+// Ada makes all three, Bola only the result, Chidi goal goal and the exact score.
+const THREE_PICKS = {
+  ada: { [RESULT]: { result: "home" }, [GOAL_GOAL]: { both: true }, [SCORE]: { home: 2, away: 1 } },
+  bola: { [RESULT]: { result: "home" } },
+  chidi: { [GOAL_GOAL]: { both: false }, [SCORE]: { home: 1, away: 0 } },
+};
+const THREE_RESULT = { home: 2, away: 1 }; // ada 1 + 1 + 3, bola 1, chidi 0 (the right winner earns nothing from the exact score)
+clock.now += 60;
+let threeSealed = 0;
+for (const [name, picks] of Object.entries(THREE_PICKS)) {
+  for (const [sport, pick] of Object.entries(picks)) {
+    const fixture = three[sport];
+    const sealed = await sealPick({ league: LEAGUE, match: fixture.id, sport: fixture.sport, pick, player: phones[name].id });
+    const envelope = await sealEnvelope({ to: envelopeKeysFrom(UNLOCKING).publicKey, league: LEAGUE, match: fixture.id, player: phones[name].id, fingerprint: sealed.fingerprint, pickByte: sealed.pickByte, salt: sealed.salt });
+    const answer = await post(phones[name], "/api/picks", { match: fixture.id, fingerprint: toHex(sealed.fingerprint), envelope });
+    if (answer.status !== 200) throw new Error(`one of the three predictions was refused: ${answer.body.error}`);
+    threeSealed++;
+  }
+}
+say(`    Ada, Bola and Chidi sealed ${threeSealed} predictions between them, and their phones are not seen again`);
+clock.now = lockTime(three[RESULT]);
+say(`    five seconds after predictions close:`);
+const lockedThree = await tick();
+clock.now = f.old.kickoff + 60;
+say(`    a minute after kickoff, with no phone doing anything:`);
+const openedThree = await tick();
+clock.now = f.old.kickoff + 2 * HOUR;
+const ended = await plan({ league: LEAGUE, feed: [{ ...fromFeed, state: "final", score: "2 – 1", result: THREE_RESULT, resultByte: encodePick(FOOTBALL, THREE_RESULT) }], listed: await kickoff.fixtures(), now: clock.now });
+await admin("/api/admin/fixtures", { fixtures: ended.put });
+say(`    the feed says Liverpool 2 – 1 Everton, and the robot's listing rules give that result to all three:`);
+const endedThree = await tick();
+const afterThree = await balance();
+say(`    the three predictions of that one match cost ${okb(afterAll - afterThree)}`);
+
 // ------------------------------------------------------------------ 6. a second robot, with no memory
 
 const countBefore = (await fetchLeague({ node: set.node, mailbox: set.mailbox, league: fromHex(LEAGUE) })).messages.length;
@@ -298,7 +353,7 @@ say(` 6. a second robot started with no memory and wrote ${countAfter - countBef
 // ------------------------------------------------------------------ 7. read it all back from the chain alone
 
 const circuit = (name) => readFileSync(new URL(`../../circuits/out/${name}.hex`, import.meta.url), "utf8");
-const circuits = loadCircuits({ football: circuit("football"), basketball: circuit("basketball"), tennis: circuit("tennis") });
+const circuits = loadCircuits(Object.fromEntries(["football", "basketball", "tennis", "result", "goalgoal", "score"].map((name) => [name, circuit(name)])));
 const read = await tableFromXLayer({ node: set.node, mailbox: set.mailbox, sites: set.sites, league: fromHex(LEAGUE), circuits });
 const names = Object.fromEntries(Object.entries(phones).map(([name, p]) => [p.id, name]));
 const points = Object.fromEntries(read.table.filter((row) => names[toHex(row.player)]).map((row) => [names[toHex(row.player)], row.points]));
@@ -313,6 +368,7 @@ const crowdExpected = crowd.map((_, i) => i).sort((a, b) => CROWD_POINTS[b % 3] 
 say(`      and ${crowdScored} of the crowd of ${CROWD} with the points their picks earned`);
 // Kickoff's own server: it was told how each lock went, and gives points only for locked matches.
 const toldLocks = Object.fromEntries((await kickoff.fixtures()).map((x) => [x.label, x.lock ?? "nothing"]));
+const threeLocks = (await kickoff.fixtures()).filter((x) => x.label === f.old.label && x.state !== "void").map((x) => x.lock);
 const onKickoff = {};
 for (const name of ["ada", "bola", "chidi"]) onKickoff[name] = (await post(phones[name], "/api/me/table", { group: null })).body.you.points;
 say(`    Kickoff's own server says: ${Object.entries(onKickoff).map(([name, p]) => `${name} ${p}`).join(", ")}`);
@@ -335,15 +391,21 @@ const checks = [
   [`their file is too big for one piece (${crowdBytes.toLocaleString("en-GB")} bytes), and the robot published it in ${Math.ceil(crowdBytes / PIECE)} pieces`, crowdBytes > PIECE && afterCrowd.did.length === 2 && afterCrowd.did[1].endsWith(`published ${CROWD} opened picks, in ${Math.ceil(crowdBytes / PIECE)} pieces`)],
   ["the crowd's result was recorded when the match ended, and nothing else needed doing", endedCrowd.problems.length === 0 && endedCrowd.did.length === 1 && endedCrowd.did[0].includes("result recorded")],
   ["on X Layer that file is whole: every byte, in that many pieces", Number(crowdOnChain[0]) === crowdBytes && Number(crowdOnChain[4]) === Math.ceil(crowdBytes / PIECE)],
+  ["the football match listed the older way was replaced by its three predictions, and called off as one", switchedOk && switched.replaced.length === 1 && Object.keys(three).length === 3 && oldNow.state === "void" && new Set(Object.values(three).map((x) => x.id)).size === 3],
+  ["each of the three was announced and locked before kickoff", lockedThree.problems.length === 0 && lockedThree.did.length === 6 && lockedThree.did.filter((d) => d.includes("locked 2 sealed picks")).length === 3],
+  [`after kickoff the robot opened all ${threeSealed} predictions itself and published them, though no phone came back`, openedThree.problems.length === 0 && openedThree.did.filter((d) => d.endsWith("opened 2 sealed picks")).length === 3 && openedThree.did.filter((d) => d.includes("published 2 opened picks")).length === 3],
+  ["the one result was recorded for each of the three", endedThree.problems.length === 0 && endedThree.did.length === 3 && endedThree.did.every((d) => d.includes("result recorded"))],
+  ["on X Layer that match is three matches (result, goal goal, exact score), and the older single one was never written", JSON.stringify(read.matches.filter((m) => m.label === f.old.label).map((m) => m.sport).sort()) === JSON.stringify([RESULT, GOAL_GOAL, SCORE])],
+  ["Kickoff's server was told all three were locked", threeLocks.length === 3 && threeLocks.every((lock) => lock === "locked")],
   ["a second robot with no memory wrote nothing", second.did.length === 0 && second.problems.length === 0 && countAfter === countBefore],
   ["the lock in force for the football is the one made before kickoff, not the changed one", (() => { const m = read.matches.find((x) => x.label === facts.football.label); return m && toHex(m.lock.root) === honest.root && m.locks.length === 2; })()],
-  ["the table read back from X Layer is ada 6, bola 2, chidi 0", JSON.stringify(points) === JSON.stringify({ ada: 6, bola: 2, chidi: 0 })],
+  ["the table read back from X Layer is ada 11, bola 3, chidi 0: the three predictions added 5, 1 and 0", JSON.stringify(points) === JSON.stringify({ ada: 11, bola: 3, chidi: 0 })],
   [`all ${CROWD} of the crowd are on that table, each with the points their pick earned`, crowdRows.length === CROWD && crowdScored === CROWD],
   ["Kickoff's server was told the three matches with picks were locked, and nothing about the match nobody picked", toldLocks[facts.football.label] === "locked" && toldLocks[facts.basketball.label] === "locked" && toldLocks[facts.crowd.label] === "locked" && toldLocks[facts.nobody.label] === "nothing"],
   ["Kickoff's own points are the same as the ones rebuilt from X Layer", JSON.stringify(onKickoff) === JSON.stringify(points)],
   ["nobody on that table shares a place", read.table.every((row, i) => row.position === i + 1)],
   ["players level on points are in the order they joined Kickoff", JSON.stringify(crowdOrder) === JSON.stringify(crowdExpected)],
-  ["the whole run cost less than 0.2 OKB", before - afterAll < OKB / 5n],
+  ["the whole run cost less than 0.2 OKB", before - afterThree < OKB / 5n],
 ];
 let failed = 0;
 for (const [what, ok] of checks) {
@@ -351,6 +413,6 @@ for (const [what, ok] of checks) {
   if (!ok) failed++;
 }
 say();
-say(`${checks.length - failed} of ${checks.length} checks passed. In all the robot's wallet spent ${okb(before - afterAll)} of test money.`);
+say(`${checks.length - failed} of ${checks.length} checks passed. In all the robot's wallet spent ${okb(before - afterThree)} of test money.`);
 if (set.summary) writeFileSync(set.summary, `${lines.join("\n")}\n`);
 process.exit(failed ? 1 : 0);
