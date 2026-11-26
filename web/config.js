@@ -16,6 +16,6 @@ export const ROBOT_KEY = "041c33b97024442f75b85016b7f6eed75964433da6f325076b9a73
 //   explorer   a site that shows X Layer's records to a person
 export const ON_CHAIN = Object.freeze({
   processor: "0x39e44dba62811e87fde122ca4d6c082568a384d0",
-  circuits: Object.freeze({ league: 5, football: 6, basketball: 7, tennis: 8 }),
+  circuits: Object.freeze({ league: 5, football: 6, basketball: 7, tennis: 8, result: 9, goalgoal: 10, score: 11 }),
   explorer: "https://www.oklink.com/xlayer",
 });

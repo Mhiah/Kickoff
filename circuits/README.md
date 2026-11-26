@@ -6,8 +6,7 @@ written rules in [docs/RULES.md](../docs/RULES.md).
 > [!NOTE]
 > Football, basketball and tennis are published on X Layer as circuits 6, 7 and 8 of processor
 > `0x39e44dba62811e87fde122ca4d6c082568a384d0`. Result, Goal Goal and Score, football's three
-> predictions, are built and checked here and are published beside them next. Their circuit IDs
-> are added here when they exist.
+> predictions, were published beside them on 26 November 2026 as circuits 9, 10 and 11.
 
 ## What a scoring circuit is
 

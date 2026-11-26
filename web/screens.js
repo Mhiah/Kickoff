@@ -708,7 +708,7 @@ ${read}
 <h2>Kickoff on X Layer</h2>
 ${copyRow("The league's account", account, shortHex(account))}
 ${copyRow("TapeOut processor", ON_CHAIN.processor, shortHex(ON_CHAIN.processor))}
-${copyRow("Circuits on it", `league ${ON_CHAIN.circuits.league}, football ${ON_CHAIN.circuits.football}, basketball ${ON_CHAIN.circuits.basketball}, tennis ${ON_CHAIN.circuits.tennis}`)}
+${copyRow("Circuits on it", `league ${ON_CHAIN.circuits.league}, football ${ON_CHAIN.circuits.football}, basketball ${ON_CHAIN.circuits.basketball}, tennis ${ON_CHAIN.circuits.tennis}, football result ${ON_CHAIN.circuits.result}, goal goal ${ON_CHAIN.circuits.goalgoal}, exact score ${ON_CHAIN.circuits.score}`)}
 <p class="say-so"><a class="link" href="${ON_CHAIN.explorer}/address/${account}" target="_blank" rel="noopener">See the league's account on X Layer</a></p>`;
   return { html, title: "Check it yourself on Kickoff", tab: "check" };
 }

@@ -18,7 +18,7 @@ X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during thi
 | Play it | <https://kickoff-two-xi.vercel.app> |
 | Play it from X Layer | <https://5-2-409.tapekit.org> |
 | TapeOut processor | `0x39e44dba62811e87fde122ca4d6c082568a384d0` (processor number 409) |
-| Circuit IDs | **5** is the league. **6**, **7** and **8** are the scoring rules for football, basketball and tennis. |
+| Circuit IDs | **5** is the league. **6**, **7** and **8** are the scoring rules for football, basketball and tennis. **9**, **10** and **11** are football's three predictions: result, goal goal and exact score. |
 | TapeOut features used | Circuits, a circuit's container, TapeSend and DeWEB, opened through a TapeKit gateway |
 | State | Live on X Layer since 24 November 2026. Real matches, real groups. No sign-up. A wallet is optional: you can link one. |
 
@@ -136,7 +136,7 @@ Today everything is free.
 | Play it from X Layer | <https://5-2-409.tapekit.org>. The site's files are stored on X Layer under the name `5.2.409.tape` (TapeOut's DeWEB), and a TapeOut gateway opens them in an ordinary browser. |
 | Chain | X Layer mainnet (chain 196) |
 | TapeOut processor | `0x39e44dba62811e87fde122ca4d6c082568a384d0`, processor number 409. It is a shared processor that anyone may publish on. Kickoff did not need one of its own. |
-| Circuit IDs on it | **5** is the league itself. **6** is the football scoring rule, **7** basketball, **8** tennis. |
+| Circuit IDs on it | **5** is the league itself. **6** is the football scoring rule, **7** basketball, **8** tennis. Football's three predictions are **9** (result), **10** (goal goal) and **11** (exact score). |
 | The league's account (its TapeOut container) | `0x24ad6fe8a46a34fa9b0610959beaba8a2c6b6982` |
 | Kickoff's id in TapeOut's mailbox | `0x0000000000000000000000c424ad6fe8a46a34fa9b0610959beaba8a2c6b6982` |
 | The robot's wallet, which holds circuit 5 | `0x37ffd5b3e27dd5ce04945559def00b66d5841fc1` |
@@ -144,6 +144,7 @@ Today everything is free.
 | Live since | 24 November 2026. Going live cost 0.087878 OKB. |
 | First real predictions locked | 25 November 2026, 17:35 UTC. Champions League: Sabah FK v Barça and Slavia Praha v Villarreal, each locked 595 seconds before kickoff. Both results were recorded that evening (1 – 4 and 0 – 1). |
 | The website put on X Layer | 25 November 2026. 44 files, for 0.001581 OKB. |
+| Football's three scoring rules published | 26 November 2026, as circuits 9, 10 and 11, for 0.005905 OKB. |
 
 **TapeOut features used:** circuits (the scoring rules), a circuit's container (the league's
 account), TapeSend (the record of every lock and result) and DeWEB (the opened predictions, and the copy
@@ -176,7 +177,7 @@ These are the tools, what each one is in plain words, and the job it does in Kic
 
 | Tool | What it is in plain words | Its job in Kickoff |
 | --- | --- | --- |
-| **Circuit** | A tiny rule machine. You give it facts, it gives an answer, and once it is published nobody can change it. | The scoring rules: circuits 6, 7 and 8 for football, basketball and tennis, and three more for football's three predictions (result, goal goal, exact score), built and checked and published beside them next. Free for anyone to check. Circuit 5 is a one-gate circuit whose only job is to be the league. |
+| **Circuit** | A tiny rule machine. You give it facts, it gives an answer, and once it is published nobody can change it. | The scoring rules: circuits 6, 7 and 8 for football, basketball and tennis, and circuits 9, 10 and 11 for football's three predictions (result, goal goal, exact score). Free for anyone to check. Circuit 5 is a one-gate circuit whose only job is to be the league. |
 | **Processor** | The workshop a circuit is published from. | Kickoff's circuits are on processor 409, a shared one that anyone may publish on. |
 | **Container** | An account that belongs to a circuit, so it can hold money and own a page. | Kickoff's own account on X Layer. Everything Kickoff says is said from it, and nothing said by any other account counts. |
 | **TapeSend** | A mailbox for those accounts, where every message is stamped with who sent it and when. | The public record: each match announced, each bundle of sealed predictions locked before kickoff, each result, and each dispute. |
@@ -198,7 +199,7 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 
 | What | How it was checked | Result |
 | --- | --- | --- |
-| Football's three predictions | The three new circuits (result, goal goal, exact score) on every possible case with both evaluators, and through the engine, the server and the website's own tests | 67,072 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
+| Football's three predictions | The three new circuits (result, goal goal, exact score) on every possible case with both evaluators, and through the engine, the server and the website's own tests | 67,072 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)). Published on X Layer as circuits 9, 10 and 11 for 0.005905 OKB, against 0.005880 in fees that the free look gave |
 | The first three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
 | The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
 | The prediction engine | 151 tests. Twenty-three try to cheat, and five have the X Layer node lie about what is on chain | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
@@ -220,7 +221,7 @@ results.
 | Stage | What it is | State |
 | --- | --- | --- |
 | 1 | Project setup: this README, the folders, the licence | Done |
-| 2 | The scoring circuits, and the checker that tests every possible case | Done, and published on X Layer as circuits 6, 7 and 8. |
+| 2 | The scoring circuits, and the checker that tests every possible case | Done, and published on X Layer as circuits 6, 7 and 8, with football's three predictions as circuits 9, 10 and 11. |
 | 3 | Proving the TapeOut parts on a private copy of X Layer | Done. Rehearsals 1 to 4 and the fees report, 29 tests against the real contracts. |
 | 4 | The prediction engine and the leaderboard builder | Done, 151 tests, with a fifth rehearsal that plays a season on chain and reads it back. Still to do: asking several nodes instead of one. |
 | 5 | The website's screens | Done, with real matches and real numbers. |
@@ -234,7 +235,7 @@ results.
 | 13 | A real test group with real people and real matches | Not started |
 | 14 | Players with a wallet, groups run by brands, and prizes | Partly done. A player who has a wallet can link it, which costs nothing: on a new phone, linking the same wallet brings their groups back. Other players are told only that a wallet is linked, never which one. Groups run by brands are built: up to 5,000 players, started only by Kickoff, with the brand's name, a prize line and a leaderboard of the top twenty and you. Paying prizes is not started. |
 | 15 | Demo video and submission | Not started |
-| 16 | Football as three predictions: result, goal goal and the exact score | Built and tested: three new scoring circuits checked on every possible case, each prediction sealed, locked and scored by itself, one screen for all three, and the robot lists every football match that way. The three new circuits are published on X Layer next. |
+| 16 | Football as three predictions: result, goal goal and the exact score | Built and tested: three new scoring circuits checked on every possible case, each prediction sealed, locked and scored by itself, one screen for all three, and the robot lists every football match that way. The three new circuits were published on X Layer on 26 November 2026 as circuits 9, 10 and 11. |
 
 **The scoring circuits**
 
@@ -370,7 +371,8 @@ prediction has to prove itself against the lock that was written before kickoff.
 
 **State: live.** The first three circuits are published on X Layer as circuits 6, 7 and 8, and were
 checked on every possible case before that. The three for football's result, goal goal and exact
-score are checked the same way and are published beside them next. The robot writes each result and publishes the opened
+score were checked the same way and published beside them on 26 November 2026, as circuits 9, 10
+and 11. The robot writes each result and publishes the opened
 predictions. Kickoff's server scores with the same circuits, and a test fails if its copy ever
 differs from the published files.
 
@@ -443,9 +445,6 @@ PUBLISH SITE, and a check that reads every file back).
 
 - **It is new.** Kickoff went live on 24 November 2026 and very few people have played it. A test
   with a real group of friends is still to do.
-- **Football's three new scoring circuits are not on X Layer yet.** They are built, and checked on
-  every possible case, and Kickoff's server and the Check tab score with them. Until they are
-  published beside circuits 6, 7 and 8, their rules are in this repository and not yet on chain.
 - **One robot does the locking.** If it is late for a match, or its wallet has run dry, that
   match's predictions are not locked and nobody scores for it. The robot warns before its wallet runs
   low, but nothing stands in for it if it stops.
