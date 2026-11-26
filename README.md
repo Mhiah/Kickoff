@@ -14,20 +14,21 @@ X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during thi
 [![Robot](https://github.com/Mhiah/Kickoff/actions/workflows/robot.yml/badge.svg)](https://github.com/Mhiah/Kickoff/actions/workflows/robot.yml)
 
 > [!NOTE]
-> **Where this is today (25 November 2026).** Kickoff is live. The website shows real Premier
+> **Where this is today (26 November 2026).** Kickoff is live. The website shows real Premier
 > League, Champions League and NBA matches. Friends play in groups, with no wallet and no sign-up.
-> Kickoff's robot locks every match's sealed predictions on X Layer, through TapeOut, before kickoff, and
-> anyone can check the record from their own browser.
+> Kickoff's robot locks every match's sealed predictions on X Layer, through TapeOut, before kickoff,
+> opens them after kickoff so nobody has to come back, and anyone can check the record from their
+> own browser. The website itself is on X Layer too, at <https://5-2-409.tapekit.org>.
 >
-> **Still to come:** the copy of the website on X Layer itself (built and tested, not published
-> yet), prizes for groups run by brands, and a test with a real group of friends. The section
-> [Where the build is](#where-the-build-is) says exactly what exists.
+> **Still to come:** prizes for groups run by brands, and a test with a real group of friends. The
+> section [Where the build is](#where-the-build-is) says exactly what exists.
 
 ## Live on X Layer
 
 | | |
 | --- | --- |
 | Play it | <https://kickoff-two-xi.vercel.app> |
+| Play it from X Layer | <https://5-2-409.tapekit.org>. The site's files are stored on X Layer under the name `5.2.409.tape` (TapeOut's DeWEB), and a TapeOut gateway opens them in an ordinary browser. |
 | Chain | X Layer mainnet (chain 196) |
 | TapeOut processor | `0x39e44dba62811e87fde122ca4d6c082568a384d0`, processor number 409. It is a shared processor that anyone may publish on. Kickoff did not need one of its own. |
 | Circuit IDs on it | **5** is the league itself. **6** is the football scoring rule, **7** basketball, **8** tennis. |
@@ -36,6 +37,8 @@ X Layer TapeOut Accelerate (OKX Build X Series). A new project, built during thi
 | The robot's wallet, which holds circuit 5 | `0x37ffd5b3e27dd5ce04945559def00b66d5841fc1` |
 | TapeOut contracts Kickoff writes to | The mailbox (TapeSend) `0xe61a9c7213a6aa616c246a2b569e555b417b25ee` and the site store (DeWEB) `0xd6efb7adcc9c83dc4924ad56f6a8e4e969b9adb6` |
 | Live since | 24 November 2026. Going live cost 0.087878 OKB. |
+| First real predictions locked | 25 November 2026, 17:35 UTC. Champions League: Sabah FK v Barça and Slavia Praha v Villarreal, each locked 595 seconds before kickoff. Both results were recorded that evening (1 – 4 and 0 – 1). |
+| The website put on X Layer | 25 November 2026. 44 files, for 0.001581 OKB. |
 
 **TapeOut features used:** circuits (the scoring rules), a circuit's container (the league's
 account), TapeSend (the record of every lock and result) and DeWEB (the opened predictions, and the copy
@@ -45,7 +48,7 @@ of the website). [TapeOut, plainly](#tapeout-plainly) says what each one does he
 
 Nothing below needs a wallet, an account or Kickoff's permission.
 
-1. **In a browser.** Open the site and go to the **Check** tab. Your own browser asks an X Layer
+1. **In a browser.** Open the site, from either address above, and go to the **Check** tab. Your own browser asks an X Layer
    node for the league's record and works the points out again with the published scoring rules.
    It shows when each of your predictions was locked, your group's points from X Layer beside Kickoff's
    own, and whether the order is the same.
@@ -337,7 +340,11 @@ circuit can change that copy.
 The copy still talks to Kickoff's server for groups and predictions, so it is the same game at a second
 address, not a game that runs with no server.
 
-**State: built and tested, not published yet.** Its name will be `5.2.409.tape`.
+**State: live.** Published on 25 November 2026 as `5.2.409.tape`: 44 files, for 0.001581 OKB,
+with the name switched on for 12 months. It opens at <https://5-2-409.tapekit.org>. The copy is the
+site as it was when it was last sent. When the site changes, the robot's wallet sends the changed
+files again (the "Website on X Layer" workflow: a look that is free, a go that needs the words
+PUBLISH SITE, and a check that reads every file back).
 
 ## TapeOut, plainly
 
@@ -350,8 +357,8 @@ These are the tools, what each one is in plain words, and the job it does in Kic
 | **Processor** | The workshop a circuit is published from. | Kickoff's circuits are on processor 409, a shared one that anyone may publish on. |
 | **Container** | An account that belongs to a circuit, so it can hold money and own a page. | Kickoff's own account on X Layer. Everything Kickoff says is said from it, and nothing said by any other account counts. |
 | **TapeSend** | A mailbox for those accounts, where every message is stamped with who sent it and when. | The public record: each match announced, each bundle of sealed predictions locked before kickoff, each result, and each dispute. |
-| **DeWEB** | A website stored on the blockchain, so it cannot be secretly changed. | Where the opened predictions are published after each match, with each player's joining time. The copy of the Kickoff site goes there too: built, not published yet. |
-| **TapeKit** | The checker that opens a DeWEB site and confirms it is genuine. | How a visitor opens the copy of the site on X Layer in an ordinary browser, once it is published. |
+| **DeWEB** | A website stored on the blockchain, so it cannot be secretly changed. | Where the opened predictions are published after each match, with each player's joining time. The copy of the Kickoff site is there too, under the name `5.2.409.tape`. |
+| **TapeKit** | The checker that opens a DeWEB site and confirms it is genuine. | How a visitor opens the copy of the site on X Layer in an ordinary browser: <https://5-2-409.tapekit.org>. |
 
 Not used: FabX (mining), which has no role in this product, and TapeCode. Kickoff writes to TapeOut
 with a small program of its own ([`robot/src/xlayer.js`](robot/src/xlayer.js)).
@@ -370,14 +377,16 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | --- | --- | --- |
 | The three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
 | The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
-| The prediction engine | 137 tests. Twenty-three try to cheat, and five have the X Layer node lie about what is on chain | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
-| The website | 78 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
+| The prediction engine | 143 tests. Twenty-three try to cheat, and five have the X Layer node lie about what is on chain | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
+| The website | 81 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 23 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
-| The server | 90 tests. They take a name somebody has, link a wallet that did not sign, send predictions in someone else's name, play old requests back, open a different prediction from the one sealed, and use the robot's addresses without its key. They also check that a match gives points only once it was locked on X Layer | All pass; every one is refused ([details](server/README.md)) |
-| The robot | 65 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, a hundred players on one match, a lock it slept through, its notes when it needs a person, putting the website on X Layer, and going live without paying for anything twice | All pass ([details](robot/README.md)) |
-| The robot on a copy of X Layer | The robot's own code announcing, locking, recording results and publishing opened predictions through TapeOut's real contracts, signing with `cast`, then the leaderboard rebuilt from the chain alone | 11 of 11 checks passed on the first run ([rehearsal 6](docs/REHEARSAL-RESULTS.md)) |
+| The server | 94 tests. They take a name somebody has, link a wallet that did not sign, send predictions in someone else's name, play old requests back, open a different prediction from the one sealed, and use the robot's addresses without its key. They also check that a match gives points only once it was locked on X Layer | All pass; every one is refused ([details](server/README.md)) |
+| The robot | 69 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, a hundred players on one match, a lock it slept through, its notes when it needs a person, putting the website on X Layer, and going live without paying for anything twice | All pass ([details](robot/README.md)) |
+| The robot on a copy of X Layer | The robot's own code announcing, locking, recording results and publishing opened predictions through TapeOut's real contracts, signing with `cast`, then the leaderboard rebuilt from the chain alone | 11 of 11 checks passed on the first run ([rehearsal 6](docs/REHEARSAL-RESULTS.md)). It has grown since: the latest run has a hundred players who seal a prediction and never come back, the robot opens all hundred after kickoff and publishes them in 4 pieces, and 22 of 22 checks pass |
 | What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
 | Going live for real | Done on X Layer on 24 November 2026 by the robot's wallet, after the same steps were rehearsed on the copy | It cost 0.087878 OKB, as measured. The robot's next run confirmed it was working as the league |
+| The first real lock | 25 November 2026: the robot locked the sealed predictions of two Champions League matches on X Layer, 595 seconds before each kickoff, then recorded both results | The Check tab, in an ordinary browser, read both matches back from X Layer as locked |
+| The website on X Layer | Sent on 25 November 2026 by the robot's wallet, after a free look that gave the cost | 44 files for 0.001581 OKB against 0.001577 estimated. The address opens in a browser and shows the real matches |
 
 GitHub repeats the tests on every change, and the badges at the top of this page show the latest
 results.
@@ -422,8 +431,10 @@ results.
 - **Kickoff's circuits sit on someone else's processor.** They are published and cannot be changed
   or removed. But publishing a new circuit there depends on that processor still selling
   transistors.
-- **The copy of the website on X Layer is not published yet,** and when it is, it will still need
-  Kickoff's server to play.
+- **The copy of the website on X Layer still needs Kickoff's server to play.** Its pages come from
+  X Layer, but groups, names and sealed predictions go through the same server as the other
+  address. It is also a copy: after the site changes, it shows the older pages until the changed
+  files are sent again.
 - **The leaderboard reader asks one X Layer node.** It checks every message against the mailbox's own
   fingerprint, but it believes that node about what the mailbox holds. TapeOut's own rule is to
   ask several nodes and require them to agree. That is still to do.
@@ -447,15 +458,15 @@ results.
 | 1 | Project setup: this README, the folders, the licence | Done |
 | 2 | The scoring circuits, and the checker that tests every possible case | Done, and published on X Layer as circuits 6, 7 and 8. |
 | 3 | Proving the TapeOut parts on a private copy of X Layer | Done. Rehearsals 1 to 4 and the fees report, 29 tests against the real contracts. |
-| 4 | The prediction engine and the leaderboard builder | Done, 137 tests, with a fifth rehearsal that plays a season on chain and reads it back. Still to do: asking several nodes instead of one. |
+| 4 | The prediction engine and the leaderboard builder | Done, 143 tests, with a fifth rehearsal that plays a season on chain and reads it back. Still to do: asking several nodes instead of one. |
 | 5 | The website's screens | Done, with real matches and real numbers. |
 | 6 | Sealing a prediction for real, on the player's own device | Done. |
 | 7 | The fixtures feed | Done, and running live against the real feeds. |
-| 8 | Kickoff's server: groups, names, and sealed predictions until they are locked | Done, 90 tests, and online with a real database. Groups of up to 30, one name for each player, signed requests, and points only for matches that were locked on X Layer. |
-| 9 | The robot: keeps the list of matches, locks predictions before kickoff and posts results on X Layer | Done and running live, 65 tests. It publishes a match's opened predictions in as many pieces as they need, tells the server how each lock went, and opens a note when its wallet runs low or a lock was missed. |
+| 8 | Kickoff's server: groups, names, and sealed predictions until they are locked | Done, 94 tests, and online with a real database. Groups of up to 30, one name for each player, signed requests, and points only for matches that were locked on X Layer. |
+| 9 | The robot: keeps the list of matches, locks predictions before kickoff and posts results on X Layer | Done and running live, 69 tests. After kickoff it opens every prediction from its locked copy, so no player has to come back. It publishes a match's opened predictions in as many pieces as they need, tells the server how each lock went, and opens a note when its wallet runs low or a lock was missed. |
 | 10 | Joining it up: real fixtures and real leaderboards on the website | Done. The League and My record screens show real numbers: a leaderboard of everyone who plays and one of your group, both numbered from 1, with every point worked out by the scoring circuits. The Check screen is read from X Layer by the player's own browser: it shows when each of your predictions was locked, works out the group's points from what is on chain, puts them beside Kickoff's own, and says whether the order is the same. |
 | 11 | Going live on X Layer: the circuits and Kickoff's account | Done on 24 November 2026. The switch was rehearsed on a private copy first: a look that says the cost and sends nothing, and a go that needs the words GO LIVE. |
-| 12 | The copy of the site on X Layer (DeWEB) | Built and tested: a look, a go that needs the words PUBLISH SITE, and a check that reads every file back. Not published yet. |
+| 12 | The copy of the site on X Layer (DeWEB) | Done on 25 November 2026: <https://5-2-409.tapekit.org>. A look that is free, a go that needs the words PUBLISH SITE, and a check that reads every file back. |
 | 13 | A real test group with real people and real matches | Not started |
 | 14 | Players with a wallet, groups run by brands, and prizes | Partly done. A player who has a wallet can link it, which costs nothing and is never required: on a new phone, linking the same wallet brings their groups back. Other players are told only that a wallet is linked, never which one. Groups run by brands are built: up to 5,000 players, started only by Kickoff, with the brand's name, a prize line and a leaderboard of the top twenty and you. Paying prizes is not started. |
 | 15 | Demo video and submission | Not started |
