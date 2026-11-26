@@ -69,7 +69,7 @@ export function home() {
   <section>
     <h2>Real games, every week</h2>
     <p>This week's fixtures are already here, and next week's arrive by themselves. Results come in after the final whistle. Nobody types them in.</p>
-    <div class="glass" style="margin-top:14px">
+    <div class="glass">
       <div class="row"><div class="grow"><div class="title" style="margin:0">Football</div>
         <div class="comps">${comp("pl")}${comp("cl")}</div>
         <div class="sub">Three predictions a match: the result and goal goal for 1 point each, the exact score for 3.</div></div></div>
@@ -90,7 +90,7 @@ export function home() {
   <section>
     <h2>You don't have to trust us</h2>
     <p>Every prediction's seal and every result is kept on X Layer through TapeOut. Anyone can read the record and rebuild the leaderboard themselves.</p>
-    <a class="btn quiet" href="#/check" style="margin-top:14px">See how to check it</a>
+    <a class="btn quiet" href="#/check">See how to check it</a>
   </section>
 </div>
 ${SAMPLE_NOTE}`;

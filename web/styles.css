@@ -192,6 +192,21 @@ body.public .tabs { display: none; }
 .demo .pick { font-size: 46px; font-weight: 700; line-height: 1; margin-top: 12px; }
 .demo .stamp { position: absolute; right: 10px; top: 10px; }
 .tagline { text-align: center; margin-top: 16px; font-style: italic; color: var(--muted); }
+/* The three parts under the hero: what you predict, how a match goes, and how to check it. */
+.trio .glass, .trio .btn { margin-top: 14px; }
+@media (max-width: 899px) {
+  .trio { margin-top: 44px; }
+  .trio section + section { margin-top: 44px; }
+  .trio h2 { margin: 0 0 12px; }
+  .trio .glass { margin-top: 20px; }
+  .trio .row { padding: 18px 20px; }
+  .trio .row .sub { line-height: 1.5; }
+  .trio .comps { margin: 10px 0 8px; gap: 6px 16px; }
+  .trio .steps li { padding-bottom: 24px; }
+  .trio .steps li:last-child { padding-bottom: 0; }
+  .trio .btn { margin-top: 20px; }
+  .trio + .sample { margin-top: 48px; }
+}
 .comps { display: flex; gap: 4px 14px; margin: 6px 0; flex-wrap: wrap; }
 .steps { list-style: none; counter-reset: s; }
 .steps li { counter-increment: s; position: relative; padding: 0 0 16px 42px; }
