@@ -18,6 +18,7 @@ import { ON_CHAIN } from "./config.js";
 import { sits } from "./lib/groups.js";
 import { HOME_NOTE, MARK, SAMPLE_NOTE, TOGGLE, comp, esc, stamp, titlebar } from "./lib/html.js";
 import { GOAL_GOAL, RESULT, SCORE, decodePick } from "./engine/picks.js";
+import { cardFacts } from "./lib/card.js";
 import { BAND_KEYS, MARKETS, bandWords, pickWords, pointsFor } from "./lib/picks.js";
 import { standing } from "./lib/sync.js";
 import { ordinal, placeName, standings } from "./lib/standings.js";
@@ -592,6 +593,10 @@ function everyPick(ctx, s) {
   return rows.sort((a, b) => b.kickoff - a.kickoff);
 }
 
+/** What a card of this player's last finished match would say (lib/card.js), or null if there is none yet. */
+export const cardOf = (ctx) =>
+  cardFacts({ played: ctx.standings?.played ?? [], standings: ctx.standings, name: ctx.mine.name, groupName: ctx.mine.group?.name ?? null, competitions: COMPETITIONS, site: ctx.site ?? "" });
+
 /** My record, with real numbers: this player's points and place, and every pick. */
 function recordReal(ctx) {
   const s = ctx.standings ?? EMPTY;
@@ -615,6 +620,8 @@ ${titlebar({ heading: name ? `${esc(name)}'s record` : "My record" })}
   <div class="glass box"><small>Total won</small><b>${won}</b><span>${s.you.threes} spot on</span></div>
   <div class="glass box"><small>Win rate</small><b>${rate}</b><span>of ${finished} played</span></div>
 </div>
+${cardOf(ctx) ? `<p class="wallet-row"><button type="button" class="link" data-save-card>Save a card of your last match</button></p>
+<p class="say-so muted" data-card-out role="status"></p>` : ""}
 <h2>Every prediction</h2>
 ${picks.length ? `<div class="glass">${picks.join("")}</div>` : `<p class="small muted" style="margin-top:10px">No predictions yet.</p>`}`;
   return { html, title: "My record on Kickoff", tab: "record" };

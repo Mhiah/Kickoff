@@ -6,6 +6,7 @@ import { COMPETITIONS, SAMPLE_LEAGUE, sampleFixtures } from "./data/sample.js";
 import { createDevice } from "./lib/device.js";
 import { createChain } from "./lib/chain.js";
 import { createFixtures } from "./lib/fixtures.js";
+import { saveCard } from "./lib/card.js";
 import { createGroups } from "./lib/groups.js";
 import { finishMove, isShared, showCode, startMove } from "./lib/move.js";
 import { createStore, seal } from "./lib/picks.js";
@@ -14,7 +15,7 @@ import { syncPicks } from "./lib/sync.js";
 import { createTable } from "./lib/table.js";
 import { hasClosed } from "./lib/time.js";
 import { createWallet } from "./lib/wallet.js";
-import { checkScreen, frame, groupScreen, home, league, matchScreen, pick, recordScreen } from "./screens.js";
+import { cardOf, checkScreen, frame, groupScreen, home, league, matchScreen, pick, recordScreen } from "./screens.js";
 
 const routes = { "": home, league, pick, match: matchScreen, record: recordScreen, check: checkScreen, group: groupScreen };
 
@@ -244,6 +245,20 @@ document.addEventListener("click", async (event) => {
     groups.choose(target.dataset.choose);
     await draw();
     carry();
+    return;
+  }
+
+  // My record: save a picture of the last finished match.
+  if (target.matches("[data-save-card]")) {
+    const out = view.querySelector("[data-card-out]");
+    try {
+      const facts = cardOf(await context());
+      if (!facts) throw new Error("There is no finished match to make a card of yet.");
+      await saveCard(facts);
+      out.textContent = "Card saved.";
+    } catch (error) {
+      out.textContent = error.message;
+    }
     return;
   }
 
