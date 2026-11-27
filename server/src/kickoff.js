@@ -66,6 +66,29 @@ const refuse = (status, message) => {
 };
 
 const HEX64 = /^[0-9a-f]{64}$/;
+/**
+ * The tokens a brand's prize can be paid in, on X Layer. Each is the real one, by its address, so a
+ * token that only calls itself USDT or USDC is not taken for it.
+ *   USDT  USD₮0, Tether's token on X Layer (OKX's token list for X Layer)
+ *   USDC  the USDC that Circle issues on X Layer (Circle's list of USDC addresses)
+ */
+export const PRIZE_TOKENS = {
+  USDT: { address: "0x779ded0c9e1022225f8e0630b35a9b54be713736", decimals: 6 },
+  USDC: { address: "0xb6ceceab302e2e4948951ee7843fc24e92933061", decimals: 6 },
+};
+/** The most winners a prize can be shared between, and the biggest prize, in whole tokens. */
+export const MAX_WINNERS = 10;
+export const MAX_PRIZE_AMOUNT = 1_000_000;
+/** A group anyone starts for a brand has to end within this long. */
+export const LONGEST_GROUP = 366 * 24 * 60 * 60;
+
+/** An amount in a token's smallest unit, as people write it: 100, 33.333333, 1,250.5. */
+const inUnits = (raw, decimals) => {
+  const whole = (raw / 10n ** BigInt(decimals)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const rest = (raw % 10n ** BigInt(decimals)).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return rest ? `${whole}.${rest}` : whole;
+};
+
 /** A week, in seconds. */
 export const WEEK = 7 * 24 * 60 * 60;
 /** The Monday, at midnight UTC, of the week a moment falls in. (The first day ever counted was a Thursday.) */
@@ -307,6 +330,141 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
   };
   const everyone = async () => (await tables()).rows;
 
+  // ------------------------------------------------------------------ a brand's group with a prize
+  //
+  // A brand's group may be given an end (`ends`). Its leaderboard then counts only the matches that
+  // are the group's own: in the competitions it plays, kicked off from when the group started up
+  // to its end. Once every one of those matches has a result, the leaderboard is final and its
+  // top player is the winner. Kickoff never holds the prize: the brand pays the winner's linked
+  // wallet itself, and what is recorded here is the payment anyone can look up on X Layer.
+
+  /** Whether a match is one of the group's own. */
+  const inWindow = (group, f) => group.plays.includes(f.comp) && f.kickoff >= group.startedAt && f.kickoff < group.ends;
+
+  /** The group's own leaderboard: its members, by points from the group's own matches. */
+  const prizeRows = async (group, all) => {
+    const stamp = (await store.get("table-stamp")) ?? "start";
+    let kept = await store.get(`prize-tally:${group.code}`);
+    if (kept?.stamp !== stamp) {
+      const fixtures = await store.tableAll("fixtures");
+      const owner = await store.tableAll("owner-of");
+      const tally = {};
+      for (const match of Object.keys(await store.tableAll("scored"))) {
+        const f = fixtures[match];
+        if (!f || !inWindow(group, f)) continue;
+        for (const [player, points] of Object.entries(await store.tableAll(`points:${match}`))) {
+          if (points !== 3 && points !== 1) continue;
+          const key = owner[player] ?? player;
+          const t = (tally[key] ??= { threes: 0, ones: 0 });
+          if (points === 3) t.threes++;
+          else t.ones++;
+        }
+      }
+      kept = { stamp, tally };
+      await store.set(`prize-tally:${group.code}`, kept);
+    }
+    return all
+      .filter((row) => row.brands?.includes(group.code))
+      .map((row) => {
+        const t = kept.tally[row.key] ?? { threes: 0, ones: 0 };
+        return { ...row, threes: t.threes, ones: t.ones, points: 3 * t.threes + t.ones };
+      })
+      .sort((a, b) => b.points - a.points || a.joinedAt - b.joinedAt || a.key.localeCompare(b.key));
+  };
+
+  /**
+   * Once a group's end has passed and every one of its matches has a result, fix its winners, once
+   * and for good: its top players, as many as its prize is shared between. Only players who
+   * scored can win, so there may be fewer, or none.
+   */
+  const settleGroup = async (group, now) => {
+    if (!group.ends || group.final || now < group.ends) return group;
+    const waiting = Object.values(await store.tableAll("fixtures")).some((f) => inWindow(group, f) && f.state !== "final" && f.state !== "void");
+    if (waiting) return group;
+    const top = (await prizeRows(group, await everyone())).filter((row) => row.points > 0).slice(0, group.money?.winners ?? 1);
+    const winners = [];
+    for (const [i, row] of top.entries()) {
+      const players = (await devicesOfPerson(row.key)).sort();
+      winners.push({ place: i + 1, players: players.length > 0 ? players : [row.key], name: row.name, points: row.points });
+    }
+    const settled = { ...group, final: { at: now, winners } };
+    await store.set(`group:${group.code}`, settled);
+    return settled;
+  };
+
+  /** The wallet a winner has linked, from whichever of their devices linked it, or null. */
+  const walletOfWinner = async (winner) => {
+    for (const device of winner?.players ?? []) {
+      const link = await store.get(`wallet-of:${device}`);
+      if (link) return link.wallet;
+    }
+    return null;
+  };
+
+  /** Whether a device belongs to the same person as any of some devices. */
+  const samePerson = async (player, devices) => {
+    if (!player || devices.length === 0) return false;
+    return devices.includes(player) || (await personOf(player)) === (await personOf(devices[0]));
+  };
+
+  /** Each winner's share of a prize that is an amount of a token: { raw, what }, or null for a prize that is only a line of words. */
+  const shareOf = (group) => {
+    if (!group.money) return null;
+    const token = PRIZE_TOKENS[group.money.token];
+    const raw = (BigInt(group.money.amount) * 10n ** BigInt(token.decimals)) / BigInt(group.money.winners);
+    return { raw, token: token.address, what: `${inUnits(raw, token.decimals)} ${group.money.token}` };
+  };
+
+  /**
+   * What may be seen of a group's prize: when it ends, who won, and whether each winner was paid.
+   * Whoever started the group is also told where to pay, and how their payments are getting on.
+   * Nobody else is ever told a winner's wallet.
+   */
+  const prizeView = async (group, player, now) => {
+    if (!group.ends) return {};
+    const winners = [];
+    const toPay = [];
+    const organiser = Boolean(group.startedBy) && (await samePerson(player, [group.startedBy]));
+    const share = shareOf(group);
+    for (const w of group.final?.winners ?? []) {
+      const wallet = await walletOfWinner(w);
+      const paid = (group.paid ?? []).find((p) => p.place === w.place) ?? null;
+      winners.push({ place: w.place, name: w.name, points: w.points, you: await samePerson(player, w.players), linked: Boolean(wallet), paid: paid ? { tx: paid.tx, what: paid.what } : null });
+      if (organiser && !paid) {
+        const claim = (group.claims ?? []).find((c) => c.place === w.place) ?? null;
+        const refused = (group.refused ?? []).find((r) => r.place === w.place) ?? null;
+        toPay.push({ place: w.place, name: w.name, wallet, what: share?.what ?? null, checking: claim ? claim.tx : null, refused: !claim && refused ? refused.reason : null });
+      }
+    }
+    return {
+      ends: group.ends,
+      ended: now !== null && now >= group.ends,
+      decided: Boolean(group.final),
+      winners,
+      ...(share ? { share: share.what } : {}),
+      ...(organiser ? { organiser: true, toPay, ...(share ? { payIn: { symbol: group.money.token, address: share.token } } : {}) } : {}),
+    };
+  };
+
+  /** A brand's prize, as an amount of a token shared between its winners, checked. */
+  const tidyMoney = (money) => {
+    const { amount, winners, token } = money ?? {};
+    if (!Object.hasOwn(PRIZE_TOKENS, token ?? "")) refuse(400, `The prize is paid in ${Object.keys(PRIZE_TOKENS).join(" or ")}.`);
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > MAX_PRIZE_AMOUNT) refuse(400, `The prize is a whole number, from 1 to ${MAX_PRIZE_AMOUNT.toLocaleString("en-GB")}.`);
+    if (!Number.isSafeInteger(winners) || winners < 1 || winners > MAX_WINNERS) refuse(400, `The prize can go to between 1 and ${MAX_WINNERS} winners.`);
+    return { amount, winners, token };
+  };
+  const prizeLineOf = (money) => `${money.amount.toLocaleString("en-GB")} ${money.token} ${money.winners === 1 ? "for 1st place" : `shared by the top ${money.winners}`}`;
+
+  /** Write a new brand's group under a code nobody has. Returns the code. */
+  const writeBrandGroup = async (record) => {
+    for (let tries = 0; tries < 30; tries++) {
+      const candidate = codeFor(record.name, String(random(10000)).padStart(4, "0"));
+      if (await store.setIfAbsent(`group:${candidate}`, { code: candidate, ...record })) return candidate;
+    }
+    return refuse(503, "Could not make a code for the group. Try again.");
+  };
+
   /**
    * One wallet has one seat in a group, whichever of its devices is being used. This gives every
    * device of the wallet the same seat: the person's name, joined at the same time.
@@ -342,8 +500,10 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     /**
      * Start a group. The player who starts it is its first member.
      * `plays` is which competitions it plays; left out, it plays all of them.
+     * With `brand`, it is a group run by a brand (startBrandGroup).
      */
-    async createGroup({ player, now, name, playerName, plays }) {
+    async createGroup({ player, now, name, playerName, plays, brand = null }) {
+      if (brand !== null && brand !== undefined) return this.startBrandGroup({ player, now, name, playerName, plays, brand });
       const groupName = tidyName(name, MAX_GROUP_NAME, "The group's name");
       const who = tidyName(playerName, MAX_PLAYER_NAME, "Your name");
       const chosen = plays === undefined ? [...COMPETITIONS] : tidyPlays(plays);
@@ -365,34 +525,182 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     },
 
     /**
-     * Start a group run by a brand. Only Kickoff does this, with its own key: it is how a group
-     * can be far bigger than a group of friends. Nobody is in it until they join with its code.
+     * Start a group for a brand, from the website. Anyone can. It holds up to 5,000 players, has a
+     * prize that is an amount of USDT or USDC shared between its top players, and has to end.
+     * Whoever starts it is the one who pays the winners, from their own wallet: Kickoff never
+     * holds the prize. Kickoff does not check that the brand is who it says it is.
+     * @param brand  { name, amount, winners, token, ends }: who runs it, the prize in whole tokens,
+     *               how many winners share it, "USDT" or "USDC", and when it ends, in seconds
+     */
+    async startBrandGroup({ player, now, name, playerName, plays, brand }) {
+      const groupName = tidyName(name, MAX_GROUP_NAME, "The group's name");
+      const who = tidyName(playerName, MAX_PLAYER_NAME, "Your name");
+      const runBy = tidyName(brand?.name, MAX_BRAND_NAME, "The brand's name");
+      const money = tidyMoney(brand);
+      if (!Number.isSafeInteger(brand.ends) || brand.ends <= now) refuse(400, "The group's last day has to be still to come.");
+      if (brand.ends > now + LONGEST_GROUP) refuse(400, "The group's last day can be at most a year away.");
+      const chosen = plays === undefined ? [...COMPETITIONS] : tidyPlays(plays);
+      await ensurePerson(player, now);
+      await named(player, who, now);
+      const code = await writeBrandGroup({ name: groupName, startedBy: player, startedAt: now, plays: chosen, brand: runBy, prize: prizeLineOf(money), money, ends: brand.ends });
+      return this.joinGroup({ player, now, code, playerName: who });
+    },
+
+    /**
+     * Start a group run by a brand, with Kickoff's own key. Nobody is in it until they join with
+     * its code, and its prize is a line of words, with one winner.
      * @param brand  who runs it, shown to players as "Run by …"
      * @param prize  one line about the prize, or nothing
+     * @param ends   when the group ends and its prize is decided, in seconds, or nothing for a
+     *               group that runs on with no end
      */
-    async createBrandGroup({ now, name, brand, prize, plays }) {
+    async createBrandGroup({ now, name, brand, prize, plays, ends }) {
       const groupName = tidyName(name, MAX_GROUP_NAME, "The group's name");
       const runBy = tidyName(brand, MAX_BRAND_NAME, "The brand's name");
       const prizeLine = prize === undefined || prize === null || String(prize).trim() === "" ? null : tidyName(prize, MAX_PRIZE, "The prize");
       const chosen = plays === undefined || plays === null ? [...COMPETITIONS] : tidyPlays(plays);
-      let code = null;
-      for (let tries = 0; tries < 30 && code === null; tries++) {
-        const candidate = codeFor(groupName, String(random(10000)).padStart(4, "0"));
-        const record = { code: candidate, name: groupName, startedBy: null, startedAt: now, plays: chosen, brand: runBy, ...(prizeLine ? { prize: prizeLine } : {}) };
-        if (await store.setIfAbsent(`group:${candidate}`, record)) code = candidate;
-      }
-      if (code === null) refuse(503, "Could not make a code for the group. Try again.");
+      const until = ends === undefined || ends === null ? null : ends;
+      if (until !== null && (!Number.isSafeInteger(until) || until <= now)) refuse(400, "The group has to end at a time that is still to come.");
+      const code = await writeBrandGroup({ name: groupName, startedBy: null, startedAt: now, plays: chosen, brand: runBy, ...(prizeLine ? { prize: prizeLine } : {}), ...(until !== null ? { ends: until } : {}) });
       return this.group({ code });
+    },
+
+    /**
+     * For Kickoff only: where a brand group's prize stands, with the wallet each winner has
+     * linked, so whoever is paying can be told where to pay.
+     */
+    async prizeLook({ now, code }) {
+      const shown = await this.group({ code, now });
+      if (!shown.brand) refuse(400, "That is a group of friends. Only a group run by a brand has a prize to record.");
+      if (!shown.ends) refuse(400, "That group has no end, so it has no winner to pay.");
+      const kept = await store.get(`group:${shown.code}`);
+      const share = shareOf(kept);
+      const winners = [];
+      for (const w of kept.final?.winners ?? []) {
+        const paid = (kept.paid ?? []).find((p) => p.place === w.place) ?? null;
+        winners.push({ place: w.place, name: w.name, points: w.points, wallet: await walletOfWinner(w), paid: paid ? { tx: paid.tx, what: paid.what, at: paid.at } : null });
+      }
+      return {
+        code: shown.code, name: shown.name, brand: shown.brand, prize: shown.prize ?? null, ends: shown.ends, ended: shown.ended, decided: shown.decided, decidedAt: kept.final?.at ?? null,
+        share: share ? { what: share.what, token: share.token, raw: share.raw.toString() } : null,
+        winners,
+      };
+    },
+
+    /**
+     * Whoever started a brand's group says they have paid a winner, and gives the payment's
+     * transaction. Nothing is believed yet: Kickoff's robot reads it on X Layer (robot/src/prize.js)
+     * and it is recorded, or refused with the reason, within a few minutes.
+     */
+    async claimPaid({ player, now, code, place, tx }) {
+      const shown = await this.group({ code, player, now });
+      if (!shown.organiser) refuse(403, "Only whoever started this group can say its prize was paid.");
+      if (!shown.decided) refuse(409, "This group has no winner yet.");
+      const due = shown.toPay.find((w) => w.place === place) ?? refuse(409, "There is no winner in that place waiting to be paid.");
+      if (!due.wallet) refuse(409, `${due.name} has not linked a wallet yet, so there is nowhere to have paid them.`);
+      const hash = typeof tx === "string" ? tx.trim().toLowerCase() : "";
+      if (!/^0x[0-9a-f]{64}$/.test(hash)) refuse(400, "That is not a transaction. It starts 0x and has 64 more letters and numbers.");
+      const used = await store.tableGet("prize-txs", hash);
+      if (used) refuse(409, "That payment is already recorded for a prize.");
+      const kept = await store.get(`group:${shown.code}`);
+      await store.set(`group:${shown.code}`, { ...kept, claims: [...(kept.claims ?? []).filter((c) => c.place !== place), { place, tx: hash, at: now }], refused: (kept.refused ?? []).filter((r) => r.place !== place) });
+      await store.tableSet("prize-claims", `${shown.code}:${place}`, { code: shown.code, place, tx: hash, at: now });
+      return this.group({ code: shown.code, player, now });
+    },
+
+    /**
+     * For Kickoff's robot: every payment waiting to be read, with what it has to have been:
+     * [{ code, place, tx, at, decidedAt, name, wallet, token, raw, what }]. `at` is when it was
+     * given and `decidedAt` when the winners were fixed. `token` and `raw` are null for a prize
+     * that is only a line of words, where any payment to the winner's wallet counts.
+     */
+    async prizeClaims({ now }) {
+      const waiting = [];
+      for (const claim of Object.values(await store.tableAll("prize-claims"))) {
+        const look = await this.prizeLook({ now, code: claim.code });
+        const winner = look.winners.find((w) => w.place === claim.place);
+        const kept = await store.get(`group:${claim.code}`);
+        waiting.push({ code: claim.code, place: claim.place, tx: claim.tx, at: claim.at, decidedAt: kept.final?.at ?? null, name: winner?.name ?? null, wallet: winner?.wallet ?? null, token: look.share?.token ?? null, raw: look.share?.raw ?? null, what: look.share?.what ?? null });
+      }
+      return waiting;
+    },
+
+    /**
+     * For Kickoff only: record that a winner was paid. Kickoff's robot has already read the
+     * payment on X Layer; what it read is checked again here against what was owed.
+     * @param place  which winner: 1 for the top player. Left out, the only winner.
+     * @param tx     the payment's transaction
+     * @param to     the wallet the robot saw it reach, which has to be the one the winner linked
+     * @param token  the token's address, and `raw` the amount in its smallest unit. For a prize
+     *               that is an amount of USDT or USDC, these have to be that token and at least
+     *               the winner's share
+     * @param what   what was paid, in a few words, for a prize that is only a line of words
+     */
+    async recordPrize({ now, code, place = 1, tx, to, token = null, raw = null, what = null }) {
+      const look = await this.prizeLook({ now, code });
+      if (!look.decided) refuse(409, look.ended ? "This group has ended, but some of its matches have no result yet, so it has no winner yet." : "This group has not ended yet.");
+      if (look.winners.length === 0) refuse(409, "Nobody scored in this group, so it has no winner.");
+      const winner = look.winners.find((w) => w.place === place) ?? refuse(409, "This group has no winner in that place.");
+      if (!winner.wallet) refuse(409, `${winner.name} has not linked a wallet yet, so there is nowhere the prize could have been paid.`);
+      const hash = typeof tx === "string" ? tx.toLowerCase() : "";
+      if (!/^0x[0-9a-f]{64}$/.test(hash)) refuse(400, "That is not a transaction on X Layer.");
+      if (typeof to !== "string" || to.toLowerCase() !== winner.wallet) refuse(409, `That payment did not go to the wallet ${winner.name} linked.`);
+      let paidWhat;
+      if (look.share) {
+        if (typeof token !== "string" || token.toLowerCase() !== look.share.token) refuse(409, `That payment was not in the token this prize is paid in (${look.share.what.split(" ").pop()}).`);
+        let amount = null;
+        try {
+          amount = BigInt(raw);
+        } catch {
+          // not an amount
+        }
+        if (amount === null || amount < BigInt(look.share.raw)) refuse(409, `That payment is less than ${winner.name}'s share of ${look.share.what}.`);
+        const symbol = look.share.what.split(" ").pop();
+        paidWhat = `${inUnits(amount, PRIZE_TOKENS[symbol].decimals)} ${symbol}`;
+      } else {
+        paidWhat = tidyName(what, 40, "What was paid");
+      }
+      const kept = await store.get(`group:${look.code}`);
+      const before = (kept.paid ?? []).find((p) => p.place === place);
+      if (before && before.tx !== hash) refuse(409, "A payment is already recorded for that winner.");
+      const used = await store.tableGet("prize-txs", hash);
+      if (used && used !== `${look.code}:${place}`) refuse(409, "That payment is already recorded for another prize.");
+      if (!before) {
+        await store.tableSet("prize-txs", hash, `${look.code}:${place}`);
+        await store.set(`group:${look.code}`, {
+          ...kept,
+          paid: [...(kept.paid ?? []), { place, tx: hash, to: winner.wallet, what: paidWhat, at: now }].sort((a, b) => a.place - b.place),
+          claims: (kept.claims ?? []).filter((c) => c.place !== place),
+          refused: (kept.refused ?? []).filter((r) => r.place !== place),
+        });
+      }
+      await store.tableDelete("prize-claims", `${look.code}:${place}`);
+      return this.group({ code: look.code, now });
+    },
+
+    /**
+     * For Kickoff's robot: a payment it read was not what was owed. Whoever started the group is
+     * told why, and can give another.
+     */
+    async refusePrize({ now, code, place, tx, reason }) {
+      const shown = await this.group({ code, now });
+      const kept = await store.get(`group:${shown.code}`);
+      const claim = (kept.claims ?? []).find((c) => c.place === place && c.tx === String(tx).toLowerCase());
+      if (!claim) refuse(409, "No such payment is waiting to be read.");
+      await store.set(`group:${shown.code}`, { ...kept, claims: kept.claims.filter((c) => c !== claim), refused: [...(kept.refused ?? []).filter((r) => r.place !== place), { place, tx: claim.tx, reason: tidyName(reason, 160, "The reason"), at: now }] });
+      await store.tableDelete("prize-claims", `${shown.code}:${place}`);
+      return { refused: true };
     },
 
     /** Join a group with its code. A player has one name everywhere: giving another one here changes it everywhere. */
     async joinGroup({ player, now, code, playerName }) {
-      const group = await this.group({ code, player });
+      const group = await this.group({ code, player, now });
       const who = tidyName(playerName, MAX_PLAYER_NAME, "Your name");
       if (group.brand) {
         // A brand's group can hold thousands, so its members are never fetched all at once. Names
         // are already one per player across Kickoff, so there is nothing to compare here.
         const before = await store.tableGet(`members:${group.code}`, player);
+        if (!before && group.ended) refuse(409, "This group has ended.");
         if (!before && (await store.tableSize(`members:${group.code}`)) >= brandMax) refuse(409, `This group is full. It can have ${brandMax.toLocaleString("en-GB")} players.`);
         const person = await ensurePerson(player, now);
         await named(player, who, now);
@@ -406,7 +714,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
           await store.tableSet("people", key, { ...record, brands: [...(record.brands ?? []), group.code] });
           await stale();
         }
-        return this.group({ code: group.code, player });
+        return this.group({ code: group.code, player, now });
       }
       const sits = (m) => m.player === player || (m.players ?? []).includes(player);
       const already = group.members.some(sits);
@@ -431,15 +739,18 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
      * A group run by a brand is told apart by `brand`. It says how many `players` it has, and its
      * `members` are never listed: only the seat of the player asking, if they are in it.
      */
-    async group({ code, player = null }) {
+    async group({ code, player = null, now = null }) {
       if (typeof code !== "string") refuse(400, "That is not a group code.");
       const tidy = code.trim().toUpperCase();
       if (!/^[A-Z]{1,7}-\d{4}$/.test(tidy)) refuse(400, "That is not a group code. A code looks like BALLERS-4821.");
-      const group = (await store.get(`group:${tidy}`)) ?? refuse(404, "There is no group with that code.");
+      let group = (await store.get(`group:${tidy}`)) ?? refuse(404, "There is no group with that code.");
       if (group.brand) {
+        if (now !== null) group = await settleGroup(group, now);
         const mine = player ? await store.tableGet(`members:${tidy}`, player) : null;
         const seat = mine ? { player, name: mine.name, joinedAt: mine.joinedAt, ...(mine.wallet ? { linked: true, players: (await devicesOf(mine.wallet)).sort() } : {}) } : null;
-        return { ...group, players: await store.tableSize(`members:${tidy}`), members: seat ? [seat] : [] };
+        // What is kept about the winner and the payment is shown only as prizeView() gives it.
+        const { final, paid, claims, refused, money, ...shown } = group;
+        return { ...shown, ...(await prizeView(group, player, now)), players: await store.tableSize(`members:${tidy}`), members: seat ? [seat] : [] };
       }
       // One seat for each player. The devices of one wallet share a seat: it is listed once, under
       // the device used most recently, with `linked` and the ids of all its devices. Which wallet
@@ -465,7 +776,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       await ensurePerson(player, now);
       const codes = Object.keys(await store.tableAll(`groups-of:${player}`));
       const groups = [];
-      for (const code of codes) groups.push(await this.group({ code, player }));
+      for (const code of codes) groups.push(await this.group({ code, player, now: now || null }));
       return groups.sort((a, b) => a.startedAt - b.startedAt);
     },
 
@@ -624,7 +935,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       let all = await everyone();
       let members = null;
       let brand = null;
-      const group = code !== null && code !== undefined ? await this.group({ code }) : null;
+      const group = code !== null && code !== undefined ? await this.group({ code, now }) : null;
       if (group?.brand) brand = group.code;
       else if (group) {
         const owner = await store.tableAll("owner-of");
@@ -667,7 +978,9 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
         // A brand's group is found by the mark on each person, never by fetching its members. Only
         // its top is sent, with the asking player's own row if they are further down. Each row
         // carries the player's ids, so the website's Check screen can look them up on X Layer.
-        inGroup = all.filter((row) => row.brands?.includes(brand));
+        // A group with an end counts only its own matches (prizeRows). One with none shows its
+        // players' points from everything they have played.
+        inGroup = group.ends ? await prizeRows(group, all) : all.filter((row) => row.brands?.includes(brand));
         const devices = new Map();
         for (const [device, key] of Object.entries(await store.tableAll("owner-of"))) devices.set(key, [...(devices.get(key) ?? []), device]);
         const withIds = (row, place, extra) => show(row, place, { players: (devices.get(row.key) ?? [row.key]).sort(), ...extra });

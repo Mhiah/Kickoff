@@ -113,12 +113,27 @@ Brands pay to run sponsored groups with prizes, and private groups pay for extra
 Kickoff is a prediction game and it is free to play. Players predict, and play for the
 leaderboard. Nobody puts money on a match.
 
-**Built:** groups run by brands. Kickoff starts one for a brand, with the brand's name and a line
-about the prize.
+**Built:** groups run by brands. "Start a group" asks whether the group is for friends or for a
+brand. Choosing Brand asks for the brand's name, the prize, how many winners share it, whether it
+is paid in USDT or USDC, and the group's last day. Anyone can start one today, and Kickoff does not
+check that a brand is who it says it is. The group's leaderboard counts only its own matches, and
+when it ends its top players are the winners, as many as the prize is shared between. The prize is
+split equally, and only a player who scored can win.
+
+**Built:** handing the prize over, in the open. Kickoff never holds the prize and never sends it.
+Each winner links a wallet. Whoever started the group is shown each winner's wallet and share,
+pays from their own wallet on X Layer, and pastes the payment's transaction on the group's screen.
+Kickoff's robot then reads that payment on X Layer itself. It counts only if it reached the wallet
+the winner linked, in the real USDT or USDC (checked by the token's address, not its name), for at
+least the winner's share, and was made after the winners were named. Then everyone in the group
+sees "Paid", with a link to the payment. Until then everyone sees "Not paid yet". A payment that
+does not count is refused, and whoever started the group is told why.
 
 **Not built yet:**
 
-- Paying a prize out to the winner.
+- Holding a prize on X Layer before a group starts, so it cannot fail to be paid. Today Kickoff can
+  show whether each winner was paid, not make anyone pay.
+- Checking that a brand is who it says it is before its group goes up.
 - A way for a brand to pay Kickoff for a sponsored group.
 - Paid extras for private groups.
 - Asking the football feed's owner whether its free plan covers a product that earns money, or
@@ -261,10 +276,10 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | The first three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
 | The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
 | The prediction engine | 167 tests. Twenty-six try to cheat, and eight have an X Layer node lie about what is on chain, three of them in ways only a second node can catch | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
-| The website | 119 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
+| The website | 125 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 23 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
-| The server | 114 tests. They take a name somebody has, link a wallet that did not sign, send predictions in someone else's name, play old requests back, open a different prediction from the one sealed, and use the robot's addresses without its key. They also check that a match gives points only once it was locked on X Layer, that the server signs for every sealed prediction it takes, and that a one-time code for moving phones works once, runs out, and cannot be guessed at | All pass; every one is refused ([details](server/README.md)) |
-| The robot | 79 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, a hundred players on one match, a lock it slept through, its notes when it needs a person, putting the website on X Layer, and going live without paying for anything twice | All pass ([details](robot/README.md)) |
+| The server | 125 tests. They take a name somebody has, link a wallet that did not sign, send predictions in someone else's name, play old requests back, open a different prediction from the one sealed, and use the robot's addresses without its key. They also check that a match gives points only once it was locked on X Layer, that the server signs for every sealed prediction it takes, and that a one-time code for moving phones works once, runs out, and cannot be guessed at | All pass; every one is refused ([details](server/README.md)) |
+| The robot | 95 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, a hundred players on one match, a lock it slept through, its notes when it needs a person, putting the website on X Layer, and going live without paying for anything twice | All pass ([details](robot/README.md)) |
 | The robot on a copy of X Layer | The robot's own code announcing, locking, recording results and publishing opened predictions through TapeOut's real contracts, signing with `cast`, then the leaderboard rebuilt from the chain alone | 11 of 11 checks passed on the first run ([rehearsal 6](docs/REHEARSAL-RESULTS.md)). It has grown since. The latest run has a hundred players who seal a prediction and never come back: the robot opens all hundred after kickoff and publishes them in 4 pieces. It also plays a football match as its three predictions, replaced on the list by the robot's own rules, locked, opened and scored, and read back from the chain as 5, 1 and 0 points. 28 of 28 checks pass |
 | What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
 | Going live for real | Done on X Layer on 24 November 2026 by the robot's wallet, after the same steps were rehearsed on the copy | It cost 0.087878 OKB, as measured. The robot's next run confirmed it was working as the league |
@@ -285,13 +300,13 @@ results.
 | 5 | The website's screens | Done, with real matches and real numbers. |
 | 6 | Sealing a prediction for real, on the player's own device | Done. |
 | 7 | The fixtures feed | Done, and running live against the real feeds. |
-| 8 | Kickoff's server: groups, names, and sealed predictions until they are locked | Done, 114 tests, and online with a real database. Groups of up to 30, one name for each player, signed requests, a signed note for every sealed prediction it takes, a one-time code to move a player to another phone, and points only for matches that were locked on X Layer. |
-| 9 | The robot: keeps the list of matches, locks predictions before kickoff and posts results on X Layer | Done and running live, 79 tests. After kickoff it opens every prediction from its locked copy, so no player has to come back. It publishes a match's opened predictions in as many pieces as they need, tells the server how each lock went, and opens a note when its wallet runs low or a lock was missed. |
+| 8 | Kickoff's server: groups, names, and sealed predictions until they are locked | Done, 125 tests, and online with a real database. Groups of up to 30, one name for each player, signed requests, a signed note for every sealed prediction it takes, a one-time code to move a player to another phone, and points only for matches that were locked on X Layer. |
+| 9 | The robot: keeps the list of matches, locks predictions before kickoff and posts results on X Layer | Done and running live, 95 tests. After kickoff it opens every prediction from its locked copy, so no player has to come back. It publishes a match's opened predictions in as many pieces as they need, tells the server how each lock went, and opens a note when its wallet runs low or a lock was missed. |
 | 10 | Joining it up: real fixtures and real leaderboards on the website | Done. The League and My record screens show real numbers: a leaderboard of everyone who plays and one of your group, both numbered from 1, with every point worked out by the scoring circuits. The Check screen is read from X Layer by the player's own browser: it shows when each of your predictions was locked, works out the group's points from what is on chain, puts them beside Kickoff's own, and says whether the order is the same. |
 | 11 | Going live on X Layer: the circuits and Kickoff's account | Done on 24 November 2026. The switch was rehearsed on a private copy first: a look that says the cost and sends nothing, and a go that needs the words GO LIVE. |
 | 12 | The copy of the site on X Layer (DeWEB) | Done on 25 November 2026: <https://5-2-409.tapekit.org>. A look that is free, a go that needs the words PUBLISH SITE, and a check that reads every file back. |
 | 13 | A real test group with real people and real matches | Not started |
-| 14 | Players with a wallet, groups run by brands, and prizes | Partly done. A player who has a wallet can link it, which costs nothing: on a new phone, linking the same wallet brings their groups back. Other players are told only that a wallet is linked, never which one. Groups run by brands are built: up to 5,000 players, started only by Kickoff, with the brand's name, a prize line and a leaderboard of the top twenty and you. Paying prizes is not started. |
+| 14 | Players with a wallet, groups run by brands, and prizes | Partly done. A player who has a wallet can link it, which costs nothing: on a new phone, linking the same wallet brings their groups back. Other players are told only that a wallet is linked, never which one. Groups run by brands are built: up to 5,000 players, started only by Kickoff, with the brand's name, a prize line and a leaderboard of the top twenty and you. A brand's group can have a last day: its leaderboard counts only its own matches, its top player then is the winner, and a prize the brand pays to the winner's linked wallet is read from X Layer and shown on the group. Kickoff holds no prize. |
 | 15 | Demo video and submission | Not started |
 | 16 | Football as three predictions: result, goal goal and the exact score | Built and tested: three new scoring circuits checked on every possible case, each prediction sealed, locked and scored by itself, one screen for all three, and the robot lists every football match that way. The three new circuits were published on X Layer on 26 November 2026 as circuits 9, 10 and 11. |
 
@@ -568,8 +583,17 @@ PUBLISH SITE, and a check that reads every file back).
 - **A brand's group has been tested with 300 players, not 5,000.** The server keeps the
   leaderboard of everyone as one list and fetches it whole each time someone looks. With thousands
   of people playing at once, the free database plan Kickoff runs on would not carry that.
-- **Kickoff does not pay prizes.** A brand's group can say what the prize is. Getting it to the
-  winner is between the brand and the winner.
+- **Kickoff does not hold or pay prizes.** Whoever started a brand's group pays each winner's
+  linked wallet themselves. Kickoff's robot reads each payment on X Layer and the group shows it,
+  or shows that the winner has not been paid. It cannot make anyone pay. Anyone can start a
+  brand's group and type any brand's name: Kickoff does not check it. A winner's wallet becomes
+  public with the payment, as any payment on X Layer is.
+- **No real prize has been paid through Kickoff yet.** Reading a payment is tested against
+  stand-in X Layer nodes, with fake tokens, short payments, old payments and payments to the wrong
+  wallet all refused. It has not yet read a real USDT or USDC payment on the live network.
+- **A group Kickoff starts itself** (with the "Make a brand group" action) has a prize that is
+  only a line of words and one winner. Its payment is recorded by hand with the "Record a prize"
+  action, and a person checks which token was paid.
 - **The Check tab checks your group.** It confirms your group's points and their order against
   X Layer. For a brand's group that is the top twenty and you. The leaderboard of everyone can be rebuilt with the command above, but the website does
   not check it for you.

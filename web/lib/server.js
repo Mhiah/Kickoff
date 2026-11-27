@@ -41,7 +41,10 @@ export function createClient({ base = "", device, fetch = (...args) => globalThi
   const code = (value) => encodeURIComponent(String(value).trim().toUpperCase());
 
   return {
-    startGroup: ({ name, playerName, plays }) => signed("/api/groups", { name, playerName, plays }),
+    /** `brand` is { name, amount, winners, token, ends } for a group run by a brand, or left out for a group of friends. */
+    startGroup: ({ name, playerName, plays, brand = null }) => signed("/api/groups", { name, playerName, plays, ...(brand ? { brand } : {}) }),
+    /** Whoever started a brand's group says they paid a winner: the winner's place and the payment's transaction. */
+    claimPaid: ({ code: c, place, tx }) => signed(`/api/groups/${code(c)}/paid`, { place, tx }),
     joinGroup: ({ code: c, playerName }) => signed(`/api/groups/${code(c)}/join`, { playerName }),
     setPlays: ({ code: c, plays }) => signed(`/api/groups/${code(c)}/plays`, { plays }),
     myGroups: async () => (await signed("/api/me/groups")).groups,

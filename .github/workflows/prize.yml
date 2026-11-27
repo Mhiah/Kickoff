@@ -1,0 +1,78 @@
+# Record, by hand, that a winner of a brand's group was paid.
+#
+# Kickoff never holds a prize and never sends one. When a brand's group ends, its top players are
+# the winners, and whoever runs the group pays each of them, to the wallet that player linked.
+#
+# Mostly this is not needed. Whoever started the group on the website gives each payment on the
+# group's own screen, and the robot reads it on X Layer on its next round. This is for a group
+# Kickoff started itself (with "Make a brand group"), which has nobody to do that.
+#
+# This never runs by itself. Somebody has to press "Run workflow" and fill in the boxes.
+#
+#   1. Run it with just the group's code. It says who won and which wallets to pay.
+#   2. The winner is paid. Run it again with the payment's transaction and the winner's place: it
+#      reads the payment and says what it found. Nothing is recorded yet.
+#   3. If that is right, run it once more with the step set to go, and type PRIZE PAID.
+#
+# Kickoff's key is the repository secret KICKOFF_ADMIN_KEY. It is sent only to Kickoff's server and
+# is never printed. No wallet key is used: nothing here can send money.
+name: Record a prize
+
+on:
+  workflow_dispatch:
+    inputs:
+      code:
+        description: "The group's code. For example: WORLDCU-4821"
+        type: string
+        required: true
+      tx:
+        description: "The payment's transaction on X Layer (starts 0x). Leave empty to see who won and where to pay"
+        type: string
+        default: ""
+      place:
+        description: "Which winner was paid: 1 for the top player, 2 for the next"
+        type: string
+        default: "1"
+      step:
+        description: "look = read and say what is there. go = record the payment"
+        type: choice
+        options:
+          - look
+          - go
+        default: look
+      confirm:
+        description: "Only for go: type PRIZE PAID"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  prize:
+    name: Read the payment and record it
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      KICKOFF_SERVER: https://kickoff-two-xi.vercel.app
+      KICKOFF_ADMIN_KEY: ${{ secrets.KICKOFF_ADMIN_KEY }}
+      # What was typed is handed over as settings, never pasted into the command itself.
+      PRIZE_CODE: ${{ inputs.code }}
+      PRIZE_TX: ${{ inputs.tx }}
+      PRIZE_PLACE: ${{ inputs.place }}
+      PRIZE_STEP: ${{ inputs.step }}
+      CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: The prize
+        run: |
+          if [ -z "$PRIZE_TX" ]; then
+            node robot/bin/prize.js --code "$PRIZE_CODE"
+          elif [ "$PRIZE_STEP" = "go" ]; then
+            node robot/bin/prize.js --code "$PRIZE_CODE" --place "$PRIZE_PLACE" --tx "$PRIZE_TX" --go
+          else
+            node robot/bin/prize.js --code "$PRIZE_CODE" --place "$PRIZE_PLACE" --tx "$PRIZE_TX"
+          fi

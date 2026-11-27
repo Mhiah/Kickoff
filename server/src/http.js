@@ -30,7 +30,11 @@
 //     POST /api/admin/freeze/<match>                            a match's bundle, once picks have closed
 //     GET  /api/admin/envelopes/<match>                         the locked copies still to open, once the match has started
 //     POST /api/admin/opened          { match, openings }       open predictions the robot has unlocked
-//     POST /api/admin/brand-groups    { name, brand, prize, plays }   start a group run by a brand, of up to 5,000 players
+//     POST /api/admin/brand-groups    { name, brand, prize, plays, ends }   start a group run by a brand, of up to 5,000 players
+//     POST /api/admin/prize/look      { code }                        where a brand group's prize stands, and the winner's wallet
+//     POST /api/admin/prize/claims                                    payments whoever started a group says they made, waiting to be read
+//     POST /api/admin/prize           { code, place, tx, to, token, raw, what }   record that a winner was paid, once the robot has read the payment
+//     POST /api/admin/prize/refuse    { code, place, tx, reason }     a payment that was read and was not what was owed
 //     POST /api/admin/locks           { locks: [{ match, state }] }   how locking on X Layer went: "locked" or "missed"
 //
 // This file knows nothing about any particular web host. It takes a request as plain values and
@@ -72,18 +76,22 @@ export function createHandler({ kickoff, now, adminKey = null }) {
   const routes = [
     ["GET", /^\/api\/fixtures$/, async () => ({ league: kickoff.league, fixtures: await kickoff.fixtures() })],
     ["GET", /^\/api\/key$/, async () => ({ key: kickoff.signingKey() })],
-    ["GET", /^\/api\/groups\/([^/]+)$/, async (r, code) => kickoff.group({ code: decodeURIComponent(code) })],
+    ["GET", /^\/api\/groups\/([^/]+)$/, async (r, code) => kickoff.group({ code: decodeURIComponent(code), now: now() })],
     ["GET", /^\/api\/matches\/([0-9a-f]{64})$/, async (r, match) => kickoff.match({ now: now(), match })],
     ["GET", /^\/api\/matches\/([0-9a-f]{64})\/receipt\/([0-9a-f]{64})$/, async (r, match, player) => kickoff.receipt({ now: now(), match, player })],
     ["GET", /^\/api\/matches\/([0-9a-f]{64})\/openings$/, async (r, match) => JSON.parse(await kickoff.openingsFile({ now: now(), match }))],
 
     ["POST", /^\/api\/groups$/, async (r) => {
       const s = await signed(r);
-      return kickoff.createGroup({ player: s.player, now: now(), name: s.name, playerName: s.playerName, plays: s.plays });
+      return kickoff.createGroup({ player: s.player, now: now(), name: s.name, playerName: s.playerName, plays: s.plays, brand: s.brand ?? null });
     }],
     ["POST", /^\/api\/groups\/([^/]+)\/join$/, async (r, code) => {
       const s = await signed(r);
       return kickoff.joinGroup({ player: s.player, now: now(), code: decodeURIComponent(code), playerName: s.playerName });
+    }],
+    ["POST", /^\/api\/groups\/([^/]+)\/paid$/, async (r, code) => {
+      const s = await signed(r);
+      return kickoff.claimPaid({ player: s.player, now: now(), code: decodeURIComponent(code), place: s.place, tx: s.tx });
     }],
     ["POST", /^\/api\/groups\/([^/]+)\/plays$/, async (r, code) => {
       const s = await signed(r);
@@ -141,7 +149,23 @@ export function createHandler({ kickoff, now, adminKey = null }) {
     }],
     ["POST", /^\/api\/admin\/brand-groups$/, async (r) => {
       admin(r);
-      return kickoff.createBrandGroup({ now: now(), name: r.body?.name, brand: r.body?.brand, prize: r.body?.prize, plays: r.body?.plays });
+      return kickoff.createBrandGroup({ now: now(), name: r.body?.name, brand: r.body?.brand, prize: r.body?.prize, plays: r.body?.plays, ends: r.body?.ends });
+    }],
+    ["POST", /^\/api\/admin\/prize\/look$/, async (r) => {
+      admin(r);
+      return kickoff.prizeLook({ now: now(), code: r.body?.code });
+    }],
+    ["POST", /^\/api\/admin\/prize\/claims$/, async (r) => {
+      admin(r);
+      return { claims: await kickoff.prizeClaims({ now: now() }) };
+    }],
+    ["POST", /^\/api\/admin\/prize\/refuse$/, async (r) => {
+      admin(r);
+      return kickoff.refusePrize({ now: now(), code: r.body?.code, place: r.body?.place, tx: r.body?.tx, reason: r.body?.reason });
+    }],
+    ["POST", /^\/api\/admin\/prize$/, async (r) => {
+      admin(r);
+      return kickoff.recordPrize({ now: now(), code: r.body?.code, place: r.body?.place ?? 1, tx: r.body?.tx, to: r.body?.to, token: r.body?.token ?? null, raw: r.body?.raw ?? null, what: r.body?.what ?? null });
     }],
     ["POST", /^\/api\/admin\/locks$/, async (r) => {
       admin(r);

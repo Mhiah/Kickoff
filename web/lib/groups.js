@@ -66,8 +66,8 @@ export function createGroups({ store, client, device }) {
       }
       return store.read(GROUPS_KEY) !== before || offline !== wasOffline;
     },
-    async start({ name, playerName, plays }) {
-      const group = put(await client.startGroup({ name, playerName, plays }));
+    async start({ name, playerName, plays, brand = null }) {
+      const group = put(await client.startGroup({ name, playerName, plays, brand }));
       rememberName(playerName);
       return group;
     },
@@ -75,6 +75,10 @@ export function createGroups({ store, client, device }) {
       const group = put(await client.joinGroup({ code, playerName }));
       rememberName(playerName);
       return group;
+    },
+    /** Whoever started a brand's group says they paid a winner. Kickoff's robot reads the payment before it counts. */
+    async paid({ code, place, tx }) {
+      return put(await client.claimPaid({ code, place, tx }));
     },
     async setPlays({ code, plays }) {
       return put(await client.setPlays({ code, plays }));

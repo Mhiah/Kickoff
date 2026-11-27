@@ -21,6 +21,7 @@ import { GOAL_GOAL, RESULT, SCORE, decodePick } from "./engine/picks.js";
 import { cardFacts } from "./lib/card.js";
 import { BAND_KEYS, MARKETS, bandWords, pickWords, pointsFor } from "./lib/picks.js";
 import { standing } from "./lib/sync.js";
+import { PAID_IN } from "./lib/prize.js";
 import { ordinal, placeName, standings } from "./lib/standings.js";
 import { EMPTY } from "./lib/table.js";
 import { clock, closesAt, dayLabel, hasClosed, howLong, todayLabel } from "./lib/time.js";
@@ -785,16 +786,40 @@ function field({ label, name, value = "", max, hint = "", extra = "" }) {
   return `<label>${label}<input name="${name}" value="${esc(value)}" maxlength="${max}" autocomplete="off" autocapitalize="words" spellcheck="false" ${extra}>${hint ? `<span class="hint">${hint}</span>` : ""}</label>`;
 }
 
+/** A choice between a few things, shown side by side. The first is chosen. */
+function choice({ name, label, options }) {
+  return `<div class="either" role="radiogroup" aria-label="${label}">${options.map(([value, words], i) => `<label><input type="radio" name="${name}" value="${value}"${i === 0 ? " checked" : ""}><span>${words}</span></label>`).join("")}</div>`;
+}
+
+/**
+ * Start a group: for friends, or for a brand. Choosing Brand shows what a brand's group needs:
+ * who runs it, the prize, how many winners share it, what it is paid in, and its last day.
+ */
 function startForm(mine) {
-  return `<form class="glass form" data-form="start" novalidate>
+  return `<form class="glass form" data-form="start" data-kind="friends" novalidate>
   <h2>Start a group</h2>
-  <p class="sub">You get a code to share. Anyone with the code can join.</p>
+  ${choice({ name: "kind", label: "Who the group is for", options: [["friends", "Friends"], ["brand", "Brand"]] })}
+  <p class="sub for-friends">You get a code to share. Anyone with the code can join.</p>
+  <p class="sub for-brand">For a brand or a community. Up to 5,000 players, and a prize for the top of the leaderboard.</p>
   ${field({ label: "Group name", name: "name", max: 40 })}
   ${field({ label: "Your name", name: "playerName", value: mine.name, max: 24, hint: "What everyone sees on the leaderboard." })}
+  <div class="for-brand">
+    ${field({ label: "Brand name", name: "brand", max: 40, hint: "Players see: Run by this name." })}
+    <div class="duo">
+      ${field({ label: "Prize", name: "amount", max: 9, extra: 'inputmode="numeric" placeholder="300"' })}
+      <div class="lab">Paid in${choice({ name: "token", label: "What the prize is paid in", options: PAID_IN.map((t) => [t, t]) })}</div>
+    </div>
+    <div class="duo days">
+      ${field({ label: "Winners", name: "winners", value: "1", max: 2, extra: 'inputmode="numeric"' })}
+      <label>Last day<input type="date" name="lastDay"></label>
+    </div>
+    <span class="hint" data-share></span>
+    <span class="hint">You pay the winners yourself, on X Layer, when the group ends. Kickoff never holds the prize.</span>
+  </div>
   <fieldset class="plays">
     <legend>What this group plays</legend>
     ${Object.keys(COMPETITIONS).map((key) => `<label class="tick"><input type="checkbox" name="plays" value="${key}" checked>${comp(key)}<span class="muted">${SPORT_WORDS[COMPETITIONS[key].sport]}</span></label>`).join("")}
-    <span class="hint">You can change this later.</span>
+    <span class="hint for-friends">You can change this later.</span>
   </fieldset>
   <button class="btn go" type="submit">Start group</button>
   <p class="say-so" data-form-out role="status"></p>
@@ -828,6 +853,68 @@ const shortWallet = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`
  * With no group yet, both forms are shown.
  */
 const playersWord = (n) => `${n.toLocaleString("en-GB")} ${n === 1 ? "player" : "players"}`;
+
+const PLACES = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th"];
+const pointsWord = (n) => `${n} ${n === 1 ? "point" : "points"}`;
+
+/**
+ * Where a brand group's prize stands, under its prize line: when the group ends, who won, and
+ * whether each winner has been paid. Kickoff never holds the prize: whoever runs the group pays
+ * each winner's linked wallet, and a payment shown is one read from X Layer. Nothing for a group
+ * with no end.
+ */
+function prizeLines(g, ctx) {
+  if (!g.ends) return "";
+  const when = `${esc(dayLabel(g.ends))}, ${clock(g.ends)}`;
+  if (ctx.now < g.ends) return `<p class="sub">Ends ${when}.</p>`;
+  if (!g.decided) return `<p class="sub">Ended ${when}. The ${g.share ? "winners are" : "winner is"} named when the last result is in.</p>`;
+  const winners = g.winners ?? [];
+  if (winners.length === 0) return `<p class="sub">Ended ${when}. Nobody scored, so there is no winner.</p>`;
+  const rows = winners
+    .map((w) => {
+      const state = w.paid
+        ? `<a class="link" href="${ON_CHAIN.explorer}/tx/${esc(w.paid.tx)}" target="_blank" rel="noopener">Paid ${esc(w.paid.what)}</a>`
+        : '<span class="muted small">Not paid yet</span>';
+      return `<div class="row"><div class="grow"><div class="title" style="margin:0">${esc(w.name)}${w.you ? '<span class="tag">you</span>' : ""}</div><div class="sub">${PLACES[w.place - 1] ?? w.place} · ${pointsWord(w.points)}</div></div>${state}</div>`;
+    })
+    .join("");
+  const mine = winners.find((w) => w.you && !w.paid);
+  const note = !mine ? "" : mine.linked
+    ? '<p class="sub">Your prize is paid to the wallet you linked.</p>'
+    : '<div class="note warn" style="margin-top:12px"><b>You won.</b> Link a wallet below, so your prize can be paid to it.</div>';
+  return `<p class="sub">Ended ${when}.</p>
+<h2>${winners.length === 1 ? "Winner" : "Winners"}</h2>
+<div class="glass">${rows}</div>
+${note}`;
+}
+
+/**
+ * For whoever started a brand's group, once it has winners: who to pay, how much, and where.
+ * They pay from their own wallet and paste the payment's transaction. It counts only after
+ * Kickoff's robot has read it on X Layer.
+ */
+function payLines(g) {
+  if (!g.organiser || !g.decided || !g.toPay?.length) return "";
+  const rows = g.toPay
+    .map((w) => {
+      const who = `<div class="row"><div class="grow"><div class="title" style="margin:0">${esc(w.name)}</div><div class="sub">${PLACES[w.place - 1] ?? w.place}${w.what ? ` · ${esc(w.what)}` : ""}</div></div>${w.wallet ? `<button type="button" class="btn small quiet" data-copy="${esc(w.wallet)}">Copy wallet</button>` : ""}</div>`;
+      if (!w.wallet) return `${who}<p class="sub pay-say">Has not linked a wallet yet. Their Group screen asks them to.</p>`;
+      if (w.checking) return `${who}<p class="sub pay-say"><b>${esc(shortWallet(w.wallet))}</b></p><p class="sub pay-say">Checking your payment on X Layer. This takes a few minutes.</p>`;
+      return `${who}<p class="sub pay-say"><b>${esc(shortWallet(w.wallet))}</b></p>
+<form class="paid" data-form="paid" novalidate>
+  <input type="hidden" name="code" value="${esc(g.code)}"><input type="hidden" name="place" value="${w.place}">
+  <input name="tx" aria-label="The payment's transaction, for ${esc(w.name)}" placeholder="Payment's transaction, 0x…" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="80">
+  <button class="btn small go" type="submit">Mark as paid</button>
+  <p class="say-so${w.refused ? " warn" : ""}" data-form-out role="status">${w.refused ? esc(w.refused) : ""}</p>
+</form>`;
+    })
+    .join("");
+  const token = g.payIn ? `<p class="fine muted">${esc(g.payIn.symbol)} on X Layer is the token ${esc(shortWallet(g.payIn.address))}. <button type="button" class="link" data-copy="${esc(g.payIn.address)}">Copy its address</button></p>` : "";
+  return `<h2>Pay the winners</h2>
+<p class="sub">Send each winner their share on X Layer, from your own wallet. Then paste the payment's transaction here. Kickoff reads it on X Layer and shows everyone it was paid.</p>
+<div class="glass pay">${rows}</div>
+${token}`;
+}
 
 /** A link back to the Group screen, in the words that fit whether this phone is in a group. */
 const backToGroup = (g) => `<a href="#/group">${g ? `Back to ${esc(g.name)}` : "Back"}</a>`;
@@ -901,6 +988,8 @@ ${DEVICE_NOTE}`;
   const nextId = nextUp(ctx, g.plays);
   // In a group of friends, anyone can copy a reminder to paste into the group's chat.
   const reminder = brand ? null : reminderFor(ctx, g);
+  // A brand's group that has ended takes nobody new, so its code is no longer offered.
+  const over = Boolean(brand && g.ends && ctx.now >= g.ends);
   const plays = Object.keys(COMPETITIONS)
     .map((key) => {
       const on = g.plays.includes(key);
@@ -929,16 +1018,18 @@ ${DEVICE_NOTE}`;
     : "";
   const html = `
 ${titlebar({ heading: esc(g.name) })}
-<p class="sub">${brand ? `Run by ${esc(brand)}` : isStarter ? "You started this group" : starter ? `${esc(starter.name)} started this group` : "Your group"}. ${count}.</p>
+<p class="sub">${brand ? `Run by ${esc(brand)}${g.organiser ? ". You started this group" : ""}` : isStarter ? "You started this group" : starter ? `${esc(starter.name)} started this group` : "Your group"}. ${count}.</p>
 ${brand && g.prize ? `<p class="sub prize"><b>Prize:</b> ${esc(g.prize)}</p>` : ""}
+${brand ? prizeLines(g, ctx) : ""}
+${brand ? payLines(g) : ""}
 ${mine.offline ? OFFLINE_NOTE : ""}
 
 ${nextId ? `${nextCard(ctx, nextId)}
 ${reminder ? `<div class="remind"><a class="link" href="#/league">See every match</a><button type="button" class="btn small quiet" data-copy="${esc(reminder)}" data-then="Reminder copied. Paste it in your group chat.">Remind my group</button></div>
 <p class="say-so muted" data-copy-out role="status"></p>` : `<p class="say-so"><a class="link" href="#/league">See every match</a></p>`}` : `<div class="note" style="margin-top:14px">No matches are open for this group right now. New ones arrive by themselves.</div>`}
 
-<div class="glass invite"><div><small class="muted">Invite code</small><b>${esc(g.code)}</b></div><button type="button" class="btn small go" data-copy="${esc(g.code)}">Copy</button></div>
-<p class="sub">${brand ? 'Anyone with this code can join. They choose "Join with a code" on Kickoff.' : 'Send this code to your friends. They choose "Join with a code" on Kickoff.'}</p>
+${over ? "" : `<div class="glass invite"><div><small class="muted">Invite code</small><b>${esc(g.code)}</b></div><button type="button" class="btn small go" data-copy="${esc(g.code)}">Copy</button></div>
+<p class="sub">${brand ? 'Anyone with this code can join. They choose "Join with a code" on Kickoff.' : 'Send this code to your friends. They choose "Join with a code" on Kickoff.'}</p>`}
 
 <h2>What this group plays</h2>
 <div class="glass">${plays}</div>

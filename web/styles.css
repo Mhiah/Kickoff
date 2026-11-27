@@ -321,6 +321,33 @@ h1.under { margin-top: 6px; }
 .form .btn { margin-top: 18px; }
 .form .btn[disabled] { opacity: 0.55; cursor: default; }
 .form .say-so:empty { display: none; }
+/* Start a group: Friends or Brand, and what a brand's group needs. */
+.either { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.form .either label { margin: 0; cursor: pointer; }
+.form .either input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; padding: 0; }
+.either span { display: block; padding: 13px 8px; border-radius: 12px; text-align: center; font-size: 16.5px; font-weight: 700; box-shadow: 0 0 0 1px var(--line); }
+.either input:checked + span { background: var(--ink); color: var(--paper); box-shadow: none; }
+.either input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
+.form[data-kind="friends"] .for-brand, .form[data-kind="brand"] .for-friends { display: none; }
+.form .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.form .lab { margin-top: 14px; font-size: 14.5px; font-weight: 600; }
+.form .duo > * { min-width: 0; }
+.form .duo.days { grid-template-columns: 2fr 3fr; }
+.form .lab .either { margin-top: 6px; gap: 6px; }
+.form .lab .either span { padding: 13px 4px; }
+.form input[type="date"] { min-width: 0; min-height: 50px; appearance: none; -webkit-appearance: none; }
+.form .for-brand > .hint { margin-top: 10px; font-size: 14.5px; }
+.form [data-share]:empty { display: none; }
+/* A brand's group, for whoever started it: who to pay, and where to say it was paid. */
+.pay .pay-say { margin: 0; padding: 0 16px 12px; }
+.pay .pay-say + .pay-say { margin-top: -6px; }
+.paid { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 14px; }
+.paid input[name="tx"] { flex: 1; min-width: 0; padding: 10px 12px; font: 400 16px var(--serif); color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 12px; }
+.paid input[name="tx"]:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.paid .say-so { flex-basis: 100%; margin: 0; }
+.paid .say-so:empty { display: none; }
+.paid .say-so.warn { color: var(--ink); }
+.fine button.link { padding: 0; font-size: inherit; }
 /* The player of the week: a star after their name. Pressing it says why, under the name. */
 .starred { white-space: nowrap; }
 .star { color: var(--gold); padding: 4px; margin: -4px -4px -4px 2px; line-height: 0; vertical-align: -2px; }

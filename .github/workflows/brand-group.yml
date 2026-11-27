@@ -29,6 +29,10 @@ on:
         description: "Which competitions, with commas between: pl, cl, nba, wnba. Leave empty for all four"
         type: string
         default: ""
+      ends:
+        description: "The group's last day, like 2026-12-06 (it ends at midnight UTC after it, and its top player wins the prize). Leave empty for a group with no end"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -46,10 +50,11 @@ jobs:
       GROUP_BRAND: ${{ inputs.brand }}
       GROUP_PRIZE: ${{ inputs.prize }}
       GROUP_PLAYS: ${{ inputs.plays }}
+      GROUP_ENDS: ${{ inputs.ends }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
       - name: Make the group
-        run: node robot/bin/brand.js --name "$GROUP_NAME" --brand "$GROUP_BRAND" --prize "$GROUP_PRIZE" --plays "$GROUP_PLAYS"
+        run: node robot/bin/brand.js --name "$GROUP_NAME" --brand "$GROUP_BRAND" --prize "$GROUP_PRIZE" --plays "$GROUP_PLAYS" --ends "$GROUP_ENDS"

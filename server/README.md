@@ -67,17 +67,38 @@ they are further down. A row carries a name and numbers and nothing else about t
 
 ## Groups run by a brand
 
-A group of friends holds 30 players and anyone can start one. A group run by a brand holds up to
-5,000, and only Kickoff can start one, with its own key. It carries the brand's name, which players
-see as "Run by …", and an optional line about the prize. Nobody in it started it, so nobody in it
-can change which competitions it plays.
+A group of friends holds 30 players. A group run by a brand holds up to 5,000 and carries the
+brand's name, which players see as "Run by …". Nobody in it can change which competitions it plays.
+
+There are two ways one is started:
+
+- **On the website**, by anyone, from "Start a group" with Brand chosen. It has a prize that is an
+  amount of USDT or USDC, a number of winners who share it equally (1 to 10), and a last day.
+  Whoever starts it is in it, and is the one who pays the winners. The server does not check that
+  the brand is who it says it is.
+- **By Kickoff, with its own key** (the **Make a brand group** workflow). Its prize is only a line
+  of words, it has one winner, and it may have no last day.
 
 A group that size is never listed member by member. Anyone with the code is told what the group is
 and how many are in it. A player in it is also given their own seat, and nobody else's. Its
 leaderboard is the top twenty and the asking player's own row, found from a mark kept on each
 person, so the list of members is never fetched whole. A test with 300 players checks that.
 
-The **Make a brand group** workflow on GitHub starts one and shows its code.
+A brand's group with a last day counts only its own matches on its leaderboard: in the
+competitions it plays, kicked off from when it started up to its end. When the end has passed and
+every one of those matches has a result, its top players are fixed as the winners, as many as the
+prize is shared between. Only a player who scored can win, so there may be fewer, or none.
+
+The server never holds a prize. Each winner links a wallet. Whoever started the group is told, and
+nobody else is, which wallet each winner linked and what their share is. They pay on X Layer from
+their own wallet and give the payment's transaction. That is only a claim: it waits in a list
+until Kickoff's robot has read the payment on X Layer. The server records it only if the robot saw
+it reach the wallet the winner linked, in the prize's own token (USDT and USDC are held here by
+their real addresses on X Layer, so a token that only shares the name does not count), for at
+least the winner's share. One payment can pay one winner, once. A payment that does not count is
+refused with the reason, which whoever started the group is shown.
+
+For a group Kickoff started itself, the **Record a prize** workflow does the same by hand.
 
 ## Linking a wallet
 
@@ -115,8 +136,9 @@ A device must sign these:
 
 | Address | What it does |
 | --- | --- |
-| `POST /api/groups` | Start a group, choosing what it plays, and get its code |
+| `POST /api/groups` | Start a group, choosing what it plays, and get its code. With a brand's details (its name, the prize, the winners, USDT or USDC, the last day) it is a group run by a brand |
 | `POST /api/groups/<code>/join` | Join a group with a name |
+| `POST /api/groups/<code>/paid` | Whoever started a brand's group says they paid a winner, and gives the payment's transaction. It counts once the robot has read it on X Layer |
 | `POST /api/groups/<code>/plays` | Choose which competitions it plays. Only the person who started it can |
 | `POST /api/me/groups` | The groups this device is in, and the wallet it has linked, if any |
 | `POST /api/me/table` | The League screen's numbers: the table of everyone, the table of a group, and this player's place and finished matches |
@@ -133,7 +155,11 @@ Only Kickoff's robot may use these, with a key of its own:
 | --- | --- |
 | `POST /api/admin/fixtures` | Put the feed's matches on the list, and update their state |
 | `POST /api/admin/freeze/<match>` | A match's bundle, once picks have closed. The server makes the bundle by itself; this is how the robot asks for it |
-| `POST /api/admin/brand-groups` | Start a group run by a brand: its name, the brand, an optional prize line and which competitions it plays |
+| `POST /api/admin/brand-groups` | Start a group run by a brand: its name, the brand, an optional prize line, which competitions it plays, and an optional end |
+| `POST /api/admin/prize/look` | Where a brand group's prize stands: its winners, the wallet each linked, each one's share, and who has been paid |
+| `POST /api/admin/prize/claims` | Payments whoever started a group says they made, waiting for the robot to read them |
+| `POST /api/admin/prize` | Record that a winner was paid: their place, the payment's transaction, the wallet it reached, the token and the amount. Refused unless that is the wallet the winner linked, the prize's own token, and at least their share |
+| `POST /api/admin/prize/refuse` | A payment the robot read that was not what was owed, with the reason |
 | `POST /api/admin/locks` | How locking on X Layer went for some matches: `locked` or `missed`. Only locked matches give points |
 
 When the server will not do something, it says why in plain words, for example "Picks for this

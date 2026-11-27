@@ -215,6 +215,8 @@ Every run's report is on its own page.
 | `bin/robot.js` | The commands: `fixtures` for one round on the list, `watch` to stay awake |
 | `bin/golive.js` | The commands for going live: `look` and `go` |
 | `bin/brand.js` | Starts a group run by a brand, and prints its code |
+| `bin/prize.js` | By hand, for a group Kickoff started: says who won and where to pay, reads a payment on X Layer, and records it |
+| `src/prize.js` | Reading a prize payment on X Layer: what reached the winner's wallet, from the chain itself. On every round it reads the payments that whoever started a brand's group says they made, and tells the server which count: the right wallet, the real token, at least the share, made after the winners were named |
 | `bin/site.js` | The commands for the website on X Layer: `look`, `go` and `check` |
 | `bin/key.js` | Prints the public key that picks are locked to. It is safe to show to anyone |
 | `src/envelope.js` | The robot's key for opening the locked copies of picks after kickoff |
