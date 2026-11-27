@@ -128,6 +128,66 @@ That fee shapes the product. It is reasonable for a sponsored league, where a br
 paying to run a campaign. It is too much to ask of a group of friends. So free leagues are meant to
 share Kickoff's own account, and a league gets its own identity when a sponsor pays for one.
 
+## What running Kickoff costs, on the real network
+
+Everything above was measured on a copy of the network before going live. This part is from
+Kickoff's own transactions on X Layer on 25 November 2026, when the gas price was 0.02 gwei.
+Anyone can look the transactions up.
+
+**A match's messages.** The first two real matches cost six messages:
+
+| Message | Gas | OKB | Transaction |
+| --- | --- | --- | --- |
+| Sabah FK v Barça is listed | 182,647 | 0.00000365 | `0xf3e5c74a0a7e01f4fdff0a0d12ab31c5dcb93ecacb63474b3adc974629856f35` |
+| its predictions are locked | 150,667 | 0.00000301 | `0x1b45486d3b875d85f587f36cad9fca673f6b0e2cf89960484d4b05ce0544b45f` |
+| Slavia Praha v Villarreal is listed | 148,543 | 0.00000297 | `0xa7c82ef3720d723dc7d387bad92cea9421f78f0bef17ce72d9af15c3ed0b6246` |
+| its predictions are locked | 150,667 | 0.00000301 | `0xb0e79a1b4f20533aab39472c8fbb5ce7669804c4f77576d462e19b5d3ebd0d43` |
+| the first result | 149,164 | 0.00000298 | `0x919aadc90c64a6af484ef56e73a23292cff29727ce4d437b1a8961e982291448` |
+| the second result | 149,164 | 0.00000298 | `0x87ae17b6b884dc22527443b83da5c825f8397061066b71c527ce3c42898046a7` |
+
+That is 0.0000186 OKB for two matches, so **about 0.0000093 OKB a match**. The robot's wallet held
+0.034318 OKB before the first and 0.034300 OKB after the last. A football match is three
+predictions, each locked and settled as its own match, so one with all three made costs about
+0.000028 OKB. A match nobody predicted is never listed, and costs nothing.
+
+**Publishing the opened predictions.** After a match, the opened predictions are written to
+Kickoff's site on X Layer, so anyone can rebuild the leaderboard. Writing there costs by the byte.
+One real piece of Kickoff's site, 14,500 bytes, cost 3,375,710 gas, which was 0.0000675 OKB: about
+**0.0000047 OKB for every 1,000 bytes**.
+
+How big the file is was measured by building it with the server's own code, not by sending it:
+
+| Predictions on one match | Bytes for each | The whole file | OKB to publish it |
+| --- | --- | --- | --- |
+| 1 | 481 | 481 | 0.0000022 |
+| 30 | 716 | 21,491 | 0.00010 |
+| 100 | 848 | 84,837 | 0.00040 |
+| 1,000 | 1,063 | 1,062,561 | 0.0049 |
+| 5,000 | about 1,213 | about 6,065,000 | about 0.028 |
+
+Each prediction in the file carries the proof that it was in the locked bundle, and that proof is
+longer in a bigger crowd, which is why the bytes for each go up. The 5,000 row is worked out from
+the pattern in the rows above it, not built. So a prediction costs between **0.0000033 and
+0.0000057 OKB** to publish.
+
+Two things to know:
+
+- **No file of opened predictions has been published on the real network yet.** The cost by the
+  byte is from the site's own files, which are written to the same place in the same way.
+- **The file could be made much smaller.** The proof beside each prediction could be worked out by
+  whoever reads the file, from the list itself, instead of being stored. That would cut most of
+  the bytes. It is not built.
+
+**A month of one sponsored group**, if every player makes 60 predictions:
+
+| Players | Predictions | Bytes each | OKB |
+| --- | --- | --- | --- |
+| 100 | 6,000 | 848 | 0.024 |
+| 1,000 | 60,000 | 1,063 | 0.30 |
+| 5,000 | 300,000 | about 1,213 | 1.69 |
+
+The messages for the matches themselves add less than 0.001 OKB a month to each row.
+
 ## How far to trust these numbers
 
 - **The fees are TapeOut's and can change.** The name fee was zero when this ran. It may not stay

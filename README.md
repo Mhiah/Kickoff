@@ -126,6 +126,50 @@ about the prize.
 
 Today everything is free.
 
+### What it costs to run
+
+Read from the robot's own transactions on X Layer on 25 November 2026, at that day's gas price
+(0.02 gwei). Amounts are in OKB, because its price moves. The dollar column uses **$100 for one
+OKB** as a round example, not the day's price. The working is in [`docs/FEES.md`](docs/FEES.md).
+
+| What | OKB | At $100 an OKB |
+| --- | --- | --- |
+| A match nobody predicted | 0 | $0 |
+| A match's three messages: listed, locked, result | 0.0000093 | under a tenth of a cent |
+| A football match with all three predictions made | 0.000028 | about a quarter of a cent |
+| One opened prediction, published so anyone can check it | 0.0000033 to 0.0000057 | a thirtieth to a twentieth of a cent |
+
+Nearly all of the cost is that last line. A prediction costs a little more to publish when more
+people predicted the same match, because each carries a longer proof.
+
+A month of one sponsored group, if every player makes 60 predictions (five football matches a week,
+all three predictions each):
+
+| Players | Predictions | On X Layer | At $100 an OKB |
+| --- | --- | --- | --- |
+| 100 | 6,000 | 0.024 OKB | $2.42 |
+| 1,000 | 60,000 | 0.30 OKB | $29.75 |
+| 5,000 | 300,000 | 1.69 OKB | $169.49 |
+
+Two more costs start on the day Kickoff earns money, and not before: hosting at $20 a month, because
+the host's free plan is for non-commercial use, and the football feed at €12 a month unless its
+owner says the free plan covers it.
+
+### Proposed prices
+
+**Nothing has been charged to anyone.** These are proposed, with the sum beside each, so the price
+can be argued with.
+
+| Sponsored group | Proposed price a month | X Layer cost (above) | Left, before the two fixed costs |
+| --- | --- | --- | --- |
+| Up to 100 players | $25 | $2.42 | $22.58 |
+| Up to 1,000 players | $120 | $29.75 | $90.25 |
+| Up to 5,000 players | $450 | $169.49 | $280.51 |
+
+What would move these sums: the price of OKB, the gas price on X Layer, and how much players
+predict. At $200 an OKB the X Layer column doubles. A group whose players each predict half as
+much costs half as much.
+
 ## What makes it different
 
 - **No trusted organiser.** Nobody, including the person who started the group and Kickoff itself,
