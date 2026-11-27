@@ -35,7 +35,7 @@ let moving = null;
 const table = createTable({ store, client });
 const chain = createChain({ store });
 // What the player last chose on the League screen, kept while the screen is drawn again.
-const looking = { part: "matches", board: "everyone" };
+const looking = { part: "matches", board: "everyone", week: false };
 const matches = createFixtures({ store, client, competitions: COMPETITIONS, sample: { league: SAMPLE_LEAGUE, fixtures: sampleFixtures } });
 
 document.body.insertAdjacentHTML("afterbegin", frame());
@@ -199,6 +199,13 @@ document.addEventListener("click", async (event) => {
     looking.board = target.dataset.board;
     for (const chip of target.parentElement.children) chip.setAttribute("aria-pressed", String(chip === target));
     for (const board of view.querySelectorAll("[data-board-of]")) board.hidden = board.dataset.boardOf !== target.dataset.board;
+    return;
+  }
+  // The league screen: the star after the player of the week's name says why it is there.
+  if (target.matches("[data-week-star]")) {
+    looking.week = !looking.week;
+    for (const star of view.querySelectorAll("[data-week-star]")) star.setAttribute("aria-expanded", String(looking.week));
+    for (const note of view.querySelectorAll(".week-note")) note.hidden = !looking.week;
     return;
   }
   // The league screen on a phone: the matches, or the table.

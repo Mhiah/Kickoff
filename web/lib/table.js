@@ -7,7 +7,7 @@
 const TABLE_KEY = "kickoff-table";
 
 /** What the League screen shows before the server has answered for the first time. */
-export const EMPTY = Object.freeze({ everyone: { players: 0, rows: [] }, group: null, you: { place: null, points: 0, threes: 0, ones: 0, wrong: 0 }, played: [] });
+export const EMPTY = Object.freeze({ everyone: { players: 0, rows: [] }, group: null, week: null, you: { place: null, points: 0, threes: 0, ones: 0, wrong: 0 }, played: [] });
 
 /**
  * @param store   from createStore() in picks.js

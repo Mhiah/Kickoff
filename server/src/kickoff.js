@@ -66,6 +66,13 @@ const refuse = (status, message) => {
 };
 
 const HEX64 = /^[0-9a-f]{64}$/;
+/** A week, in seconds. */
+export const WEEK = 7 * 24 * 60 * 60;
+/** The Monday, at midnight UTC, of the week a moment falls in. (The first day ever counted was a Thursday.) */
+export const weekStart = (seconds) => {
+  const day = Math.floor(seconds / 86400);
+  return (day - ((day + 3) % 7)) * 86400;
+};
 /** How long a code for moving to another phone lasts, in seconds. */
 export const MOVE_LASTS = 10 * 60;
 /** How many wrong codes one phone may try in that time. */
@@ -266,28 +273,39 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
    * @returns [{ key, name, joinedAt, threes, ones, points, place, brands }]: `brands` is the codes
    *          of the brand groups the person is in, if any
    */
-  const everyone = async () => {
+  const tables = async () => {
     const stamp = (await store.get("table-stamp")) ?? "start";
     const kept = await store.get("table-kept");
-    if (kept?.stamp === stamp) return kept.rows;
+    if (kept?.stamp === stamp && kept.weeks) return kept;
     const people = await store.tableAll("people");
     const owner = await store.tableAll("owner-of");
     const tally = new Map(Object.keys(people).map((key) => [key, { threes: 0, ones: 0 }]));
-    for (const match of Object.keys(await store.tableAll("scored"))) {
+    // The same points, also added up by the week their match kicked off in, for the player of
+    // the week. Only the two newest weeks with points are kept: nothing older is ever shown.
+    const byWeek = new Map();
+    for (const [match, about] of Object.entries(await store.tableAll("scored"))) {
       for (const [player, points] of Object.entries(await store.tableAll(`points:${match}`))) {
-        const t = tally.get(owner[player] ?? player);
+        const key = owner[player] ?? player;
+        const t = tally.get(key);
         if (!t) continue;
         if (points === 3) t.threes++;
         else if (points === 1) t.ones++;
+        if (points > 0 && Number.isSafeInteger(about?.kickoff)) {
+          const week = weekStart(about.kickoff);
+          const gained = byWeek.get(week) ?? byWeek.set(week, {}).get(week);
+          gained[key] = (gained[key] ?? 0) + points;
+        }
       }
     }
     const rows = [...tally]
       .map(([key, t]) => ({ key, name: people[key].name, joinedAt: people[key].joinedAt, ...t, points: 3 * t.threes + t.ones, ...(people[key].brands ? { brands: people[key].brands } : {}) }))
       .sort((a, b) => b.points - a.points || a.joinedAt - b.joinedAt || a.key.localeCompare(b.key));
     rows.forEach((row, i) => (row.place = i + 1));
-    await store.set("table-kept", { stamp, rows });
-    return rows;
+    const weeks = Object.fromEntries([...byWeek].sort((a, b) => b[0] - a[0]).slice(0, 2));
+    await store.set("table-kept", { stamp, rows, weeks });
+    return { rows, weeks };
   };
+  const everyone = async () => (await tables()).rows;
 
   /**
    * One wallet has one seat in a group, whichever of its devices is being used. This gives every
@@ -589,6 +607,9 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
      *   group     { players, rows }: the same for the group, in full, or null. For a group run by
      *             a brand it is the top of the group with this player's own row, like `everyone`,
      *             and each row also carries `players`, the ids that player picks with
+     *   week      { from, to, everyone, group }: the last finished week, Monday to Sunday (UTC),
+     *             and its player of the week among everybody and in the group, each
+     *             { name, points, you } or null if nobody gained a point that week
      *   you       { place, points, threes, ones, wrong } among everybody. `place` is null for
      *             someone with no name yet, who is not on the table. `wrong` counts their picks
      *             that scored nothing.
@@ -622,6 +643,21 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
         if (added) all = await everyone();
       }
       const mine = me ? (all.find((row) => row.key === me) ?? null) : null;
+      // The player of the week: whoever gained the most points from matches that kicked off in
+      // the last finished week, Monday to Sunday. A tie goes the way the leaderboard's do, to
+      // whoever joined first. Nobody, if nobody gained a point that week.
+      const lastWeek = weekStart(now) - WEEK;
+      const gained = (await tables()).weeks[lastWeek] ?? {};
+      const best = (rows) => {
+        let top = null;
+        for (const row of rows) {
+          const points = gained[row.key] ?? 0;
+          if (points === 0) continue;
+          const ahead = !top || points > top.points || (points === top.points && (row.joinedAt < top.row.joinedAt || (row.joinedAt === top.row.joinedAt && row.key < top.row.key)));
+          if (ahead) top = { row, points };
+        }
+        return top ? { name: top.row.name, points: top.points, you: top.row.key === me } : null;
+      };
       const show = (row, place, extra = {}) => ({ place, name: row.name, threes: row.threes, ones: row.ones, points: row.points, you: row.key === me, ...extra });
       const top = all.slice(0, TABLE_TOP).map((row) => show(row, row.place));
       if (mine && mine.place > TABLE_TOP) top.push(show(mine, mine.place, { below: true }));
@@ -657,6 +693,7 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       return {
         everyone: { players: all.length, rows: top },
         group: inGroup ? { players: inGroup.length, rows: groupRows } : null,
+        week: { from: lastWeek, to: lastWeek + WEEK, everyone: best(all), group: inGroup ? best(inGroup) : null },
         you: { place: mine?.place ?? null, points: mine?.points ?? 0, threes: mine?.threes ?? 0, ones: mine?.ones ?? 0, wrong: played.filter((p) => p.points === 0 && !p.missed).length },
         played: played.slice(0, PLAYED_SHOWN),
       };

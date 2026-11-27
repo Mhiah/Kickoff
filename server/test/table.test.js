@@ -8,7 +8,7 @@ import {
   walletLinkText, withOpenings,
 } from "../../engine/src/index.js";
 import { testWallet } from "../../engine/test/test-wallet.js";
-import { TABLE_TOP } from "../src/kickoff.js";
+import { TABLE_TOP, WEEK, weekStart } from "../src/kickoff.js";
 import { RedisStore } from "../src/redis-store.js";
 import { FAKE_TOKEN, FAKE_URL, fakeRedis } from "./fake-redis.js";
 import { LEAGUE, device, server, serverWithFixtures } from "./helpers.js";
@@ -438,4 +438,94 @@ test("the tables work the same on the real kind of database", async () => {
   assert.ok(redis.seen.length - before - first < first, "the second look does less work, because the table was kept");
   await join(s, ada, "Ada B", group.code);
   assert.deepEqual(names((await table(s, bola)).everyone), ["1 Bola 3", "2 Ada B 0"]);
+});
+
+// ---- The player of the week
+
+const monday = (y, m, d) => Date.UTC(y, m, d) / 1000;
+
+test("a week runs from Monday to Sunday, by the clock X Layer keeps", () => {
+  const start = monday(2026, 10, 23); // Monday 23 November 2026
+  assert.equal(new Date(start * 1000).getUTCDay(), 1);
+  for (const moment of [start, start + 1, Date.UTC(2026, 10, 26, 13, 5) / 1000, start + WEEK - 1]) assert.equal(weekStart(moment), start);
+  assert.equal(weekStart(start - 1), start - WEEK);
+  assert.equal(weekStart(start + WEEK), start + WEEK);
+});
+
+test("the player of the week is whoever gained the most in the last finished week, and nobody until a week has finished", async () => {
+  const s = await serverWithFixtures();
+  const [ada, bola, chidi] = [await device(), await device(), await device()];
+  await join(s, ada, "Ada");
+  await join(s, bola, "Bola");
+  await join(s, chidi, "Chidi");
+  const sealed = [
+    [ada, await pick(s, ada, s.f.football, { home: 2, away: 1 })], // spot on: 3
+    [bola, await pick(s, bola, s.f.football, { home: 1, away: 0 })], // right winner: 1
+    [chidi, await pick(s, chidi, s.f.football, { home: 0, away: 2 })], // wrong: 0
+  ];
+  s.clock.now = s.f.football.kickoff + 3 * 3600;
+  for (const [who, p] of sealed) await open(s, who, p);
+  await result(s, s.f.football, "2 – 1", { home: 2, away: 1 });
+
+  // The week the match was played in is still running: there is no player of that week yet.
+  const thisWeek = weekStart(s.f.football.kickoff);
+  let t = await table(s, bola);
+  assert.deepEqual(t.week, { from: thisWeek - WEEK, to: thisWeek, everyone: null, group: null });
+
+  // The Monday after, it is Ada, for everyone who asks.
+  s.clock.now = thisWeek + WEEK + 60;
+  t = await table(s, bola);
+  assert.deepEqual(t.week, { from: thisWeek, to: thisWeek + WEEK, everyone: { name: "Ada", points: 3, you: false }, group: null });
+  assert.deepEqual((await table(s, ada)).week.everyone, { name: "Ada", points: 3, you: true });
+
+  // A week later nothing was played in the week just gone, so there is nobody. Ada's total stands.
+  s.clock.now += WEEK;
+  t = await table(s, ada);
+  assert.deepEqual([t.week.from, t.week.everyone], [thisWeek + WEEK, null]);
+  assert.deepEqual(names(t.everyone), ["1 Ada 3", "2 Bola 1", "3 Chidi 0"]);
+});
+
+test("level for the week, it goes to whoever joined Kickoff first; and a group has its own player of the week", async () => {
+  const s = await serverWithFixtures();
+  const [ada, bola, chidi, dayo] = [await device(), await device(), await device(), await device()];
+  const adas = await join(s, ada, "Ada"); // Ada's group
+  const bolas = await join(s, bola, "Bola"); // Bola's group, which Chidi and Dayo join
+  await join(s, chidi, "Chidi", bolas.code);
+  await join(s, dayo, "Dayo", bolas.code);
+  const sealed = [];
+  // Football: Ada spot on (3). Basketball: Chidi and Dayo spot on (3 each), Bola the winner only (1).
+  sealed.push([ada, await pick(s, ada, s.f.football, { home: 2, away: 1 })]);
+  sealed.push([dayo, await pick(s, dayo, s.f.basketball, { winner: "home", band: "B" })]);
+  sealed.push([chidi, await pick(s, chidi, s.f.basketball, { winner: "home", band: "B" })]);
+  sealed.push([bola, await pick(s, bola, s.f.basketball, { winner: "home", band: "D" })]);
+  s.clock.now = s.f.basketball.kickoff + 3 * 3600;
+  for (const [who, p] of sealed) await open(s, who, p);
+  await result(s, s.f.football, "2 – 1", { home: 2, away: 1 });
+  await result(s, s.f.basketball, "104 – 96", basketballResult({ home: 104, away: 96 }));
+  assert.equal(weekStart(s.f.football.kickoff), weekStart(s.f.basketball.kickoff), "both matches are in one week");
+
+  s.clock.now = weekStart(s.f.basketball.kickoff) + WEEK + 60;
+  // Among everyone, three have 3 for the week. Ada joined first.
+  const t = await table(s, dayo, bolas.code);
+  assert.deepEqual(t.week.everyone, { name: "Ada", points: 3, you: false });
+  // In Bola's group Ada is not there to win it. Chidi and Dayo are level; Chidi joined first.
+  assert.deepEqual(t.week.group, { name: "Chidi", points: 3, you: false });
+  assert.deepEqual((await table(s, chidi, bolas.code)).week.group, { name: "Chidi", points: 3, you: true });
+  // In Ada's group of one, it is Ada.
+  assert.deepEqual((await table(s, ada, adas.code)).week.group, { name: "Ada", points: 3, you: true });
+});
+
+test("a match that was not locked on X Layer in time gives nobody a week, as it gives nobody points", async () => {
+  const s = await serverWithFixtures();
+  const ada = await device();
+  await join(s, ada, "Ada");
+  const p = await pick(s, ada, s.f.football, { home: 2, away: 1 });
+  s.clock.now = s.f.football.kickoff + 3 * 3600;
+  await open(s, ada, p);
+  await lock(s, s.f.football, "missed");
+  await resultOnly(s, s.f.football, "2 – 1", { home: 2, away: 1 });
+  s.clock.now = weekStart(s.f.football.kickoff) + WEEK + 60;
+  const t = await table(s, ada);
+  assert.equal(t.week.everyone, null);
+  assert.equal(t.you.points, 0);
 });

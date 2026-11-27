@@ -87,7 +87,7 @@ function phone(online) {
 /** The rows of a table on the screen, as "place name points". `which` is "everyone" or "group". */
 function rowsOf(html, which) {
   const board = html.match(new RegExp(`data-board-of="${which}"[^>]*>(.*?)</div>\\s*(<div data-board-of|<h2>Played)`, "s"))?.[1] ?? "";
-  return [...board.matchAll(/<tr class="(you)?"><td>(\d+)<\/td><td>([^<]+)(?:<span class="tag">you<\/span>)?<\/td><td>\d+<\/td><td>\d+<\/td><td class="pts">(\d+)<\/td>/g)].map((m) => `${m[2]} ${m[3]} ${m[4]}${m[1] ? " (you)" : ""}`);
+  return [...board.matchAll(/<tr class="(you)?"><td>(\d+)<\/td><td>(?:<span class="starred">)?([^<]+)(?:<button[^>]*data-week-star.*?<\/button><\/span>)?(?:<span class="tag">you<\/span>)?<\/td><td>\d+<\/td><td>\d+<\/td><td class="pts">(\d+)<\/td>/g)].map((m) => `${m[2]} ${m[3]} ${m[4]}${m[1] ? " (you)" : ""}`);
 }
 const tile = (html, label) => html.match(new RegExp(`<small>${label}</small><b>([^<]*)</b><span>([^<]*)</span>`))?.slice(1, 3);
 
@@ -407,4 +407,65 @@ test("offline, the tables are what the phone last saw", async () => {
   // Looking at another group, the table of everyone is still good and the group's is not shown as this one's.
   assert.equal(mya.table.view("OTHER-0001").group, null);
   assert.equal(mya.table.view("OTHER-0001").everyone.players, 2);
+});
+
+test("the player of the week has a star after their name once the week has finished, and pressing it says why", async () => {
+  const online = await kickoffOnline();
+  const [mya, jerkson, kemi] = [phone(online), phone(online), phone(online)];
+  const group = await mya.groups.start({ name: "Sunday Ballers", playerName: "mya", plays: ["pl", "nba"] });
+  online.clock.now += 60;
+  await jerkson.groups.join({ code: group.code, playerName: "Jerkson" });
+  online.clock.now += 60;
+  await kemi.groups.start({ name: "Work lot", playerName: "Kemi", plays: ["pl"] });
+  const all = [mya, jerkson, kemi];
+  for (const p of all) await p.carry();
+  // Arsenal v Chelsea ends 2–1: Jerkson is spot on (3), Kemi has the winner (1), mya nothing.
+  await mya.seal(online.f.football, { home: 0, away: 0 });
+  await jerkson.seal(online.f.football, { home: 2, away: 1 });
+  await kemi.seal(online.f.football, { home: 1, away: 0 });
+  for (const p of all) await p.carry();
+  online.clock.now = KICKOFF - CLOSES_BEFORE + SETTLE;
+  for (const p of all) await p.carry();
+  online.clock.now = KICKOFF + 2 * HOUR;
+  for (const p of all) await p.carry();
+  await online.result(online.f.football, "2 – 1", { home: 2, away: 1 });
+  for (const p of all) await p.carry();
+
+  // Who has the star on a board, and what pressing it says. Null if nobody has one.
+  const boardOf = (html, board) => html.match(new RegExp(`data-board-of="${board}"[^>]*>(.*?)</div>\\s*(<div data-board-of|<h2>Played)`, "s"))?.[1] ?? "";
+  const lineOf = (html, board) => {
+    const row = boardOf(html, board).match(/<td><span class="starred">([^<]+)<button type="button" class="star" data-week-star aria-expanded="false" aria-label="Player of the week">.*?<\/button><\/span>(?:<span class="tag">you<\/span>)?<\/td>.*?<\/tr><tr class="week-note(?: you)?" hidden><td><\/td><td colspan="4">([^<]+)<\/td><\/tr>/s);
+    assert.ok((boardOf(html, board).match(/data-week-star/g) ?? []).length <= 1, "at most one star on a board");
+    return row ? `${row[1]} | ${row[2]}` : null;
+  };
+  // The week is still running: no star anywhere.
+  assert.ok(!(await mya.league()).includes("Player of the week"));
+
+  // The Monday after (NOW is a Monday, so a week on). The robot has put later matches on the list, as it does.
+  const later = async (weeks) => {
+    const x = { comp: "pl", sport: FOOTBALL, home: "Spurs", away: "Everton", kickoff: KICKOFF + weeks * 7 * 24 * HOUR, label: "Premier League: Spurs v Everton" };
+    await online.kickoff.putFixtures({ fixtures: [{ id: toHex(await matchId(LEAGUE, { sport: x.sport, kickoff: x.kickoff, bestOf: 0, label: x.label })), feedId: `test:later-${weeks}`, state: "scheduled", ...x }] });
+  };
+  await later(1);
+  await later(2);
+  online.clock.now = NOW + 7 * 24 * HOUR;
+  for (const p of all) await p.carry();
+  let html = await mya.league();
+  assert.equal(lineOf(html, "everyone"), "Jerkson | Player of the week: Jerkson, 3 points");
+  assert.equal(lineOf(html, "group"), "Jerkson | Player of the week: Jerkson, 3 points");
+  // Kemi's own group has only Kemi in it, who gained 1.
+  html = await kemi.league();
+  assert.equal(lineOf(html, "everyone"), "Jerkson | Player of the week: Jerkson, 3 points");
+  assert.equal(lineOf(html, "group"), "Kemi | Player of the week: Kemi, 1 point");
+  // Once the star has been pressed, the screen keeps showing why when it is drawn again.
+  const pressed = league(null, { ...(await kemi.ctx()), looking: { part: "table", board: "everyone", week: true } }).html;
+  assert.match(pressed, /aria-expanded="true"/);
+  assert.match(pressed, /<tr class="week-note"><td><\/td><td colspan="4">Player of the week: Jerkson, 3 points<\/td><\/tr>/);
+  // The leaderboard itself is unchanged by it.
+  assert.deepEqual(rowsOf(html, "everyone"), ["1 Jerkson 3", "2 Kemi 1 (you)", "3 mya 0"]);
+
+  // A week after that, nobody played in the week just gone: the star is gone.
+  online.clock.now += 7 * 24 * HOUR;
+  for (const p of all) await p.carry();
+  assert.ok(!(await mya.league()).includes("Player of the week"));
 });

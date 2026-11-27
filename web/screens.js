@@ -147,7 +147,7 @@ export function tableHtml() {
   const shared = you.sharedWith.length
     ? `<p class="small muted" style="margin-top:8px">${esc(group.you)} and ${esc(you.sharedWith.join(" and "))} are level on everything, so they share ${placeName(you.position)} place.</p>`
     : "";
-  return `<div class="glass clip"><table class="table"><thead><tr><th><span hidden>Place</span></th><th>Player</th><th>3-pt predictions</th><th>1-pt predictions</th><th>Points</th></tr></thead><tbody>${rows}</tbody></table></div>${shared}`;
+  return `<div class="glass clip"><table class="table"><thead><tr><th><span hidden>Place</span></th><th>Player</th><th>3-pt<span class="long"> predictions</span></th><th>1-pt<span class="long"> predictions</span></th><th>Points</th></tr></thead><tbody>${rows}</tbody></table></div>${shared}`;
 }
 
 function playedHtml(limit) {
@@ -198,14 +198,26 @@ function nextCard(ctx, nextId) {
  * { place (null until a pick of theirs has been scored), name, threes, ones, points, you }.
  * Only the top of a long board is sent, with your own row added if it is further down.
  */
-function boardHtml(board, empty) {
+const STAR = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z"/></svg>`;
+
+/**
+ * A leaderboard. `best` is its player of the week ({ name, points }), or null: whoever gained the
+ * most points in the last finished week, Monday to Sunday. They get a star after their
+ * name, and pressing the star says why. `open` is whether that is showing.
+ */
+function boardHtml(board, empty, best = null, open = false) {
   if (board.rows.length === 0) return `<p class="small muted" style="margin-top:10px">${empty}</p>`;
   const top = board.rows.filter((row) => !row.below);
   const below = board.rows.filter((row) => row.below);
-  const line = (row) =>
-    `<tr class="${row.you ? "you" : ""}"><td>${row.place ?? "–"}</td><td>${esc(row.name)}${row.you ? '<span class="tag">you</span>' : ""}</td><td>${row.threes}</td><td>${row.ones}</td><td class="pts">${row.points}</td></tr>`;
+  const line = (row) => {
+    const starred = best && row.name === best.name;
+    const star = starred ? `<button type="button" class="star" data-week-star aria-expanded="${open}" aria-label="Player of the week">${STAR}</button>` : "";
+    // Why, on a line of its own under the row, the full width of the leaderboard.
+    const why = starred ? `<tr class="week-note${row.you ? " you" : ""}"${open ? "" : " hidden"}><td></td><td colspan="4">Player of the week: ${esc(best.name)}, ${best.points} ${best.points === 1 ? "point" : "points"}</td></tr>` : "";
+    return `<tr class="${row.you ? "you" : ""}"><td>${row.place ?? "–"}</td><td>${starred ? `<span class="starred">${esc(row.name)}${star}</span>` : esc(row.name)}${row.you ? '<span class="tag">you</span>' : ""}</td><td>${row.threes}</td><td>${row.ones}</td><td class="pts">${row.points}</td></tr>${why}`;
+  };
   const gap = below.length ? `<tr class="gap"><td colspan="5">…</td></tr>` : "";
-  return `<div class="glass clip"><table class="table"><thead><tr><th><span hidden>Place</span></th><th>Player</th><th>3-pt predictions</th><th>1-pt predictions</th><th>Points</th></tr></thead><tbody>${top.map(line).join("")}${gap}${below.map(line).join("")}</tbody></table></div>`;
+  return `<div class="glass clip"><table class="table"><thead><tr><th><span hidden>Place</span></th><th>Player</th><th>3-pt<span class="long"> predictions</span></th><th>1-pt<span class="long"> predictions</span></th><th>Points</th></tr></thead><tbody>${top.map(line).join("")}${gap}${below.map(line).join("")}</tbody></table></div>`;
 }
 
 /**
@@ -269,8 +281,8 @@ ${next ? `<div class="phone-only">${nextCard(ctx, nextId)}</div>` : ""}
   <section data-part-of="table">
     <h2>Leaderboard</h2>
     <div class="chips" role="group" aria-label="Which leaderboard"><button type="button" data-board="everyone" aria-pressed="${board === "everyone"}">Everyone</button><button type="button" data-board="group" aria-pressed="${board === "group"}">My group</button></div>
-    <div data-board-of="everyone" style="margin-top:12px"${board === "everyone" ? "" : " hidden"}>${boardHtml(s.everyone, "Nobody has played yet.")}</div>
-    <div data-board-of="group" style="margin-top:12px"${board === "group" ? "" : " hidden"}>${s.group ? boardHtml(s.group, "Nobody has played yet.") : `<p class="small muted" style="margin-top:10px">You are not in a group yet. <a class="link" href="#/group">Start or join one</a>.</p>`}</div>
+    <div data-board-of="everyone" style="margin-top:12px"${board === "everyone" ? "" : " hidden"}>${boardHtml(s.everyone, "Nobody has played yet.", s.week?.everyone, Boolean(ctx.looking?.week))}</div>
+    <div data-board-of="group" style="margin-top:12px"${board === "group" ? "" : " hidden"}>${s.group ? boardHtml(s.group, "Nobody has played yet.", s.week?.group, Boolean(ctx.looking?.week)) : `<p class="small muted" style="margin-top:10px">You are not in a group yet. <a class="link" href="#/group">Start or join one</a>.</p>`}</div>
     <h2>Played</h2>
     ${played}
   </section>

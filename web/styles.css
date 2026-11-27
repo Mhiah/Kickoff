@@ -25,6 +25,7 @@
   --pl: #e3127e;             /* Premier League: pink */
   --cl: #2343d9;             /* Champions League: blue */
   --nba: #f0b400;            /* NBA: yellow */
+  --gold: #d9a406;           /* the star after the name of the player of the week */
   --wnba: #f26a1b;           /* WNBA: orange */
   --red: #cf2338;            /* only for things that were refused */
   --code-bg: #17171c;
@@ -49,6 +50,7 @@
   --pl: #ff4fa3;
   --cl: #6f8dff;
   --nba: #ffc933;
+  --gold: #f2c230;
   --wnba: #ff8a3d;
   --red: #ff6b7d;
   --code-bg: rgba(255, 255, 255, 0.08);
@@ -195,6 +197,8 @@ body.public .tabs { display: none; }
 /* The three parts under the hero: what you predict, how a match goes, and how to check it. */
 .trio .glass, .trio .btn { margin-top: 14px; }
 @media (max-width: 899px) {
+  /* A phone's leaderboard has no room for the long headings: "3-pt", "1-pt", "Points". */
+  .table th .long { display: none; }
   .trio { margin-top: 44px; }
   .trio section + section { margin-top: 44px; }
   .trio h2 { margin: 0 0 12px; }
@@ -316,6 +320,11 @@ h1.under { margin-top: 6px; }
 .form .btn { margin-top: 18px; }
 .form .btn[disabled] { opacity: 0.55; cursor: default; }
 .form .say-so:empty { display: none; }
+/* The player of the week: a star after their name. Pressing it says why, under the name. */
+.starred { white-space: nowrap; }
+.star { color: var(--gold); padding: 4px; margin: -4px -4px -4px 2px; line-height: 0; vertical-align: -2px; }
+.star svg { width: 17px; height: 17px; display: block; }
+.table tr.week-note td { padding-top: 0; border-top: 0; font-size: 14px; font-weight: 400; color: var(--muted); text-align: left; }
 .remind { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 14.5px; }
 .remind + .say-so:empty { display: none; }
 .more { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 26px; font-size: 15.5px; }
