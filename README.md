@@ -121,6 +121,8 @@ about the prize.
 - Paying a prize out to the winner.
 - A way for a brand to pay Kickoff for a sponsored group.
 - Paid extras for private groups.
+- Asking the football feed's owner whether its free plan covers a product that earns money, or
+  moving to a paid plan. Its terms do not say either way.
 
 Today everything is free.
 
@@ -270,10 +272,24 @@ This is what happens behind the screens, and how far each piece has got.
 
 A small program in [`feed/`](feed/) asks two sports-data services for the week's matches:
 
-| Feed | Competitions |
-| --- | --- |
-| [football-data.org](https://www.football-data.org) | Premier League, Champions League |
-| [balldontlie](https://www.balldontlie.io) | NBA, WNBA |
+| Feed | Competitions | Plan Kickoff is on |
+| --- | --- | --- |
+| [football-data.org](https://www.football-data.org) | Premier League, Champions League | Free: twelve competitions, ten requests a minute, scores a little behind live |
+| [balldontlie](https://www.balldontlie.io) | NBA, WNBA | Free: five requests a minute |
+
+**What the feeds' terms allow**, as read on 27 November 2026:
+
+- **football-data.org** asks for the credit "Football data provided by the Football-Data.org API"
+  somewhere visible. It is at the foot of Kickoff's home page. Its terms neither allow nor forbid a
+  product that earns money on the free plan. They do say a key is for one application, that use
+  beyond what a plan is meant for can end the account, and that an account can be ended with fifteen
+  days' notice. Its paid plans start at €12 a month.
+- **balldontlie**'s terms allow commercial use, paid apps included, with no approval and no credit
+  needed, as long as what is built is not itself a sports-data feed. Its paid plans start at $9.99
+  a month for each league.
+- **Neither promises its data is right.** Both say so in their terms. That is why Kickoff waits for
+  a final score to be given twice, keeps the first if a feed changes its mind, and lets any player
+  dispute a result.
 
 It puts every match into one shape, whichever feed it came from, and turns each finished match
 into a result the scoring rules can take:
@@ -474,6 +490,10 @@ PUBLISH SITE, and a check that reads every file back).
   code in those ten minutes can become that player. And a server set on it could try every code
   against the copy it holds, which would gain it nothing it cannot already do, because it is the
   server that checks a player's signature in the first place.
+- **The feeds are on free plans.** That is enough for Kickoff as it is today: free to play, with a
+  handful of requests an hour. Either feed can end a free account, and the football feed's terms do
+  not say whether the free plan covers a product that earns money. That has to be settled with its
+  owner, or a paid plan taken, before a brand pays for a group.
 - **A result is the feed's word.** Kickoff checks that it is a result that can happen, not that it
   is true. A final score is recorded only once the feed has given the same one twice, five minutes
   apart, because a feed can call a match finished and correct the score a moment later. If the feed

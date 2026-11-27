@@ -44,5 +44,10 @@ export function titlebar({ eyebrow = "", before = "", heading, headingClass = ""
 /** The line at the foot of every screen until Kickoff is live. */
 /** The same line once the matches are real but the table is not yet. */
 export const SAMPLE_NOTE = `<p class="sample">A preview with made-up names and matches. Nothing here is live yet.</p>`;
-/** The foot of the home page. Kickoff is live; only the card at its top is made up, to show what a prediction looks like. */
-export const HOME_NOTE = `<p class="sample">The prediction card at the top is an example.</p>`;
+/**
+ * The foot of the home page. Kickoff is live; only the card at its top is made up, to show what a
+ * prediction looks like. The second line is the credit the football feed's terms ask for, in
+ * their words, where anyone can see it.
+ */
+export const HOME_NOTE = `<p class="sample">The prediction card at the top is an example.</p>
+<p class="sample credit">Football data provided by the Football-Data.org API.</p>`;

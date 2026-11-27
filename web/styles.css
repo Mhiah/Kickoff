@@ -186,6 +186,7 @@ body.public .tabs { display: none; }
 .note.warn { border-left-color: var(--nba); }
 .note.plain { background: transparent; box-shadow: none; padding: 4px 0 4px 12px; margin-top: 6px; font-size: 14.5px; }
 .sample { text-align: center; font-size: 13.5px; color: var(--muted); font-style: italic; margin-top: 28px; }
+.sample.credit { margin-top: 4px; font-style: normal; }
 
 /* ---- home */
 .hero h1 { font-size: 43px; line-height: 1.04; margin: 26px 0 14px; letter-spacing: -0.02em; }

@@ -136,6 +136,8 @@ test("each typeface file is small enough to go on chain in one piece", () => {
 test("the home page says its card is an example, and does not say Kickoff is not live", () => {
   const { html } = home();
   assert.match(html, /<p class="sample">The prediction card at the top is an example\.<\/p>/);
+  // The football feed's terms ask for this credit, in these words, somewhere anyone can see it.
+  assert.match(html, /<p class="sample credit">Football data provided by the Football-Data\.org API\.<\/p>/);
   assert.ok(!/Nothing here is live yet|made-up/.test(html));
 });
 
