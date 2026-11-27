@@ -7,6 +7,7 @@ import { createDevice } from "./lib/device.js";
 import { createChain } from "./lib/chain.js";
 import { createFixtures } from "./lib/fixtures.js";
 import { createGroups } from "./lib/groups.js";
+import { finishMove, isShared, showCode, startMove } from "./lib/move.js";
 import { createStore, seal } from "./lib/picks.js";
 import { createClient } from "./lib/server.js";
 import { syncPicks } from "./lib/sync.js";
@@ -28,6 +29,8 @@ const device = createDevice(store);
 const client = createClient({ base: SERVER, device });
 const groups = createGroups({ store, device, client });
 const wallet = createWallet({ device, client });
+// A one-time code this phone is showing, to carry its player to another phone: { code, until, left }.
+let moving = null;
 const table = createTable({ store, client });
 const chain = createChain({ store });
 // What the player last chose on the League screen, kept while the screen is drawn again.
@@ -50,7 +53,8 @@ async function context() {
   const mine = await groups.view();
   // Where this copy of Kickoff is open, for the reminder a player copies to their group.
   const site = `${location.origin}${location.pathname.replace(/index\.html$/, "")}`;
-  return { now, site, real, league, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine, standings: real ? table.view(mine.group?.code ?? null) : null, chain: real ? chain.view(league) : null, chainUnreachable: chain.unreachable, looking };
+  if (moving && moving.until <= now) moving = null;
+  return { now, site, moving: moving ? { ...moving, code: showCode(moving.code) } : null, real, league, fixtures, matchIds, picks: store.all(mine.player), lasting: store.lasting, editing, mine, standings: real ? table.view(mine.group?.code ?? null) : null, chain: real ? chain.view(league) : null, chainUnreachable: chain.unreachable, looking };
 }
 
 async function draw({ keepPlace = false } = {}) {
@@ -243,6 +247,21 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  // Moving to another phone: make a one-time code and show it.
+  if (target.matches("[data-move-start]")) {
+    const out = view.querySelector("[data-move-out]");
+    target.disabled = true;
+    out.textContent = "";
+    try {
+      moving = await startMove({ store, client, device });
+      await draw({ keepPlace: true });
+    } catch (error) {
+      out.textContent = error.unreachable ? "Kickoff could not be reached. Try again when you are online." : error.message;
+      target.disabled = false;
+    }
+    return;
+  }
+
   if (target.matches("[data-copy]")) {
     const before = target.textContent;
     try {
@@ -275,13 +294,20 @@ document.addEventListener("submit", async (event) => {
   out.textContent = "";
   button.disabled = true;
   try {
+    if (form.dataset.form === "code") {
+      // This phone becomes the player the code belongs to. Everything is read again from the start.
+      await finishMove({ store, client, typed: typed.code });
+      location.hash = "#/group";
+      location.reload();
+      return;
+    }
     if (form.dataset.form === "start") await groups.start({ name: typed.name, playerName: typed.playerName, plays: new FormData(form).getAll("plays") });
     else await groups.join({ code: typed.code, playerName: typed.playerName });
     if (location.hash === "#/group") await draw();
     else location.hash = "#/group";
     carry();
   } catch (error) {
-    out.textContent = error.message;
+    out.textContent = error.unreachable ? "Kickoff could not be reached. Try again when you are online." : error.message;
     button.disabled = false;
   }
 });
@@ -315,7 +341,7 @@ async function carry() {
       changed = await matches.refresh();
     }
     const ctx = await context();
-    if (ctx.real) changed = (await syncPicks({ store, client, player: ctx.mine.player, league: ctx.league, fixtures: ctx.fixtures, now: ctx.now, robotKey: ROBOT_KEY, serverKey: SERVER_KEY })) || changed;
+    if (ctx.real) changed = (await syncPicks({ store, client, player: ctx.mine.player, league: ctx.league, fixtures: ctx.fixtures, now: ctx.now, robotKey: ROBOT_KEY, serverKey: SERVER_KEY, shared: isShared(store) })) || changed;
     // The tables are asked for when something of this player's has changed, when what is kept is
     // for another group, and otherwise at most every five minutes while a screen that shows them
     // is open. Not more often: every look costs the server work.
@@ -338,6 +364,8 @@ async function carry() {
     }
     // Draw again if something changed, or if picks have closed or a match has started since the
     // screen was drawn. A pick being made is left alone, unless its match has just closed.
+    // A one-time code that has run out is taken off the screen.
+    if (moving && moving.until <= Math.floor(Date.now() / 1000) && location.hash === "#/group/move") changed = true;
     const moved = stage(ctx) !== drawnAt;
     if (moved || (changed && !view.querySelector("[data-picker]"))) await draw({ keepPlace: true });
   } catch {

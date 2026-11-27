@@ -258,3 +258,33 @@ test("a group name or code cannot break out of the reminder button", () => {
   const html = groupScreen(undefined, { ...inGroup, mine: { ...inGroup.mine, group: odd, groups: [odd] } }).html;
   assert.ok(!html.includes("<script>alert(1)"));
 });
+
+// ---- Moving to another phone
+
+test("the Group screen offers a move to another phone, and the screen for it shows a code only once one is made", () => {
+  assert.match(groupScreen(undefined, inGroup).html, /<a href="#\/group\/move">Move to another phone<\/a>/);
+  const before = groupScreen("move", inGroup).html;
+  assert.match(before, /<button class="btn go" type="button" data-move-start>Get a code<\/button>/);
+  assert.ok(!before.includes("One-time code"));
+  assert.match(before, /That phone becomes you: same name, same groups, same points\. This one keeps working\./);
+  assert.match(before, /<a class="link" href="#\/group\/code">Enter a code<\/a>/);
+
+  const showing = groupScreen("move", { ...inGroup, moving: { code: "ABCD-EFGH", until: NOW + 600, left: 0 } }).html;
+  assert.match(showing, /<small class="muted">One-time code<\/small><b>ABCD-EFGH<\/b>/);
+  assert.match(showing, /It works once and runs out at \d\d:\d\d\. Anyone who has it becomes you, so keep it to yourself\./);
+  assert.ok(!showing.includes("data-move-start") && !showing.includes("did not fit"));
+  assert.match(groupScreen("move", { ...inGroup, moving: { code: "ABCD-EFGH", until: NOW + 600, left: 3 } }).html, /3 of your predictions did not fit and stay on this phone\. They still count\./);
+});
+
+test("the other phone has a place to type the code, and is told when the code will replace a player it already has", () => {
+  // Someone with no group yet is offered it under the start and join forms.
+  for (const arg of [undefined, "start", "join"]) assert.match(groupScreen(arg, ctx).html, /Playing on another phone\?<\/span> <a class="link" href="#\/group\/code">Bring my player here<\/a>/);
+  assert.ok(!groupScreen(undefined, inGroup).html.includes("Bring my player here"));
+
+  const fresh = groupScreen("code", ctx).html;
+  assert.match(fresh, /<form class="glass form" data-form="code" novalidate>/);
+  assert.match(fresh, /<input name="code"[^>]*maxlength="9"/);
+  assert.match(fresh, /<button class="btn go" type="submit">Bring my player here<\/button>/);
+  assert.ok(!fresh.includes("replaces that"));
+  assert.match(groupScreen("code", inGroup).html, /This phone is playing as <b>Bola<\/b> now\. The code replaces that\./);
+});

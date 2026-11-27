@@ -15,6 +15,9 @@
 //     POST /api/me/groups             {}                        the groups this device is in, and its wallet if it linked one
 //     POST /api/me/table              { group }                 the League screen: both tables, and this player's place and matches
 //     POST /api/wallet                { wallet, linkAt, signature } link a wallet (engine/src/wallet.js)
+//     POST /api/move                  { id, box }           leave a locked copy of this phone's key for
+//                                                           another phone to collect with a one-time code
+//     POST /api/move/take             { id }                collect it. Handed over once, then gone
 //     POST /api/picks                 { match, fingerprint, envelope }  send a sealed pick, with the locked
 //                                                                copy that lets the robot open it after kickoff
 //                                                                The answer carries the server's signed word
@@ -93,6 +96,14 @@ export function createHandler({ kickoff, now, adminKey = null }) {
     ["POST", /^\/api\/me\/table$/, async (r) => {
       const s = await signed(r);
       return kickoff.table({ player: s.player, now: now(), code: s.group ?? null });
+    }],
+    ["POST", /^\/api\/move$/, async (r) => {
+      const s = await signed(r);
+      return kickoff.leaveMove({ player: s.player, now: now(), id: s.id, box: s.box });
+    }],
+    ["POST", /^\/api\/move\/take$/, async (r) => {
+      const s = await signed(r);
+      return kickoff.takeMove({ player: s.player, now: now(), id: s.id });
     }],
     ["POST", /^\/api\/wallet$/, async (r) => {
       const s = await signed(r);

@@ -66,6 +66,12 @@ const refuse = (status, message) => {
 };
 
 const HEX64 = /^[0-9a-f]{64}$/;
+/** How long a code for moving to another phone lasts, in seconds. */
+export const MOVE_LASTS = 10 * 60;
+/** How many wrong codes one phone may try in that time. */
+export const MOVE_TRIES = 5;
+/** The biggest locked copy the server will hold, in characters of base64. */
+export const MOVE_MAX = 56_000;
 const isId = (value) => typeof value === "string" && HEX64.test(value);
 
 /** Tidy a name someone typed. Refuses an empty one, an overlong one, or one with hidden characters. */
@@ -517,6 +523,59 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
     async walletOf({ player }) {
       const link = await store.get(`wallet-of:${player}`);
       return link ? { wallet: link.wallet, at: link.at, signature: link.signature, linkedAt: link.linkedAt } : null;
+    },
+
+    // ---------------------------------------------------------------- moving to another phone
+    //
+    // A player is the key their phone made. To play on another phone, the first phone locks a
+    // copy of its key with a one-time code and leaves it here; the other phone, given the code,
+    // collects it and unlocks it (web/lib/move.js). The server holds the locked copy for a few
+    // minutes and hands it over once. It is never given the code, so it cannot unlock it.
+
+    /**
+     * Leave a locked copy for another phone to collect.
+     * @param id   where to leave it: 64 hex digits, worked out from the code by both phones
+     * @param box  the locked copy, as base64
+     * @returns { until } when it runs out
+     */
+    async leaveMove({ player, now, id, box }) {
+      if (typeof id !== "string" || !HEX64.test(id)) refuse(400, "That is not a place a copy can be left.");
+      if (typeof box !== "string" || box.length < 40 || box.length > MOVE_MAX || !/^[A-Za-z0-9+/]+={0,2}$/.test(box)) refuse(400, "That is not a locked copy, or it is too big.");
+      // A phone has one copy waiting at a time: asking for a new code ends the old one.
+      const before = await store.get(`move-of:${player}`);
+      if (before && before !== id) await store.remove(`move:${before}`);
+      await store.set(`move:${id}`, { box, from: player, until: now + MOVE_LASTS });
+      await store.set(`move-of:${player}`, id);
+      return { until: now + MOVE_LASTS };
+    },
+
+    /**
+     * Collect a locked copy. It is handed over once and then gone. A phone gets a few tries, so
+     * codes cannot be guessed at.
+     * @returns { box }
+     */
+    async takeMove({ player, now, id }) {
+      const tries = await store.get(`move-tries:${player}`);
+      const recent = tries && now - tries.since < MOVE_LASTS ? tries : { count: 0, since: now };
+      if (recent.count >= MOVE_TRIES) refuse(429, "Too many tries. Wait ten minutes, then get a new code.");
+      const wrong = async () => {
+        await store.set(`move-tries:${player}`, { count: recent.count + 1, since: recent.since });
+        refuse(404, "That code is not right, or it has run out.");
+      };
+      if (typeof id !== "string" || !HEX64.test(id)) await wrong();
+      const waiting = await store.get(`move:${id}`);
+      if (!waiting || now >= waiting.until) {
+        if (waiting) await store.remove(`move:${id}`);
+        await wrong();
+      }
+      // Two phones asking at the same moment: only the first is given it.
+      await store.setIfAbsent(`move-taken:${id}`, player);
+      if ((await store.get(`move-taken:${id}`)) !== player) await wrong();
+      await store.remove(`move:${id}`);
+      await store.remove(`move-taken:${id}`);
+      if ((await store.get(`move-of:${waiting.from}`)) === id) await store.remove(`move-of:${waiting.from}`);
+      await store.remove(`move-tries:${player}`);
+      return { box: waiting.box };
     },
 
     // ---------------------------------------------------------------- tables

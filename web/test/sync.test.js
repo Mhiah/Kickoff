@@ -8,11 +8,12 @@ import { createDevice } from "../lib/device.js";
 import { createFixtures } from "../lib/fixtures.js";
 import { createStore, pickWords, seal } from "../lib/picks.js";
 import { createClient } from "../lib/server.js";
+import { BOX_MAX, finishMove, isShared, newCode, readCode, showCode, startMove } from "../lib/move.js";
 import { RETRY_AFTER, UNSIGNED, standing, syncPicks } from "../lib/sync.js";
 import { league, pick } from "../screens.js";
 import { FakeStorage, NOW, noGroup } from "./helpers.js";
 
-import { FOOTBALL, BASKETBALL, isServerKey, matchId, parseOpenings, toHex, verifyTaken } from "../../engine/src/index.js";
+import { FOOTBALL, BASKETBALL, fromHex, isServerKey, matchId, parseOpenings, playerIdOf, toHex, verifyTaken } from "../../engine/src/index.js";
 import { createHandler } from "../../server/src/http.js";
 import { CLOSES_BEFORE, SETTLE, createKickoff } from "../../server/src/kickoff.js";
 import { createSigner } from "../../server/src/signing.js";
@@ -63,7 +64,7 @@ async function phone(online, storage = new FakeStorage()) {
   const matches = createFixtures({ store, client, competitions: COMPETITIONS, sample: { league: SAMPLE_LEAGUE, fixtures: sampleFixtures } });
   const player = await device.player();
   const self = {
-    storage, store, player, matches, client,
+    storage, store, player, matches, client, device,
     /** The key this phone checks the server's signed notes against, as the website's settings give it. */
     serverKey: online.serverKey,
     async ctx() {
@@ -73,7 +74,7 @@ async function phone(online, storage = new FakeStorage()) {
     async carry() {
       await matches.refresh();
       const c = await self.ctx();
-      return c.real ? syncPicks({ store, client, player, league: c.league, fixtures: c.fixtures, now: c.now, serverKey: self.serverKey }) : false;
+      return c.real ? syncPicks({ store, client, player, league: c.league, fixtures: c.fixtures, now: c.now, serverKey: self.serverKey, shared: isShared(store) }) : false;
     },
     async seal(match, chosen) {
       const c = await self.ctx();
@@ -536,4 +537,183 @@ test("a prediction sent before notes existed gets one the next time the phone is
 test("the server's key written into the website is either not set yet or a real public key", async () => {
   const { SERVER_KEY } = await import("../config.js");
   assert.ok(SERVER_KEY === null || isServerKey(SERVER_KEY), "SERVER_KEY in web/config.js is not a key a note can be checked against");
+});
+
+// ---- Moving to another phone with a one-time code
+
+const movesSent = (online) => online.net.sent.filter((x) => x.url.startsWith("/api/move"));
+const leftAt = (online) => movesSent(online).filter((x) => x.url === "/api/move").at(-1).body.match(/id\\?":\\?"([0-9a-f]{64})/)[1];
+
+test("a one-time code carries a player to another phone: the same player, with the predictions the first phone holds", async () => {
+  const online = await kickoffOnline({ signer: SERVER });
+  const ada = await phone(online);
+  await ada.carry();
+  await ada.seal(online.football, { home: 2, away: 1 });
+  await ada.carry();
+  ada.store.write("kickoff-name", "Ada");
+
+  const moving = await startMove({ store: ada.store, client: ada.client, device: ada.device });
+  assert.match(moving.code, /^[A-HJ-NP-Z2-9]{8}$/);
+  assert.equal(moving.until, NOW + 600);
+  assert.equal(moving.left, 0);
+
+  // The other phone is somebody else until the code is typed in. Typed in small letters, with the dash, is fine.
+  const other = await phone(online);
+  assert.notEqual(other.player, ada.player);
+  const now = await finishMove({ store: other.store, client: other.client, typed: ` ${showCode(moving.code).toLowerCase()} ` });
+  assert.deepEqual(now, { player: ada.player, name: "Ada" });
+
+  // Opened again, that phone is Ada: her key, her name, and her prediction exactly as the first phone holds it.
+  const second = await phone(online, other.storage);
+  assert.equal(second.player, ada.player);
+  assert.equal(second.store.read("kickoff-name"), "Ada");
+  assert.deepEqual(second.store.get(online.football), ada.store.get(online.football));
+  assert.equal(await verifyTaken(second.store.get(online.football).taken), true, "the signed note came along");
+  // It has nothing to send again.
+  const sends = online.net.sent.filter((x) => x.url === "/api/picks").length;
+  await second.carry();
+  assert.equal(online.net.sent.filter((x) => x.url === "/api/picks").length, sends);
+  assert.equal(await second.stands(online.football), "sent");
+  // Both phones know the key is on two phones now. What the other phone was before is put aside, not thrown away.
+  assert.ok(isShared(ada.store) && isShared(second.store));
+  assert.equal(toHex(await playerIdOf(fromHex(JSON.parse(other.store.read("kickoff-before-move")).device.publicKey))), other.player);
+});
+
+test("the server is never given the code, cannot read the copy it holds, and keeps nothing once it is collected", async () => {
+  const online = await kickoffOnline({ signer: SERVER });
+  const ada = await phone(online);
+  await ada.carry();
+  const sealed = await ada.seal(online.football, { home: 2, away: 1 });
+  await ada.carry();
+  const moving = await startMove({ store: ada.store, client: ada.client, device: ada.device });
+  const everything = online.net.sent.map((x) => `${x.url} ${x.body}`).join("\n");
+  assert.ok(!everything.includes(moving.code) && !everything.includes(showCode(moving.code)), "the code was sent to the server");
+  // What the server holds is locked: the key's private half and the prediction's secret are not readable in it.
+  const held = await online.kept.get(`move:${leftAt(online)}`);
+  const secret = JSON.parse(ada.store.read("kickoff-device")).privateJwk.d;
+  const readable = Buffer.from(held.box, "base64").toString("latin1");
+  for (const hidden of [secret, sealed.salt, ada.player, "privateJwk"]) assert.ok(!readable.includes(hidden) && !held.box.includes(hidden));
+  assert.ok(held.box.length <= BOX_MAX);
+
+  const other = await phone(online);
+  await finishMove({ store: other.store, client: other.client, typed: moving.code });
+  assert.equal(await online.kept.get(`move:${leftAt(online)}`), null);
+  assert.equal(await online.kept.get(`move-of:${ada.player}`), null);
+});
+
+test("CHEAT: a code works once, and not at all after ten minutes", async () => {
+  const online = await kickoffOnline();
+  const ada = await phone(online);
+  const first = await startMove({ store: ada.store, client: ada.client, device: ada.device });
+  const one = await phone(online);
+  const two = await phone(online);
+  await finishMove({ store: one.store, client: one.client, typed: first.code });
+  await assert.rejects(finishMove({ store: two.store, client: two.client, typed: first.code }), /That code is not right, or it has run out\./);
+  assert.equal((await phone(online, two.storage)).player, two.player, "the second phone is still itself");
+
+  const late = await startMove({ store: ada.store, client: ada.client, device: ada.device });
+  online.clock.now += 600;
+  await assert.rejects(finishMove({ store: two.store, client: two.client, typed: late.code }), /That code is not right, or it has run out\./);
+  assert.equal(await online.kept.get(`move:${leftAt(online)}`), null, "a copy that has run out is thrown away when asked for");
+
+  // Asking for a new code ends the one before it.
+  const older = await startMove({ store: ada.store, client: ada.client, device: ada.device });
+  const newer = await startMove({ store: ada.store, client: ada.client, device: ada.device });
+  const three = await phone(online);
+  await assert.rejects(finishMove({ store: three.store, client: three.client, typed: older.code }), /not right/);
+  assert.equal((await finishMove({ store: three.store, client: three.client, typed: newer.code })).player, ada.player);
+});
+
+test("CHEAT: codes cannot be guessed at: a phone gets five wrong tries, then has to wait", async () => {
+  const online = await kickoffOnline();
+  const ada = await phone(online);
+  const moving = await startMove({ store: ada.store, client: ada.client, device: ada.device });
+  const guesser = await phone(online);
+  for (let i = 0; i < 5; i++) {
+    let guess = newCode();
+    while (guess === moving.code) guess = newCode();
+    await assert.rejects(finishMove({ store: guesser.store, client: guesser.client, typed: guess }), /That code is not right, or it has run out\./);
+  }
+  // Now even the right code is refused from that phone, until the ten minutes have passed.
+  await assert.rejects(finishMove({ store: guesser.store, client: guesser.client, typed: moving.code }), /Too many tries\. Wait ten minutes, then get a new code\./);
+  assert.equal((await phone(online, guesser.storage)).player, guesser.player);
+  // The copy is still there for the phone it was meant for.
+  const other = await phone(online);
+  assert.equal((await finishMove({ store: other.store, client: other.client, typed: moving.code })).player, ada.player);
+  // Something that could not be a code is not sent anywhere.
+  const asked = movesSent(online).length;
+  for (const typed of ["", "ABCD", "ABCD-EFG0", "ABCDEFGHI", "abcd efgh ijkl", null]) {
+    assert.equal(readCode(typed), null);
+    await assert.rejects(finishMove({ store: other.store, client: other.client, typed }), /A code is 8 letters and numbers, like ABCD-EFGH\./);
+  }
+  assert.equal(movesSent(online).length, asked);
+});
+
+test("CHEAT: a copy that was swapped or damaged on the way is not taken on, and the phone stays as it was", async () => {
+  const online = await kickoffOnline();
+  const ada = await phone(online);
+  const eve = await phone(online);
+  const moving = await startMove({ store: ada.store, client: ada.client, device: ada.device });
+  const place = `move:${leftAt(online)}`;
+  const held = await online.kept.get(place);
+  // The server swaps in a copy locked with another code (somebody else's player).
+  const evil = await startMove({ store: eve.store, client: eve.client, device: eve.device });
+  const swapped = (await online.kept.get(`move:${leftAt(online)}`)).box;
+  assert.ok(evil.code !== moving.code);
+  await online.kept.set(place, { ...held, box: swapped });
+  const other = await phone(online);
+  await assert.rejects(finishMove({ store: other.store, client: other.client, typed: moving.code }), /That copy could not be unlocked\. Get a new code on your other phone\./);
+  assert.equal((await phone(online, other.storage)).player, other.player);
+  assert.equal(other.store.read("kickoff-before-move"), null);
+  assert.ok(!isShared(other.store));
+});
+
+test("a prediction changed on the other phone is said to be, on the first, and is not raised as a problem", async () => {
+  const online = await kickoffOnline({ signer: SERVER });
+  const ada = await phone(online);
+  await ada.carry();
+  await ada.seal(online.football, { home: 2, away: 1 });
+  await ada.carry();
+  const moving = await startMove({ store: ada.store, client: ada.client, device: ada.device });
+  const blank = await phone(online);
+  await finishMove({ store: blank.store, client: blank.client, typed: moving.code });
+  const second = await phone(online, blank.storage);
+  await second.carry();
+
+  // On the second phone she changes her mind. The first phone is not opened again until after the lock.
+  online.clock.now += 60;
+  const changed = await second.seal(online.football, { home: 0, away: 0 });
+  await second.carry();
+  online.clock.now = CLOSES + SETTLE;
+  const bundle = await online.robotFreezes(online.football);
+  assert.deepEqual(bundle.entries.map((e) => e.fingerprint), [changed.fingerprint]);
+  await second.carry();
+  await ada.carry();
+  assert.equal(await second.stands(online.football), "locked");
+  assert.equal(await ada.stands(online.football), "elsewhere");
+  assert.deepEqual(ada.store.get(online.football).elsewhere, { fingerprint: changed.fingerprint });
+  assert.equal(ada.store.get(online.football).problem, undefined);
+  assert.match(await ada.screen(online.football), /<div class="state ">Changed on your other phone<\/div>/);
+  // It is settled: the first phone does not keep asking.
+  const asks = online.net.sent.length;
+  online.clock.now += RETRY_AFTER;
+  await ada.carry();
+  assert.equal(online.net.sent.filter((x) => x.url.includes("/receipt/")).length, online.net.sent.slice(0, asks).filter((x) => x.url.includes("/receipt/")).length);
+});
+
+test("CHEAT: for a player on one phone, a receipt for a different prediction is still a problem", async () => {
+  const online = await kickoffOnline();
+  const ada = await phone(online);
+  await ada.carry();
+  await ada.seal(online.football, { home: 2, away: 1 });
+  await ada.carry();
+  // Kickoff swaps her fingerprint for another before bundling.
+  const held = await online.kept.tableGet(`sealed:${online.football}`, ada.player);
+  await online.kept.tableSet(`sealed:${online.football}`, ada.player, { ...held, fingerprint: "ab".repeat(32) });
+  online.clock.now = CLOSES + SETTLE;
+  await online.robotFreezes(online.football);
+  await ada.carry();
+  assert.equal(await ada.stands(online.football), "problem");
+  assert.equal(ada.store.get(online.football).problem, "Kickoff's receipt does not prove this prediction was locked.");
+  assert.equal(ada.store.get(online.football).elsewhere, undefined);
 });

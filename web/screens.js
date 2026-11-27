@@ -379,6 +379,8 @@ function standingMark(entry, f, ctx) {
       return mark("bad", "Not entered in time", "It does not count for this match.");
     case "unlocked":
       return NOT_LOCKED;
+    case "elsewhere":
+      return mark("", "Changed on your other phone");
     default:
       return mark("bad", "Problem", esc(entry.problem));
   }
@@ -795,8 +797,9 @@ const OFFLINE_NOTE = `<div class="note warn" style="margin-top:14px"><b>Kickoff 
 const DEVICE_NOTE = `<div class="note" style="margin-top:16px"><b>No sign-up.</b> A wallet is optional: you can link one. This phone and browser become your player. Use the same ones each time, and do not clear the browser's saved data, or Kickoff will not know it is you.</div>`;
 
 /** For someone on a new phone: linking the wallet they linked before brings their groups back. */
-const WALLET_BACK = `<div class="wallet-row"><span class="muted">Linked a wallet before?</span><button type="button" class="btn small quiet" data-link-wallet>Bring my groups back</button></div>
-<p class="say-so muted" data-wallet-out role="status"></p>`;
+const WALLET_BACK = `<p class="wallet-row"><span class="muted">Linked a wallet before?</span> <button type="button" class="link" data-link-wallet>Bring my groups back</button></p>`;
+/** Where what happened when a wallet was asked for is said. */
+const WALLET_OUT = `<p class="say-so muted" data-wallet-out role="status"></p>`;
 
 /** A wallet's address, shortened to its two ends. */
 const shortWallet = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -807,9 +810,55 @@ const shortWallet = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`
  */
 const playersWord = (n) => `${n.toLocaleString("en-GB")} ${n === 1 ? "player" : "players"}`;
 
+/** A link back to the Group screen, in the words that fit whether this phone is in a group. */
+const backToGroup = (g) => `<a href="#/group">${g ? `Back to ${esc(g.name)}` : "Back"}</a>`;
+
+/** The first phone: get a one-time code that carries this player to another phone (lib/move.js). */
+function moveScreen(ctx) {
+  const m = ctx.moving;
+  const html = `
+${titlebar({ heading: "Move to another phone" })}
+<p class="sub">${backToGroup(ctx.mine.group)}</p>
+<div class="glass form">
+  <h2>Play on another phone</h2>
+  <p class="sub">Get a code here and type it on your other phone. That phone becomes you: same name, same groups, same points. This one keeps working.</p>
+  ${m
+    ? `<div class="glass invite"><div><small class="muted">One-time code</small><b>${esc(m.code)}</b></div></div>
+  <p class="sub">It works once and runs out at ${clock(m.until)}. Anyone who has it becomes you, so keep it to yourself.</p>${m.left > 0 ? `
+  <p class="sub">${m.left} of your predictions did not fit and stay on this phone. They still count.</p>` : ""}`
+    : `<button class="btn go" type="button" data-move-start>Get a code</button>`}
+  <p class="say-so" data-move-out role="status"></p>
+</div>
+<p class="wallet-row"><span class="muted">Holding the other phone?</span> <a class="link" href="#/group/code">Enter a code</a></p>`;
+  return { html, title: "Move to another phone on Kickoff", tab: "group", real: true };
+}
+
+/** The other phone: type the code, and this phone becomes that player. */
+function codeScreen(ctx) {
+  const mine = ctx.mine;
+  const html = `
+${titlebar({ heading: "Enter a code" })}
+<p class="sub">${backToGroup(mine.group)}</p>
+<form class="glass form" data-form="code" novalidate>
+  <h2>Bring your player here</h2>
+  <p class="sub">Type the code showing on your other phone.</p>
+  ${field({ label: "One-time code", name: "code", max: 9, hint: "It looks like ABCD-EFGH.", extra: 'autocapitalize="characters"' })}
+  ${mine.group ? `<p class="sub">This phone is playing as <b>${esc(mine.name)}</b> now. The code replaces that.</p>` : ""}
+  <button class="btn go" type="submit">Bring my player here</button>
+  <p class="say-so" data-form-out role="status"></p>
+</form>
+<p class="sub">No code yet? On your other phone, open Group and choose "Move to another phone".</p>`;
+  return { html, title: "Enter a code on Kickoff", tab: "group", real: true };
+}
+
+/** Under the start and join forms: a way in for someone who already plays on another phone. */
+const MOVE_HERE = `<p class="wallet-row"><span class="muted">Playing on another phone?</span> <a class="link" href="#/group/code">Bring my player here</a></p>`;
+
 export function groupScreen(arg, ctx) {
   const mine = ctx.mine;
   const g = mine.group;
+  if (arg === "move") return moveScreen(ctx);
+  if (arg === "code") return codeScreen(ctx);
 
   if (!g || arg === "start" || arg === "join") {
     const forms = arg === "start" ? startForm(mine) : arg === "join" ? joinForm(mine) : `<div class="pair">${startForm(mine)}${joinForm(mine)}</div>`;
@@ -819,7 +868,8 @@ ${titlebar({ heading })}
 <p class="sub">${g ? `<a href="#/group">Back to ${esc(g.name)}</a>` : arg === "start" ? 'Have a code already? <a href="#/group/join">Join with a code</a>.' : arg === "join" ? 'No code yet? <a href="#/group/start">Start a group</a>.' : "Play with your friends. Start a group and share its code, or join one with a code."}</p>
 ${mine.offline ? OFFLINE_NOTE : ""}
 ${forms}
-${g || mine.wallet ? "" : WALLET_BACK}
+${g ? "" : `<div class="ways-in">${mine.wallet ? "" : WALLET_BACK}${MOVE_HERE}</div>${mine.wallet ? "" : `
+${WALLET_OUT}`}`}
 ${DEVICE_NOTE}`;
     return { html, title: `${heading} on Kickoff`, tab: "group", real: true };
   }
@@ -882,7 +932,7 @@ ${brand ? '<p class="fine muted">This group is too big to list. Its leaderboard 
 <p class="say-so muted" data-wallet-out role="status"></p>
 ${switcher}
 
-<div class="more"><a href="#/group/start">Start another group</a><a href="#/group/join">Join another group</a></div>`;
+<div class="more"><a href="#/group/start">Start another group</a><a href="#/group/join">Join another group</a><a href="#/group/move">Move to another phone</a></div>`;
   return { html, title: `${g.name} on Kickoff`, tab: "group", real: true };
 }
 

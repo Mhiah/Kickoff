@@ -55,8 +55,9 @@ with a new secret, so the same pick sealed twice does not look the same from out
 
 **What to know:**
 
-- **The pick lives in the browser's storage.** If that is cleared, the secret is gone and the pick
-  can never be opened. A way to back it up is still to do.
+- **The pick lives in the browser's storage.** If that is cleared, this phone can no longer open
+  it. A pick that reached Kickoff is still opened by Kickoff's robot after kickoff, and a player
+  who moved to another phone with a one-time code has the pick there too.
 - **Private browsing may keep nothing.** The pick then lasts for the visit only, and the pick
   screen says so.
 - **A match's id is made from its facts,** kickoff time included. If a match moves, it is a
@@ -87,6 +88,7 @@ hand. A test fails if it differs from the engine by a single byte.
 | `lib/server.js` | Talking to Kickoff's server, with everything signed by the device's key |
 | `lib/fixtures.js` | The matches to pick: real ones from the server once there are any, made-up ones until then |
 | `lib/sync.js` | Carrying a sealed pick through: sent, receipt checked, opened after kickoff |
+| `lib/move.js` | Moving a player to another phone with a one-time code |
 | `lib/groups.js` | The groups this device plays in, kept on the device so they show at once and offline |
 | `config.js` | Where Kickoff's server is |
 | `lib/time.js` | Times as the screens show them, and when picks close |
@@ -116,9 +118,11 @@ closed, and (after the robot's part is done by hand) locked.
 The first time someone plays, their phone makes its own key and keeps the private half in the
 browser. That key is the player. Everything the phone sends to Kickoff is signed with it.
 
-This means the same phone and browser have to be used each time. If the browser's saved data is
-cleared, the key is gone and Kickoff no longer knows who the player is. A way to back the key up
-is still to do.
+If the browser's saved data is cleared on the only phone holding the key, Kickoff no longer knows
+who the player is. A one-time code carries the key to another phone (`lib/move.js`): the first
+phone locks a copy with the code and leaves it with the server, and the other phone, given the
+code, collects it and unlocks it. The server is never given the code. From then on both phones
+are the same player.
 
 ## Run the checks
 

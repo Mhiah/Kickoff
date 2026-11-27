@@ -20,6 +20,8 @@
 //   taken     { league, match, player, fingerprint, receivedAt, closesAt, key, sig }
 //                                   Kickoff's signed note that it took this pick, whole, so it
 //                                   can be checked by anyone with nothing else to hand
+//   elsewhere { fingerprint }       the player changed this pick on their other phone, and
+//                                   that one is what was locked
 //   waiting   true                  Kickoff could not be reached; it will be tried again
 //   receipt   { index, count, path, root }
 //   opened    { at }
@@ -47,9 +49,11 @@ export const UNSIGNED = "Kickoff has this prediction but did not sign for it. It
  *                  picks are sent without a copy and only this device can open them
  * @param serverKey the public key of Kickoff's server, which its signed notes are checked
  *                  against. Without it, notes are not asked for
+ * @param shared    true if this phone's key is also on another phone (move.js), so a pick may
+ *                  have been changed from there
  * @returns true if anything kept on the device changed
  */
-export async function syncPicks({ store, client, player, league, fixtures, now, robotKey = null, serverKey = null }) {
+export async function syncPicks({ store, client, player, league, fixtures, now, robotKey = null, serverKey = null, shared = false }) {
   const copies = isEnvelopeKey(robotKey);
   const notes = isServerKey(serverKey);
   let changed = false;
@@ -99,15 +103,19 @@ export async function syncPicks({ store, client, player, league, fixtures, now, 
     }
 
     // 2. Fetch the receipt, once picks have closed.
-    if (isSent(entry) && !entry.receipt && now >= closes) {
+    if (isSent(entry) && !entry.receipt && !entry.elsewhere && now >= closes) {
       try {
         const r = await client.receipt({ match, player });
-        const proves =
-          r.fingerprint === entry.fingerprint &&
-          (await verifyReceipt({ league, match, player, fingerprint: r.fingerprint, index: r.index, count: r.count, path: r.path.map(fromHex), root: r.root }));
+        const inBundle = await verifyReceipt({ league, match, player, fingerprint: r.fingerprint, index: r.index, count: r.count, path: r.path.map(fromHex), root: r.root });
+        const proves = r.fingerprint === entry.fingerprint && inBundle;
         if (proves) {
           const { problem, triedAt, ...rest } = entry;
           entry = { ...rest, receipt: { index: r.index, count: r.count, path: r.path, root: r.root } };
+        } else if (inBundle && shared) {
+          // This player is in the bundle with a different pick, and plays on two phones: the pick
+          // was changed on the other one after this phone sent its own. That one counts.
+          const { problem, triedAt, ...rest } = entry;
+          entry = { ...rest, elsewhere: { fingerprint: r.fingerprint } };
         } else {
           Object.assign(entry, { problem: "Kickoff's receipt does not prove this prediction was locked.", triedAt: now });
         }
@@ -148,11 +156,13 @@ export async function syncPicks({ store, client, player, league, fixtures, now, 
  *   "opened"    handed over after the start
  *   "unlocked"  the pick reached Kickoff, but the match's picks were not locked on X Layer before
  *               kickoff, so nobody scores for it
+ *   "elsewhere" the player changed this pick on their other phone, and that one was locked
  */
 export function standing(entry, fixture, now) {
   if (!fixture.real) return "made-up";
   if (fixture.lock === "missed" && (entry.opened || entry.receipt || entry.sent?.fingerprint === entry.fingerprint)) return "unlocked";
   if (entry.opened) return "opened";
+  if (entry.elsewhere) return "elsewhere";
   if (entry.problem) return "problem";
   if (entry.receipt) return "locked";
   const sent = entry.sent?.fingerprint === entry.fingerprint;

@@ -121,6 +121,8 @@ A device must sign these:
 | `POST /api/me/groups` | The groups this device is in, and the wallet it has linked, if any |
 | `POST /api/me/table` | The League screen's numbers: the table of everyone, the table of a group, and this player's place and finished matches |
 | `POST /api/wallet` | Link a wallet: its address, the note's time, and its signature of the note |
+| `POST /api/move` | Leave a locked copy of this phone's key for another phone to collect with a one-time code. Held for ten minutes |
+| `POST /api/move/take` | Collect it. Handed over once, then gone. Five wrong tries and a phone has to wait |
 | `POST /api/picks` | Send a sealed pick. Sending again before picks close replaces it |
 | `POST /api/picks/mine` | What the server holds for this device |
 | `POST /api/opened` | Open a pick, after the match has started. The robot does this for every pick, so a phone only does it for a pick that was sent without a locked copy |

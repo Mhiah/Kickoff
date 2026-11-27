@@ -5,8 +5,9 @@
 // worked out from the public half, and everything the device sends to Kickoff is signed with the
 // private half, so nobody else can send, change or open a pick in this player's name.
 //
-// If this browser's storage is cleared the key is gone, and with it this player. A way to back it
-// up is still to do.
+// If this browser's storage is cleared the key is gone, and with it this player, unless the key
+// is also on another phone: a one-time code carries it there (move.js), and a linked wallet
+// brings a player's groups back.
 
 import { fromHex, toHex } from "../engine/bytes.js";
 import { newDeviceKey, playerIdOf, signRequest } from "../engine/identity.js";

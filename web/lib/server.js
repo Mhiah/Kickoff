@@ -51,6 +51,10 @@ export function createClient({ base = "", device, fetch = (...args) => globalThi
     table: ({ group = null } = {}) => signed("/api/me/table", { group }),
     /** Link a wallet: the note it signed, and when. Returns { wallet, linkedAt, carried, groups }. */
     linkWallet: ({ wallet, linkAt, signature }) => signed("/api/wallet", { wallet, linkAt, signature }),
+    /** Leave a locked copy of this phone's key for another phone to collect (lib/move.js). */
+    leaveMove: ({ id, box }) => signed("/api/move", { id, box }),
+    /** Collect one, with the place worked out from the code. */
+    takeMove: ({ id }) => signed("/api/move/take", { id }),
     group: (c) => send("GET", `/api/groups/${code(c)}`),
     /** Kickoff's id on X Layer, and every match on its list: { league, fixtures }. */
     fixtures: () => send("GET", "/api/fixtures"),

@@ -322,7 +322,14 @@ h1.under { margin-top: 6px; }
 /* The League screen on a phone: the matches and the table take turns, chosen at the top. */
 .chips.parts { margin-top: 16px; }
 .cols[data-show="table"] > [data-part-of="matches"], .cols[data-show="matches"] > [data-part-of="table"] { display: none; }
-.wallet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 20px; font-size: 15.5px; }
+/* A quiet question with an underlined answer to press. Two of them sit close, as a pair: one
+   under the other on a phone, side by side on a computer. */
+.wallet-row { margin-top: 18px; font-size: 14.5px; }
+.ways-in { margin-top: 18px; }
+.ways-in .wallet-row { margin-top: 0; }
+.ways-in .wallet-row + .wallet-row { margin-top: 8px; }
+.wallet-row + .say-so:empty, .ways-in + .say-so:empty { display: none; }
+.wallet-row button.link { padding: 0; }
 .switch { flex: none; width: 44px; height: 26px; border-radius: 99px; background: var(--line); position: relative; }
 .switch i { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
 .switch[aria-checked="true"] { background: var(--ink); }
@@ -363,6 +370,9 @@ h1.under { margin-top: 6px; }
   .cols[data-show] > [data-part-of] { display: block; }
 
   .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .ways-in { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+  .ways-in .wallet-row { font-size: 14px; }
+  .ways-in .wallet-row + .wallet-row { margin-top: 0; }
   .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
   .boxes { gap: 14px; margin-top: 14px; }
   .box { padding: 16px 18px; }
