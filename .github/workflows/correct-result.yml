@@ -1,0 +1,67 @@
+# Put a wrong result right, by hand.
+#
+# The robot never changes a result once it is recorded. If the feed later says something else, the
+# robot keeps the first result and opens a note here on GitHub. When a person has looked up the
+# real score and the first result was wrong, this is how it is put right.
+#
+# It works only for a match whose predictions were never locked on X Layer, so nobody's points
+# change, and only to what the feed says now. Nobody types a score in.
+#
+# This never runs by itself. Somebody has to press "Run workflow" and fill in the boxes.
+#
+#   1. Run it with a few words of the match's name. It says what Kickoff has and what the feed says.
+#   2. If the feed is right, run it again with the step set to go, and type CORRECT RESULT.
+#
+# Kickoff's key is the repository secret KICKOFF_ADMIN_KEY. It is sent only to Kickoff's server and
+# is never printed. No wallet key is used.
+
+name: Correct a result
+
+on:
+  workflow_dispatch:
+    inputs:
+      match:
+        description: "A few words of the match's name. For example: Sporting CP v Man United"
+        type: string
+        required: true
+      step:
+        description: "look = say what Kickoff has and what the feed says. go = correct it"
+        type: choice
+        options:
+          - look
+          - go
+        default: look
+      confirm:
+        description: "Only for go: type CORRECT RESULT"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  correct:
+    name: Read the feed and correct the result
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      KICKOFF_SERVER: https://kickoff-two-xi.vercel.app
+      KICKOFF_ADMIN_KEY: ${{ secrets.KICKOFF_ADMIN_KEY }}
+      FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+      BALLDONTLIE_KEY: ${{ secrets.BALLDONTLIE_KEY }}
+      # What was typed is handed over as settings, never pasted into the command itself.
+      RESULT_MATCH: ${{ inputs.match }}
+      RESULT_STEP: ${{ inputs.step }}
+      CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: The result
+        run: |
+          if [ "$RESULT_STEP" = "go" ]; then
+            node robot/bin/correct.js --match "$RESULT_MATCH" --go
+          else
+            node robot/bin/correct.js --match "$RESULT_MATCH"
+          fi

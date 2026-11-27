@@ -279,7 +279,7 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | The website | 127 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 23 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
 | The server | 125 tests. They take a name somebody has, link a wallet that did not sign, send predictions in someone else's name, play old requests back, open a different prediction from the one sealed, and use the robot's addresses without its key. They also check that a match gives points only once it was locked on X Layer, that the server signs for every sealed prediction it takes, and that a one-time code for moving phones works once, runs out, and cannot be guessed at | All pass; every one is refused ([details](server/README.md)) |
-| The robot | 95 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, a hundred players on one match, a lock it slept through, its notes when it needs a person, putting the website on X Layer, and going live without paying for anything twice | All pass ([details](robot/README.md)) |
+| The robot | 100 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, a hundred players on one match, a lock it slept through, its notes when it needs a person, putting the website on X Layer, and going live without paying for anything twice | All pass ([details](robot/README.md)) |
 | The robot on a copy of X Layer | The robot's own code announcing, locking, recording results and publishing opened predictions through TapeOut's real contracts, signing with `cast`, then the leaderboard rebuilt from the chain alone | 11 of 11 checks passed on the first run ([rehearsal 6](docs/REHEARSAL-RESULTS.md)). It has grown since. The latest run has a hundred players who seal a prediction and never come back: the robot opens all hundred after kickoff and publishes them in 4 pieces. It also plays a football match as its three predictions, replaced on the list by the robot's own rules, locked, opened and scored, and read back from the chain as 5, 1 and 0 points. 28 of 28 checks pass |
 | What going live costs | Read from X Layer and measured on the private copy | About 0.09 OKB by the route that needs only one token ([details](docs/FEES.md)) |
 | Going live for real | Done on X Layer on 24 November 2026 by the robot's wallet, after the same steps were rehearsed on the copy | It cost 0.087878 OKB, as measured. The robot's next run confirmed it was working as the league |
@@ -301,7 +301,7 @@ results.
 | 6 | Sealing a prediction for real, on the player's own device | Done. |
 | 7 | The fixtures feed | Done, and running live against the real feeds. |
 | 8 | Kickoff's server: groups, names, and sealed predictions until they are locked | Done, 125 tests, and online with a real database. Groups of up to 30, one name for each player, signed requests, a signed note for every sealed prediction it takes, a one-time code to move a player to another phone, and points only for matches that were locked on X Layer. |
-| 9 | The robot: keeps the list of matches, locks predictions before kickoff and posts results on X Layer | Done and running live, 95 tests. After kickoff it opens every prediction from its locked copy, so no player has to come back. It publishes a match's opened predictions in as many pieces as they need, tells the server how each lock went, and opens a note when its wallet runs low or a lock was missed. |
+| 9 | The robot: keeps the list of matches, locks predictions before kickoff and posts results on X Layer | Done and running live, 100 tests. After kickoff it opens every prediction from its locked copy, so no player has to come back. It publishes a match's opened predictions in as many pieces as they need, tells the server how each lock went, and opens a note when its wallet runs low or a lock was missed. |
 | 10 | Joining it up: real fixtures and real leaderboards on the website | Done. The League and My record screens show real numbers: a leaderboard of everyone who plays and one of your group, both numbered from 1, with every point worked out by the scoring circuits. The Check screen is read from X Layer by the player's own browser: it shows when each of your predictions was locked, works out the group's points from what is on chain, puts them beside Kickoff's own, and says whether the order is the same. |
 | 11 | Going live on X Layer: the circuits and Kickoff's account | Done on 24 November 2026. The switch was rehearsed on a private copy first: a look that says the cost and sends nothing, and a go that needs the words GO LIVE. |
 | 12 | The copy of the site on X Layer (DeWEB) | Done on 25 November 2026: <https://5-2-409.tapekit.org>. A look that is free, a go that needs the words PUBLISH SITE, and a check that reads every file back. |
@@ -582,6 +582,16 @@ PUBLISH SITE, and a check that reads every file back).
 - **A prediction made before locked copies existed still lives only on its phone.** That is two
   predictions, both from 25 November 2026. Every prediction made since opens by itself, even if the
   phone is lost.
+- **The robot has not yet opened a real prediction on the live network.** Those two are the only
+  real predictions so far, and they were made before the robot could open one. Opening, scoring and
+  publishing the opened predictions have been run end to end against a copy of X Layer and in the
+  season rehearsal, not yet with a real player on a real match.
+- **One early result was recorded wrong, and is corrected by hand.** On 25 November 2026 the feed
+  called Sporting CP v Man United finished at 2 – 3, then took a goal back: it ended 2 – 2. Nobody
+  had predicted it, so no points were affected. Since 26 November a final score is recorded only
+  once the feed has said it twice. The robot still never changes a recorded result by itself: it
+  opens a note, and a person can put right a match that was never locked with the "Correct a
+  result" action, which keeps what was first recorded.
 - **A brand's group has been tested with 300 players, not 5,000.** The server keeps the
   leaderboard of everyone as one list and fetches it whole each time someone looks. With thousands
   of people playing at once, the free database plan Kickoff runs on would not carry that.
