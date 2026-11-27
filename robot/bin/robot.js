@@ -19,6 +19,7 @@ import { chainTick, newMemory } from "../src/chain.js";
 import { createOpener, envelopeKeysFrom } from "../src/envelope.js";
 import { createNotes, noteChanged, noteMissed, walletWatch } from "../src/notes.js";
 import { createServer } from "../src/server.js";
+import { prizeRound } from "../src/prize.js";
 import { inWords, syncFixtures } from "../src/sync.js";
 import { watch } from "../src/watch.js";
 import { castSender, createChain } from "../src/xlayer.js";
@@ -149,7 +150,13 @@ const tally = await watch({
     return report;
   },
   list: async () => (await kickoff.list()).fixtures,
-  chain: chainRound,
+  // After each round on X Layer: read any prize payments whoever started a brand's group says they made.
+  chain: chainRound && (async (fixtures) => {
+    const out = await chainRound(fixtures);
+    if (!canChange) return out;
+    const prizes = await prizeRound({ kickoff, now: clock() });
+    return { ...out, did: [...out.did, ...prizes.did], problems: [...out.problems, ...prizes.problems] };
+  }),
   memory,
   say,
 });

@@ -10,7 +10,7 @@ import { createStore, pickWords, seal } from "../lib/picks.js";
 import { createClient } from "../lib/server.js";
 import { BOX_MAX, finishMove, isShared, newCode, readCode, showCode, startMove } from "../lib/move.js";
 import { RETRY_AFTER, UNSIGNED, standing, syncPicks } from "../lib/sync.js";
-import { league, pick } from "../screens.js";
+import { league, matchScreen, pick } from "../screens.js";
 import { FakeStorage, NOW, noGroup } from "./helpers.js";
 
 import { FOOTBALL, BASKETBALL, fromHex, isServerKey, matchId, parseOpenings, playerIdOf, toHex, verifyTaken } from "../../engine/src/index.js";
@@ -105,6 +105,42 @@ test("until real matches are on Kickoff's list, the made-up ones are shown and s
   assert.ok(!online.net.sent.some((s) => s.url === "/api/picks"));
   assert.ok(!(await ada.screen("ars-che")).includes('class="state'), "a made-up prediction has no sent or locked mark");
   assert.match(await ada.screen("ars-che"), /Nothing here is live yet/);
+});
+
+test("once real matches have been on the list, a week with none shows nothing made up", async () => {
+  const online = await kickoffOnline();
+  const ada = await phone(online);
+  await ada.carry();
+  assert.equal((await ada.ctx()).real, true);
+  // Nine days on, both matches are long over and no new one is listed.
+  online.clock.now = KICKOFF + 9 * 24 * HOUR;
+  await ada.carry();
+  const c = await ada.ctx();
+  assert.deepEqual([c.real, c.league, Object.keys(c.fixtures)], [true, LEAGUE, []]);
+  // The League screen is the real one, with no match to predict and nobody made up on it.
+  const html = league(null, { ...c, standings: null }).html;
+  assert.match(html, /Nothing open/);
+  assert.match(html, /No matches on the list right now\. New ones arrive by themselves\./);
+  assert.ok(!html.includes("0 of 0 matches") && !html.includes("data-filter"), "nothing to count or to filter");
+  for (const made of ["Sunday Ballers", "Funke", "Inter v Barcelona", "Nothing here is live yet"]) assert.ok(!html.includes(made), made);
+  // The sample match page is not shown either: its address shows the League.
+  assert.equal(matchScreen("anything", { ...c, standings: null }).title, league(null, { ...c, standings: null }).title);
+  assert.ok(!matchScreen("anything", { ...c, standings: null }).html.includes("Man City"));
+});
+
+test("a player who is in a real group is never shown the made-up matches", async () => {
+  // Kickoff's list has no match on it at all, and this phone has never been sent one.
+  const online = await kickoffOnline({ withMatches: false });
+  const ada = await phone(online);
+  await ada.carry();
+  const guest = await ada.matches.view(online.clock.now);
+  assert.equal(guest.real, false, "a visitor in no group still sees the preview, which says it is one");
+  const member = await ada.matches.view(online.clock.now, { member: true });
+  assert.deepEqual([member.real, Object.keys(member.fixtures)], [true, []]);
+  // Even a phone whose copy of the list is gone.
+  const bare = await phone(online);
+  const lost = await bare.matches.view(online.clock.now, { member: true });
+  assert.deepEqual([lost.real, lost.league, Object.keys(lost.fixtures)], [true, null, []]);
 });
 
 test("real matches replace the made-up ones, and each is only shown if its id checks out", async () => {

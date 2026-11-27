@@ -8,6 +8,7 @@ import { createChain } from "./lib/chain.js";
 import { createFixtures } from "./lib/fixtures.js";
 import { saveCard } from "./lib/card.js";
 import { createGroups } from "./lib/groups.js";
+import { brandFrom, shareWords } from "./lib/prize.js";
 import { finishMove, isShared, showCode, startMove } from "./lib/move.js";
 import { createStore, seal } from "./lib/picks.js";
 import { createClient } from "./lib/server.js";
@@ -50,8 +51,8 @@ const stage = (ctx) => Object.entries(ctx.fixtures).map(([id, f]) => `${id}:${ha
 /** What is true right now: the time, the matches, this player's groups, and the picks kept on this device. */
 async function context() {
   const now = Math.floor(Date.now() / 1000);
-  const { real, league, fixtures, matchIds } = await matches.view(now);
   const mine = await groups.view();
+  const { real, league, fixtures, matchIds } = await matches.view(now, { member: Boolean(mine.group) });
   // Where this copy of Kickoff is open, for the reminder a player copies to their group.
   const site = `${location.origin}${location.pathname.replace(/index\.html$/, "")}`;
   if (moving && moving.until <= now) moving = null;
@@ -305,6 +306,20 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+// "Start a group": choosing Friends or Brand shows the boxes that go with it, and the brand's boxes
+// say what each winner would get as they are filled in.
+function startChoice(event) {
+  const form = event.target.closest('[data-form="start"]');
+  if (!form) return;
+  const typed = Object.fromEntries(new FormData(form));
+  form.dataset.kind = typed.kind === "brand" ? "brand" : "friends";
+  const each = shareWords(typed);
+  const out = form.querySelector("[data-share]");
+  if (out) out.textContent = each && Number(String(typed.winners).trim()) > 1 ? `Each winner gets ${each}.` : "";
+}
+document.addEventListener("change", startChoice);
+document.addEventListener("input", startChoice);
+
 // The group screen's forms: start a group, or join one with a code.
 document.addEventListener("submit", async (event) => {
   const form = event.target.closest("[data-form]");
@@ -323,8 +338,19 @@ document.addEventListener("submit", async (event) => {
       location.reload();
       return;
     }
-    if (form.dataset.form === "start") await groups.start({ name: typed.name, playerName: typed.playerName, plays: new FormData(form).getAll("plays") });
-    else await groups.join({ code: typed.code, playerName: typed.playerName });
+    if (form.dataset.form === "paid") {
+      // Whoever started a brand's group gives a payment. It shows as being checked until the robot has read it on X Layer.
+      const tx = String(typed.tx ?? "").trim();
+      if (!/^0x[0-9a-fA-F]{64}$/.test(tx)) throw new Error("Paste the payment's transaction. It starts 0x and has 64 more letters and numbers.");
+      await groups.paid({ code: typed.code, place: Number(typed.place), tx });
+      await draw({ keepPlace: true });
+      return;
+    }
+    if (form.dataset.form === "join" && !String(typed.code ?? "").trim()) throw new Error("Type the group's code.");
+    if (form.dataset.form === "start") {
+      const brand = typed.kind === "brand" ? brandFrom(typed, Math.floor(Date.now() / 1000)) : null;
+      await groups.start({ name: typed.name, playerName: typed.playerName, plays: new FormData(form).getAll("plays"), brand });
+    } else await groups.join({ code: typed.code, playerName: typed.playerName });
     if (location.hash === "#/group") await draw();
     else location.hash = "#/group";
     carry();
@@ -363,7 +389,7 @@ async function carry() {
       changed = await matches.refresh();
     }
     const ctx = await context();
-    if (ctx.real) changed = (await syncPicks({ store, client, player: ctx.mine.player, league: ctx.league, fixtures: ctx.fixtures, now: ctx.now, robotKey: ROBOT_KEY, serverKey: SERVER_KEY, shared: isShared(store) })) || changed;
+    if (ctx.real && ctx.league) changed = (await syncPicks({ store, client, player: ctx.mine.player, league: ctx.league, fixtures: ctx.fixtures, now: ctx.now, robotKey: ROBOT_KEY, serverKey: SERVER_KEY, shared: isShared(store) })) || changed;
     // The tables are asked for when something of this player's has changed, when what is kept is
     // for another group, and otherwise at most every five minutes while a screen that shows them
     // is open. Not more often: every look costs the server work.

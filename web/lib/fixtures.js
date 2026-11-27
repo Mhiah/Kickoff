@@ -47,7 +47,7 @@ export function together(fixtures) {
  * @param store         from createStore() in picks.js
  * @param client        from createClient() in server.js
  * @param competitions  the competitions Kickoff covers
- * @param sample        { league, fixtures(now) }: the made-up matches, shown until there are real ones
+ * @param sample        { league, fixtures(now) }: the made-up matches, shown only until Kickoff's list first has real ones
  */
 export function createFixtures({ store, client, competitions, sample }) {
   const kept = () => {
@@ -64,8 +64,10 @@ export function createFixtures({ store, client, competitions, sample }) {
     /**
      * What the screens are handed: { real, league, fixtures, matchIds }.
      * `fixtures` is by id. For a real match the id is its match id.
+     * `member` is whether this player is in a real group. The made-up matches are only for a
+     * phone whose player is in no group, while Kickoff's list has never had a real match on it.
      */
-    async view(now) {
+    async view(now, { member = false } = {}) {
       const d = kept();
       const fixtures = {};
       const matchIds = {};
@@ -93,8 +95,12 @@ export function createFixtures({ store, client, competitions, sample }) {
       }
       together(fixtures);
       if (Object.keys(fixtures).length > 0) return { real: true, league: d.league, fixtures, matchIds };
+      // No real match is on the list right now. Once Kickoff's list has had real matches on it,
+      // or this player is in a real group, nothing made up is shown in their place: the screens
+      // say that no matches are on the list. `league` is null if the list has never arrived.
+      if (member || d?.fixtures.length > 0) return { real: true, league: d?.league ?? null, fixtures: {}, matchIds: {} };
 
-      // Made-up matches, shown until a real one is on the list. A football one is three
+      // Made-up matches, shown until a real one has been on the list. A football one is three
       // predictions here too: the first keeps the match's own key, so its link stays the same.
       const made = {};
       for (const [id, fixture] of Object.entries(sample.fixtures(now))) {

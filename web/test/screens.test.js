@@ -136,6 +136,8 @@ test("each typeface file is small enough to go on chain in one piece", () => {
 test("the home page says its card is an example, and does not say Kickoff is not live", () => {
   const { html } = home();
   assert.match(html, /<p class="sample">The prediction card at the top is an example\.<\/p>/);
+  // The football feed's terms ask for this credit, in these words, somewhere anyone can see it.
+  assert.match(html, /<p class="sample credit">Football data provided by the Football-Data\.org API\.<\/p>/);
   assert.ok(!/Nothing here is live yet|made-up/.test(html));
 });
 
@@ -313,4 +315,90 @@ test("the League screen has a filter chip only for competitions with a match on 
   const listed = new Set(Object.values(ctx.fixtures).map((f) => f.comp));
   assert.deepEqual(chips, ["all", ...Object.keys(COMPETITIONS).filter((key) => listed.has(key))]);
   assert.ok(!chips.includes("ll") && !chips.includes("sa"), "the made-up week has no La Liga or Serie A match, so no chip for them");
+});
+
+// ---- A brand group's prize
+
+test("starting a group offers Friends or Brand, and Brand asks for the prize, the winners, what it is paid in and the last day", () => {
+  const html = groupScreen("start", ctx).html;
+  // Friends is chosen to begin with, and the brand's boxes are there for when Brand is.
+  assert.match(html, /<form class="glass form" data-form="start" data-kind="friends" novalidate>/);
+  assert.match(html, /<input type="radio" name="kind" value="friends" checked><span>Friends<\/span>/);
+  assert.match(html, /<input type="radio" name="kind" value="brand"><span>Brand<\/span>/);
+  for (const name of ["brand", "amount", "winners"]) assert.match(html, new RegExp(`<input name="${name}"`));
+  assert.match(html, /<input type="radio" name="token" value="USDT" checked><span>USDT<\/span><\/label><label><input type="radio" name="token" value="USDC"><span>USDC<\/span>/);
+  assert.match(html, /<label>Last day<input type="date" name="lastDay"><\/label>/);
+  // Whoever starts it is told plainly that they pay, and that Kickoff holds nothing.
+  assert.match(html, /You pay the winners yourself, on X Layer, when the group ends\. Kickoff never holds the prize\./);
+  assert.ok(!/\b(bets?|betting|stakes?|picks?)\b/i.test(html.replace(/data-[a-z-]+|class="[^"]*"/g, "")));
+});
+
+test("a brand's group says when it ends, then who won, then whether each winner was paid", () => {
+  const brandGroup = { ...realGroup, brand: "OKX", prize: "300 USDT shared by the top 3", startedBy: null, players: 812, members: [{ player: ctx.mine.player, name: "Bola", joinedAt: NOW }], ends: NOW + 3 * 86400, ended: false, decided: false, winners: [], share: "100 USDT" };
+  const at = (now, more = {}) => groupScreen(undefined, { ...ctx, now, mine: { ...ctx.mine, groups: [{ ...brandGroup, ...more }], group: { ...brandGroup, ...more }, name: "Bola" } }).html;
+  const after = brandGroup.ends + 3600;
+  const won = (name, place, more = {}) => ({ place, name, points: 15 - place, you: false, linked: true, paid: null, ...more });
+  const done = { ended: true, decided: true };
+
+  // Still running.
+  assert.match(at(NOW), /<p class="sub prize"><b>Prize:<\/b> 300 USDT shared by the top 3<\/p>\n<p class="sub">Ends \w+day \d+ \w{3}, \d\d:\d\d\.<\/p>/);
+  assert.match(at(NOW), /Invite code/);
+  assert.match(at(NOW), /Run by OKX\. 812 players\./);
+  // Ended, with a result still to come. Nobody new can join now, so the code is no longer offered.
+  assert.match(at(after, { ended: true }), /Ended \w+day \d+ \w{3}, \d\d:\d\d\. The winners are named when the last result is in\./);
+  assert.ok(!at(after, { ended: true }).includes("Invite code") && !at(after, { ended: true }).includes("Anyone with this code can join"));
+  // Decided, and nobody scored.
+  assert.match(at(after, done), /Nobody scored, so there is no winner\./);
+  // Three winners, in order. Each is not paid until a payment is recorded for them.
+  const three = at(after, { ...done, winners: [won("Ada", 1), won("Chidi", 2), won("Dayo", 3)] });
+  assert.match(three, /<h2>Winners<\/h2>/);
+  assert.deepEqual([...three.matchAll(/<div class="sub">(\d\w\w) · (\d+ points?)<\/div>/g)].map((m) => `${m[1]} ${m[2]}`), ["1st 14 points", "2nd 13 points", "3rd 12 points"]);
+  assert.equal(three.match(/Not paid yet/g).length, 3);
+  assert.ok(!three.includes("You won") && !three.includes("Pay the winners"));
+  // This player won and has no wallet linked: they are asked to link one.
+  const mineNoWallet = at(after, { ...done, winners: [won("Ada", 1), won("Bola", 2, { you: true, linked: false })] });
+  assert.match(mineNoWallet, /Bola<span class="tag">you<\/span>/);
+  assert.match(mineNoWallet, /<b>You won\.<\/b> Link a wallet below, so your prize can be paid to it\./);
+  assert.match(mineNoWallet, /data-link-wallet>Link a wallet</);
+  assert.match(at(after, { ...done, winners: [won("Bola", 1, { you: true })] }), /<h2>Winner<\/h2>[\s\S]*Your prize is paid to the wallet you linked\./);
+  // Paid: what was paid, as a link to the payment on X Layer. The others still wait.
+  const paid = at(after, { ...done, winners: [won("Ada", 1, { paid: { tx: `0x${"ab".repeat(32)}`, what: "100 USDT" } }), won("Bola", 2, { you: true, paid: { tx: `0x${"cd".repeat(32)}`, what: "100 USDT" } }), won("Dayo", 3)] });
+  assert.match(paid, new RegExp(`<a class="link" href="https://www\\.oklink\\.com/xlayer/tx/0x${"ab".repeat(32)}" target="_blank" rel="noopener">Paid 100 USDT</a>`));
+  assert.equal(paid.match(/Not paid yet/g).length, 1);
+  assert.ok(!paid.includes("Your prize is paid to"), "a winner who has been paid is not told where it will go");
+  // A brand's group with no end, and a group of friends, say none of this.
+  for (const html of [at(NOW, { ends: undefined }), groupScreen(undefined, inGroup).html]) assert.ok(!/Ends |Winner|Not paid|Pay the winners/.test(html));
+});
+
+test("whoever started a brand's group is shown who to pay, how much and where, and nobody else is", () => {
+  const WALLET = `0x${"1a".repeat(20)}`;
+  const TOKEN = "0x779ded0c9e1022225f8e0630b35a9b54be713736";
+  const winners = [{ place: 1, name: "Ada", points: 14, you: false, linked: true, paid: null }, { place: 2, name: "Chidi", points: 9, you: false, linked: false, paid: null }];
+  const brandGroup = { ...realGroup, code: "HOOPS-0001", brand: "OKX", prize: "200 USDT shared by the top 2", startedBy: ctx.mine.player, players: 40, members: [{ player: ctx.mine.player, name: "Bola", joinedAt: NOW }], ends: NOW - 3600, ended: true, decided: true, winners, share: "100 USDT" };
+  const pay = (name, place, more = {}) => ({ place, name, wallet: WALLET, what: "100 USDT", checking: null, refused: null, ...more });
+  const as = (more = {}) => groupScreen(undefined, { ...ctx, now: NOW, mine: { ...ctx.mine, groups: [{ ...brandGroup, ...more }], group: { ...brandGroup, ...more }, name: "Bola" } }).html;
+
+  // A player sees the winners and nothing about paying.
+  assert.ok(!as().includes("Pay the winners") && !as().includes(WALLET));
+  // Whoever started it: each winner, their share, their wallet to copy, and a box for the payment.
+  const mine = as({ organiser: true, payIn: { symbol: "USDT", address: TOKEN }, toPay: [pay("Ada", 1), pay("Chidi", 2, { wallet: null })] });
+  assert.match(mine, /Run by OKX\. You started this group\. 40 players\./);
+  assert.match(mine, /<h2>Pay the winners<\/h2>/);
+  assert.match(mine, new RegExp(`<div class="sub">1st · 100 USDT</div></div><button type="button" class="btn small quiet" data-copy="${WALLET}">Copy wallet</button>`));
+  assert.match(mine, /<form class="paid" data-form="paid" novalidate>\s*<input type="hidden" name="code" value="HOOPS-0001"><input type="hidden" name="place" value="1">/);
+  assert.match(mine, /<button class="btn small go" type="submit">Mark as paid<\/button>/);
+  // A winner with no wallet cannot be paid yet, and has no box.
+  assert.match(mine, /Has not linked a wallet yet\. Their Group screen asks them to\./);
+  assert.equal(mine.match(/data-form="paid"/g).length, 1);
+  // Which token exactly, by its address, so the real one is sent.
+  assert.match(mine, new RegExp(`USDT on X Layer is the token 0x779d…3736\\. <button type="button" class="link" data-copy="${TOKEN}">Copy its address</button>`));
+  // A payment being read says so and has no box. One that was not accepted says why, and can be given again.
+  const checking = as({ organiser: true, toPay: [pay("Ada", 1, { checking: `0x${"ab".repeat(32)}` })] });
+  assert.match(checking, /Checking your payment on X Layer\. This takes a few minutes\./);
+  assert.ok(!checking.includes('data-form="paid"'));
+  const refused = as({ organiser: true, toPay: [pay("Ada", 1, { refused: "It paid 15 USDT, less than the 100 USDT share." })] });
+  assert.match(refused, /<p class="say-so warn" data-form-out role="status">It paid 15 USDT, less than the 100 USDT share\.<\/p>/);
+  assert.match(refused, /data-form="paid"/);
+  // Once everyone is paid there is nothing left to do, and the section goes.
+  assert.ok(!as({ organiser: true, toPay: [] }).includes("Pay the winners"));
 });

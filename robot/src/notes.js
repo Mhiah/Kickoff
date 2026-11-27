@@ -166,7 +166,7 @@ export function changedNote({ label, from, to, owner }) {
       "",
       "**Kickoff has kept the first result.** A result, once recorded, is never changed by the robot, so that nobody can alter one after the fact. The points for this match were worked out from the first result.",
       "",
-      "**What to do:** look up the real score. If the first result was right, there is nothing to do. If it was wrong, the match needs a person to decide what happens to its points.",
+      "**What to do:** look up the real score. If the first result was right, there is nothing to do. If it was wrong and the match's predictions were never locked on X Layer, nobody's points came from it: run the **Correct a result** action, which puts it right to what the feed says now. If its predictions were locked, the match needs a person to decide what happens to its points.",
     ].join("\n"),
   };
 }

@@ -44,11 +44,13 @@ const comparable = (f) => {
  * @param feed    the feed's matches for the days being looked at
  * @param listed  what is on Kickoff's list now
  * @param now     the time in seconds
- * @returns { put, added, updated, calledOff, unchanged }
+ * @returns { put, added, updated, calledOff, unchanged, heldBack }
  *   put        the matches to send to the server, new and changed together
  *   added      new matches (by label)
  *   updated    matches whose state or score changed: [{ label, from, to }]
  *   calledOff  matches the feed has moved to another time, so the old one is off: [label]
+ *   heldBack   the lines the feed now gives differently for a match already finished. They are
+ *              flagged and never sent. A person can put one right with correct.js.
  */
 /** Predictions close this long before kickoff, in seconds. The same number as the server's. */
 const CLOSES_BEFORE = 10 * 60;
@@ -90,6 +92,7 @@ export async function plan({ league, feed, listed, now }) {
   const calledOff = [];
   const replaced = [];
   const same_ = new Set(); // matches with nothing to change: a football match's three lines count once
+  const heldBack = []; // every line the feed now gives differently for a finished match: not sent
 
   for (const w of wanted) {
     const have = byId.get(w.id);
@@ -103,6 +106,7 @@ export async function plan({ league, feed, listed, now }) {
       // A finished match stays finished. A feed that goes back on a result is flagged, not obeyed.
       if (have.state === "final" && (w.state !== "final" || w.resultByte !== have.resultByte)) {
         updated.push({ label: w.label, from: `final ${have.score ?? ""}`.trim(), to: `${w.state} ${w.score ?? ""}`.trim(), refused: true });
+        heldBack.push(w);
         continue;
       }
       put.push(w);
@@ -135,7 +139,7 @@ export async function plan({ league, feed, listed, now }) {
     const key = `${u.label}|${u.from}|${u.to}|${u.refused ?? ""}`;
     return seen.has(key) ? false : (seen.add(key), true);
   });
-  return { put: put.map((f) => JSON.parse(JSON.stringify(f))), added: once(added), updated: updatedOnce, calledOff: once(calledOff), replaced: once(replaced), unchanged: same_.size };
+  return { put: put.map((f) => JSON.parse(JSON.stringify(f))), added: once(added), updated: updatedOnce, calledOff: once(calledOff), replaced: once(replaced), unchanged: same_.size, heldBack: heldBack.map((f) => JSON.parse(JSON.stringify(f))) };
 }
 
 /** How long the feed has to keep saying the same final score before it is believed, in seconds. */
