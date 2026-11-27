@@ -86,7 +86,7 @@ hand. A test fails if it differs from the engine by a single byte.
 | `lib/picks.js` | Sealing a pick on the device and keeping it there |
 | `lib/device.js` | This device's own key, and the player id made from it |
 | `lib/server.js` | Talking to Kickoff's server, with everything signed by the device's key |
-| `lib/fixtures.js` | The matches to pick: real ones from the server once there are any, made-up ones until then |
+| `lib/fixtures.js` | The matches to predict: real ones from the server. Made-up ones only until the list first has a real match, and never for a player in a real group |
 | `lib/sync.js` | Carrying a sealed pick through: sent, receipt checked, opened after kickoff |
 | `lib/move.js` | Moving a player to another phone with a one-time code |
 | `lib/card.js` | The card of a finished match, drawn in the browser and saved as a picture |

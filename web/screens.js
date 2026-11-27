@@ -128,6 +128,10 @@ function weekHtml(ctx) {
   const chips = Object.keys(COMPETITIONS)
     .map((key) => `<button type="button" data-filter="${key}" aria-pressed="false">${comp(key)}</button>`)
     .join("");
+  // Real matches, and none on the list this week: say so, with nothing to filter or count.
+  if (ctx.real && ids.length === 0) return `
+  <h2>This week</h2>
+  <div class="note" style="margin-top:14px">No matches on the list right now. New ones arrive by themselves.</div>`;
   return `
   <h2>This week</h2>
   <div class="chips" role="group" aria-label="Show one competition"><button type="button" data-filter="all" aria-pressed="true">All</button>${chips}</div>
@@ -269,7 +273,7 @@ ${titlebar({
 <div class="tiles">
   <div class="glass tile"><small>Your place</small><b>${s.you.place ? ordinal(s.you.place) : "–"}</b><span>${s.you.place ? `of ${people(s.everyone.players)}` : "after your first prediction"}</span></div>
   <div class="glass tile"><small>Your points</small><b>${s.you.points}</b><span>${s.you.threes} for 3 points, ${s.you.ones} for 1</span></div>
-  <div class="glass tile"><small>Predicted this week</small><b>${picked} of ${ids.length}</b><span>predict as many as you like</span></div>
+  <div class="glass tile"><small>Predicted this week</small><b>${picked} of ${ids.length}</b><span>${ids.length ? "predict as many as you like" : "no matches right now"}</span></div>
   <div class="glass tile"><small>Next to close</small><b>${next ? esc(closesIn) : "Nothing open"}</b><span>${next ? teams(next) : "new matches arrive each week"}</span></div>
 </div>
 
@@ -528,7 +532,9 @@ ${f.real ? "" : SAMPLE_NOTE}`;
 
 // ------------------------------------------------------------------------------------ match
 
-export function matchScreen() {
+export function matchScreen(arg, ctx) {
+  // This page is part of the made-up sample. With real matches there is no such page: League.
+  if (ctx?.real) return league(null, ctx);
   const m = match;
   const opened = m.opened
     .map(

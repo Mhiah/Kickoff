@@ -276,7 +276,7 @@ through are an ordinary website, and the fixtures come from ordinary sports data
 | The first three scoring circuits | Every possible case, four separate ways: Kickoff's own evaluator, TapeOut's official reference evaluator, the real TapeOut contracts, and the JavaScript reader the website uses | 65,728 cases, 0 wrong ([details](docs/CHECK-RESULTS.md)) |
 | The TapeOut parts | Five rehearsals and a fees report on a private copy of X Layer, against the real contracts: publishing circuits, an account and its mailbox, the on-chain site, and two whole seasons | All passed ([details](docs/REHEARSAL-RESULTS.md)) |
 | The prediction engine | 167 tests. Twenty-six try to cheat, and eight have an X Layer node lie about what is on chain, three of them in ways only a second node can catch | All pass; every cheat and every lie is refused ([details](engine/README.md)) |
-| The website | 125 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
+| The website | 127 checks, many of them run against the real server's code, and clicked through in a browser in both light and dark | All pass ([details](web/README.md)) |
 | The fixtures feed | 23 tests against saved examples, and one live run against the real feeds | All pass; the live run fetched 82 real matches ([details](feed/README.md)) |
 | The server | 125 tests. They take a name somebody has, link a wallet that did not sign, send predictions in someone else's name, play old requests back, open a different prediction from the one sealed, and use the robot's addresses without its key. They also check that a match gives points only once it was locked on X Layer, that the server signs for every sealed prediction it takes, and that a one-time code for moving phones works once, runs out, and cannot be guessed at | All pass; every one is refused ([details](server/README.md)) |
 | The robot | 95 tests, run against the server's own code: new matches, results, postponements, moved matches, a failing feed, where each key is sent, being on time for every lock, never writing twice, refusing a bundle that does not add up, a hundred players on one match, a lock it slept through, its notes when it needs a person, putting the website on X Layer, and going live without paying for anything twice | All pass ([details](robot/README.md)) |
@@ -502,8 +502,10 @@ match, a player's record, a proof screen called "Check it yourself", and the gro
 - **Group:** the invite code, who is in, the next match to predict, and an optional wallet link. A
   group run by a brand says who runs it and what the prize is, and is too big to list by name.
 
-**State: live, with real matches and real numbers.** Until a real match is on the list, the screens
-show made-up matches and say so at their foot.
+**State: live, with real matches and real numbers.** A copy of Kickoff that has never had a real
+match on its list shows made-up matches to a visitor in no group, and says so at their foot. Once
+real matches have been listed, or for anyone in a real group, nothing made up is shown: a week
+with no matches says "No matches on the list right now".
 
 ### 7. The robot keeps it moving
 

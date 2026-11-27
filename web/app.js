@@ -51,8 +51,8 @@ const stage = (ctx) => Object.entries(ctx.fixtures).map(([id, f]) => `${id}:${ha
 /** What is true right now: the time, the matches, this player's groups, and the picks kept on this device. */
 async function context() {
   const now = Math.floor(Date.now() / 1000);
-  const { real, league, fixtures, matchIds } = await matches.view(now);
   const mine = await groups.view();
+  const { real, league, fixtures, matchIds } = await matches.view(now, { member: Boolean(mine.group) });
   // Where this copy of Kickoff is open, for the reminder a player copies to their group.
   const site = `${location.origin}${location.pathname.replace(/index\.html$/, "")}`;
   if (moving && moving.until <= now) moving = null;
@@ -346,6 +346,7 @@ document.addEventListener("submit", async (event) => {
       await draw({ keepPlace: true });
       return;
     }
+    if (form.dataset.form === "join" && !String(typed.code ?? "").trim()) throw new Error("Type the group's code.");
     if (form.dataset.form === "start") {
       const brand = typed.kind === "brand" ? brandFrom(typed, Math.floor(Date.now() / 1000)) : null;
       await groups.start({ name: typed.name, playerName: typed.playerName, plays: new FormData(form).getAll("plays"), brand });
@@ -388,7 +389,7 @@ async function carry() {
       changed = await matches.refresh();
     }
     const ctx = await context();
-    if (ctx.real) changed = (await syncPicks({ store, client, player: ctx.mine.player, league: ctx.league, fixtures: ctx.fixtures, now: ctx.now, robotKey: ROBOT_KEY, serverKey: SERVER_KEY, shared: isShared(store) })) || changed;
+    if (ctx.real && ctx.league) changed = (await syncPicks({ store, client, player: ctx.mine.player, league: ctx.league, fixtures: ctx.fixtures, now: ctx.now, robotKey: ROBOT_KEY, serverKey: SERVER_KEY, shared: isShared(store) })) || changed;
     // The tables are asked for when something of this player's has changed, when what is kept is
     // for another group, and otherwise at most every five minutes while a screen that shows them
     // is open. Not more often: every look costs the server work.
