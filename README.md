@@ -213,6 +213,7 @@ much costs half as much.
 | TapeOut contracts Kickoff writes to | The mailbox (TapeSend) `0xe61a9c7213a6aa616c246a2b569e555b417b25ee` and the site store (DeWEB) `0xd6efb7adcc9c83dc4924ad56f6a8e4e969b9adb6` |
 | Live since | 24 November 2026. Going live cost 0.087878 OKB. |
 | First real predictions locked | 25 November 2026, 17:35 UTC. Champions League: Sabah FK v Barça and Slavia Praha v Villarreal, each locked 595 seconds before kickoff. Both results were recorded that evening (1 – 4 and 0 – 1). |
+| First real predictions opened and scored | 27 November 2026. Premier League: Nottingham v Chelsea, which ended 3 – 2. Three players' predictions were locked at 19:50 UTC, ten minutes before kickoff. The robot opened them during the match and they were scored when the result came in: 2 points each, for the result and goal goal. Nobody had to do anything after sealing. |
 | The website put on X Layer | 25 November 2026. 44 files, for 0.001581 OKB. |
 | Football's three scoring rules published | 26 November 2026, as circuits 9, 10 and 11, for 0.005905 OKB. |
 
@@ -583,10 +584,6 @@ PUBLISH SITE, and a check that reads every file back).
 - **A prediction made before locked copies existed still lives only on its phone.** That is two
   predictions, both from 25 November 2026. Every prediction made since opens by itself, even if the
   phone is lost.
-- **The robot has not yet opened a real prediction on the live network.** Those two are the only
-  real predictions so far, and they were made before the robot could open one. Opening, scoring and
-  publishing the opened predictions have been run end to end against a copy of X Layer and in the
-  season rehearsal, not yet with a real player on a real match.
 - **One early result was recorded wrong, and is corrected by hand.** On 25 November 2026 the feed
   called Sporting CP v Man United finished at 2 – 3, then took a goal back: it ended 2 – 2. Nobody
   had predicted it, so no points were affected. Since 26 November a final score is recorded only
