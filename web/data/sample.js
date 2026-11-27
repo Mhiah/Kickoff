@@ -4,6 +4,8 @@
 export const COMPETITIONS = {
   pl: { name: "Premier League", sport: "football" },
   cl: { name: "Champions League", sport: "football" },
+  ll: { name: "La Liga", sport: "football" },
+  sa: { name: "Serie A", sport: "football" },
   nba: { name: "NBA", sport: "basketball" },
   wnba: { name: "WNBA", sport: "basketball" },
 };

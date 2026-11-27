@@ -75,7 +75,7 @@ export async function syncFixtures({ server, adminKey, keys, now, dryRun = false
 /** The report in plain words, one line each. */
 export function inWords(report) {
   const lines = [];
-  const names = { pl: "Premier League", cl: "Champions League", nba: "NBA", wnba: "WNBA" };
+  const names = { pl: "Premier League", cl: "Champions League", ll: "La Liga", sa: "Serie A", nba: "NBA", wnba: "WNBA" };
   lines.push(`Matches from ${report.from} to ${report.to}${report.dryRun ? " (a dry run: nothing was changed)" : ""}`);
   for (const [comp, n] of Object.entries(report.fetched)) lines.push(`  ${names[comp] ?? comp}: ${n === null ? "could not be fetched" : `${n} in the feed`}`);
   lines.push(`Added: ${report.added.length}. Updated: ${report.updated.filter((u) => !u.refused).length}. Called off: ${report.calledOff.length}. Unchanged: ${report.unchanged}.`);

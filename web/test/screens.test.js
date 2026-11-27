@@ -177,7 +177,9 @@ test("in a group, the screen shows its real code, members and competitions", () 
   assert.ok(!html.includes("data-plays"));
   assert.match(html, /Only Ada can change this/);
   assert.equal(html.match(/>On</g).length, 2);
-  assert.equal(html.match(/>Off</g).length, 2);
+  // The group was started before La Liga and Serie A were added, so those two are off for it, like the rest it did not choose.
+  assert.equal(html.match(/>Off</g).length, 4);
+  for (const name of ["Premier League", "Champions League", "La Liga", "Serie A", "NBA", "WNBA"]) assert.ok(html.includes(name), `${name} is not listed`);
   // Whoever started it gets the switches, set as the group has them.
   const mine = groupScreen(undefined, asStarter).html;
   assert.match(mine, /You started this group/);
@@ -287,4 +289,28 @@ test("the other phone has a place to type the code, and is told when the code wi
   assert.match(fresh, /<button class="btn go" type="submit">Bring my player here<\/button>/);
   assert.ok(!fresh.includes("replaces that"));
   assert.match(groupScreen("code", inGroup).html, /This phone is playing as <b>Bola<\/b> now\. The code replaces that\./);
+});
+
+// ---- La Liga and Serie A
+
+test("La Liga and Serie A are competitions like the others: named, with their own dot, on the start form and the group's switches", () => {
+  assert.deepEqual(Object.keys(COMPETITIONS), ["pl", "cl", "ll", "sa", "nba", "wnba"]);
+  assert.deepEqual([COMPETITIONS.ll, COMPETITIONS.sa], [{ name: "La Liga", sport: "football" }, { name: "Serie A", sport: "football" }]);
+  const css = readFileSync(file("styles.css"), "utf8");
+  for (const key of ["ll", "sa"]) {
+    assert.match(css, new RegExp(`--${key}: #[0-9a-f]{6};`));
+    assert.ok(css.includes(`.comp.${key} { --c: var(--${key}); }`) && css.includes(`.slip.edge.${key} { --c: var(--${key}); }`));
+  }
+  const start = groupScreen("start", ctx).html;
+  for (const key of ["ll", "sa"]) assert.match(start, new RegExp(`<input type="checkbox" name="plays" value="${key}" checked>`));
+  const mine = groupScreen(undefined, asStarter).html;
+  for (const key of ["ll", "sa"]) assert.match(mine, new RegExp(`aria-checked="false" aria-label="${COMPETITIONS[key].name}" data-plays="${key}"`), "off for a group that did not choose it, and its starter can turn it on");
+});
+
+test("the League screen has a filter chip only for competitions with a match on the list", () => {
+  const html = league(null, ctx).html;
+  const chips = [...html.matchAll(/data-filter="([a-z]+)"/g)].map((m) => m[1]);
+  const listed = new Set(Object.values(ctx.fixtures).map((f) => f.comp));
+  assert.deepEqual(chips, ["all", ...Object.keys(COMPETITIONS).filter((key) => listed.has(key))]);
+  assert.ok(!chips.includes("ll") && !chips.includes("sa"), "the made-up week has no La Liga or Serie A match, so no chip for them");
 });

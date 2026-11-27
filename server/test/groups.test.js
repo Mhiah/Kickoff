@@ -12,7 +12,7 @@ test("starting a group gives a code, and the starter is its first member", async
   assert.equal(body.code, "SUNDAYB-4821");
   assert.equal(body.name, "Sunday Ballers");
   assert.equal(body.startedBy, ada.player);
-  assert.deepEqual(body.plays, ["pl", "cl", "nba", "wnba"]);
+  assert.deepEqual(body.plays, ["pl", "cl", "ll", "sa", "nba", "wnba"]);
   assert.deepEqual(body.members.map((m) => [m.name, m.player]), [["Ada", ada.player]]);
 });
 

@@ -21,7 +21,7 @@ const INK = "#121216";
 const MUTED = "#66666f";
 const HAIR = "#e2e2e7";
 /** The competitions' colours, as in styles.css. */
-const COLOURS = { pl: "#e3127e", cl: "#2343d9", nba: "#f0b400", wnba: "#f26a1b" };
+const COLOURS = { pl: "#e3127e", cl: "#2343d9", ll: "#7b3fe4", sa: "#0e9f6e", nba: "#f0b400", wnba: "#f26a1b" };
 /** The order a football match's three predictions are listed in, and what each is called. */
 const ORDER = [RESULT, GOAL_GOAL, SCORE, FOOTBALL, BASKETBALL];
 const KIND = { [RESULT]: "Result", [GOAL_GOAL]: "Goal Goal", [SCORE]: "Exact score", [FOOTBALL]: "Exact score", [BASKETBALL]: "Winner and margin" };

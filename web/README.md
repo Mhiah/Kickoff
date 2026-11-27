@@ -35,7 +35,7 @@ The Kickoff website.
 - **Light and dark.** A visitor first sees whichever their own device is set to. The small switch
   at the end of the top row changes it, and the choice is remembered on that device.
 - **A colour for each competition**, shown as a dot beside its name: pink for the Premier League,
-  blue for the Champions League, yellow for the NBA, orange for the WNBA. Red is used only for
+  blue for the Champions League, purple for La Liga, green for Serie A, yellow for the NBA, orange for the WNBA. Red is used only for
   things that were refused.
 
 ## Making a pick

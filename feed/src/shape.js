@@ -1,7 +1,7 @@
 // The one shape every match is put into, whichever feed it came from.
 //
 //   feedId      the feed's own name for the match, which stays the same if the match is moved
-//   comp        "pl", "cl", "nba" or "wnba"
+//   comp        "pl", "cl", "ll", "sa", "nba" or "wnba"
 //   sport       1 football, 2 basketball (the picks engine's numbers)
 //   home, away  the two sides, by the short names people use
 //   kickoff     the start time, in seconds
@@ -21,6 +21,8 @@ import { BASKETBALL, FOOTBALL, checkFixture, encodePick } from "../../engine/src
 export const COMPETITIONS = {
   pl: { name: "Premier League", sport: FOOTBALL },
   cl: { name: "Champions League", sport: FOOTBALL },
+  ll: { name: "La Liga", sport: FOOTBALL },
+  sa: { name: "Serie A", sport: FOOTBALL },
   nba: { name: "NBA", sport: BASKETBALL },
   wnba: { name: "WNBA", sport: BASKETBALL },
 };

@@ -14,7 +14,7 @@ Kickoff's robot: the program that does by itself what nobody should have to do b
 
 It runs on GitHub and does its job every half hour. Each time:
 
-1. Fetches the coming week's matches from the two feeds: Premier League and Champions League from
+1. Fetches the coming week's matches from the two feeds: Premier League, Champions League, La Liga and Serie A from
    one, NBA and WNBA from the other.
 2. Reads the list Kickoff's server has.
 3. Works out the difference, and sends only what changed.

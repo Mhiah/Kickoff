@@ -47,7 +47,7 @@ export const MAX_MEMBERS = 30;
 export const BRAND_MAX = 5000;
 export const MAX_BRAND_NAME = 30;
 export const MAX_PRIZE = 80;
-export const COMPETITIONS = ["pl", "cl", "nba", "wnba"];
+export const COMPETITIONS = ["pl", "cl", "ll", "sa", "nba", "wnba"];
 /** How many rows of the table of everyone are sent. A player further down is sent their own row as well. */
 export const TABLE_TOP = 20;
 /** How many of a player's finished matches are sent. */

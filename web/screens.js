@@ -72,7 +72,7 @@ export function home() {
     <p>This week's fixtures are already here, and next week's arrive by themselves. Results come in after the final whistle. Nobody types them in.</p>
     <div class="glass">
       <div class="row"><div class="grow"><div class="title" style="margin:0">Football</div>
-        <div class="comps">${comp("pl")}${comp("cl")}</div>
+        <div class="comps">${comp("pl")}${comp("cl")}${comp("ll")}${comp("sa")}</div>
         <div class="sub">Three predictions a match: the result and goal goal for 1 point each, the exact score for 3.</div></div></div>
       <div class="row"><div class="grow"><div class="title" style="margin:0">Basketball</div>
         <div class="comps">${comp("nba")}${comp("wnba")}</div>
@@ -124,7 +124,9 @@ function weekHtml(ctx) {
       return `<div data-day><div class="day">${esc(day)}</div><div class="glass">${rows.join("")}</div></div>`;
     })
     .join("");
+  // One chip for each competition that has a match on the list. One with nothing on is left out.
   const chips = Object.keys(COMPETITIONS)
+    .filter((key) => ids.some((id) => ctx.fixtures[id].comp === key))
     .map((key) => `<button type="button" data-filter="${key}" aria-pressed="false">${comp(key)}</button>`)
     .join("");
   return `

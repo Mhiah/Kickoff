@@ -1,4 +1,4 @@
-// Football: the Premier League and the Champions League, from football-data.org (version 4).
+// Football: the Premier League, the Champions League, La Liga and Serie A, from football-data.org (version 4).
 //
 // One request for each competition:
 //
@@ -21,7 +21,8 @@ import { footballResult } from "../../engine/src/index.js";
 import { count, finish, seconds } from "./shape.js";
 
 const HOST = "https://api.football-data.org/v4";
-export const FOOTBALL_CODES = { pl: "PL", cl: "CL" };
+// La Liga is "PD" in the feed (Primera División) and Serie A is "SA".
+export const FOOTBALL_CODES = { pl: "PL", cl: "CL", ll: "PD", sa: "SA" };
 
 const VOID = {
   POSTPONED: "Postponed",

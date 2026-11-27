@@ -8,11 +8,20 @@ import { championsLeague, fakeWeb, nbaFromTheDocs, nbaPages, premierLeague, wnba
 
 const byId = (list, id) => list.find((m) => m.feedId.endsWith(String(id)));
 const KEYS = { football: "football-key", basketball: "basketball-key" };
+/** A competition with no matches in the days asked for. */
+const NOTHING_ON = { matches: [] };
+/** La Liga, as the feed sends it: one match still to play. */
+const laLiga = {
+  competition: { id: 2014, name: "Primera Division", code: "PD", type: "LEAGUE" },
+  matches: [{ id: 544001, utcDate: "2026-11-29T20:00:00Z", status: "TIMED", homeTeam: { shortName: "Real Madrid" }, awayTeam: { shortName: "Barça" }, score: { winner: null, duration: "REGULAR", fullTime: { home: null, away: null } } }],
+};
 const nbaAnswer = (url) => (url.includes("cursor=") ? nbaPages[1] : nbaPages[0]);
 const web = () =>
   fakeWeb([
     ["/competitions/PL/matches", premierLeague],
     ["/competitions/CL/matches", championsLeague],
+    ["/competitions/PD/matches", laLiga],
+    ["/competitions/SA/matches", NOTHING_ON],
     ["/wnba/v1/games", wnbaFromTheDocs],
     ["/v1/games", nbaAnswer],
   ]);
@@ -194,11 +203,14 @@ test("an endless run of pages is cut off and reported", async () => {
 
 // ---- the whole week
 
-test("the week brings all four competitions together, soonest first", async () => {
+test("the week brings all six competitions together, soonest first", async () => {
   const { fetch, asked } = web();
   const week = await fetchWeek({ keys: KEYS, from: "2026-11-21", to: "2026-11-30", fetch });
-  assert.deepEqual(week.fetched, { pl: 9, cl: 4, nba: 10, wnba: 0 });
-  assert.equal(week.matches.length, 23);
+  assert.deepEqual(week.fetched, { pl: 9, cl: 4, ll: 1, sa: 0, nba: 10, wnba: 0 });
+  assert.equal(week.matches.length, 24);
+  // La Liga is "PD" to the feed and Serie A is "SA". A La Liga match reads like any other football match.
+  assert.ok(asked.some((a) => a.url.startsWith("https://api.football-data.org/v4/competitions/PD/matches?")) && asked.some((a) => a.url.startsWith("https://api.football-data.org/v4/competitions/SA/matches?")));
+  assert.deepEqual(byId(week.matches, 544001), { feedId: "football-data:544001", comp: "ll", sport: FOOTBALL, home: "Real Madrid", away: "Barça", kickoff: Date.UTC(2026, 10, 29, 20, 0) / 1000, label: "La Liga: Real Madrid v Barça", state: "scheduled" });
   assert.deepEqual(week.matches.map((m) => m.kickoff), [...week.matches.map((m) => m.kickoff)].sort((a, b) => a - b));
   assert.equal(asked.filter((a) => a.url.includes("football-data")).every((a) => a.headers["X-Auth-Token"] === "football-key"), true);
   assert.equal(asked.filter((a) => a.url.includes("balldontlie")).every((a) => a.headers.Authorization === "basketball-key"), true);
@@ -206,9 +218,9 @@ test("the week brings all four competitions together, soonest first", async () =
 });
 
 test("one feed failing does not stop the other, and is never hidden", async () => {
-  const { fetch } = fakeWeb([["/competitions/PL/matches", premierLeague], ["/competitions/CL/matches", 403], ["/wnba/v1/games", wnbaFromTheDocs], ["/v1/games", 429]]);
+  const { fetch } = fakeWeb([["/competitions/PL/matches", premierLeague], ["/competitions/CL/matches", 403], ["/competitions/PD/matches", laLiga], ["/competitions/SA/matches", NOTHING_ON], ["/wnba/v1/games", wnbaFromTheDocs], ["/v1/games", 429]]);
   const week = await fetchWeek({ keys: KEYS, from: "2026-11-21", to: "2026-11-30", fetch });
-  assert.deepEqual(week.fetched, { pl: 9, cl: null, nba: null, wnba: 0 });
+  assert.deepEqual(week.fetched, { pl: 9, cl: null, ll: 1, sa: 0, nba: null, wnba: 0 });
   assert.ok(week.problems.some((p) => /Champions League: could not be fetched .*not in the plan/.test(p)));
   assert.ok(week.problems.some((p) => /NBA: could not be fetched .*too many requests/.test(p)));
 });
@@ -216,7 +228,7 @@ test("one feed failing does not stop the other, and is never hidden", async () =
 test("a missing key skips that feed and says so, without asking the feed anything", async () => {
   const { fetch, asked } = web();
   const week = await fetchWeek({ keys: { football: "football-key" }, from: "2026-11-21", to: "2026-11-30", fetch });
-  assert.deepEqual(week.fetched, { pl: 9, cl: 4, nba: null, wnba: null });
+  assert.deepEqual(week.fetched, { pl: 9, cl: 4, ll: 1, sa: 0, nba: null, wnba: null });
   assert.ok(asked.every((a) => a.url.includes("football-data")));
   assert.equal(week.problems.filter((p) => /no key was given for the basketball feed/.test(p)).length, 2);
 });
@@ -261,5 +273,5 @@ test("days are written the way the feeds want them", () => {
   assert.equal(day(now), "2026-11-23");
   assert.equal(day(now, 7), "2026-11-30");
   assert.equal(day(now, 8), "2026-12-01");
-  assert.deepEqual(Object.keys(COMPETITIONS), ["pl", "cl", "nba", "wnba"]);
+  assert.deepEqual(Object.keys(COMPETITIONS), ["pl", "cl", "ll", "sa", "nba", "wnba"]);
 });

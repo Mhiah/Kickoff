@@ -16,6 +16,8 @@ type them in.
 | --- | --- | --- |
 | Premier League | Football | [football-data.org](https://www.football-data.org), version 4 |
 | Champions League | Football | football-data.org |
+| La Liga | Football | football-data.org |
+| Serie A | Football | football-data.org |
 | NBA | Basketball | [balldontlie](https://www.balldontlie.io) |
 | WNBA | Basketball | balldontlie |
 
@@ -28,7 +30,7 @@ Every match is put into one shape, whichever feed it came from:
 | Part | What it is |
 | --- | --- |
 | `feedId` | The feed's own name for the match. It stays the same if the match is moved. |
-| `comp` | `pl`, `cl`, `nba` or `wnba` |
+| `comp` | `pl`, `cl`, `ll` (La Liga), `sa` (Serie A), `nba` or `wnba` |
 | `home`, `away` | The two sides, by the short names people use |
 | `kickoff` | The start time, in seconds |
 | `label` | The text that goes into the match's id, such as `Premier League: Arsenal v Chelsea` |
@@ -161,7 +163,7 @@ scoring circuits and check the points.
 | `src/shape.js` | The one shape every match is put into, and the checks on it |
 | `src/football.js` | Reading football-data.org |
 | `src/basketball.js` | Reading balldontlie, for both leagues |
-| `src/week.js` | All four competitions for a stretch of days |
+| `src/week.js` | All six competitions for a stretch of days |
 | `bin/fixtures.js` | The command that prints the fixtures |
 | `test/examples.js` | Saved examples of what each feed sends |
 | `test/feed.test.js` | The tests |

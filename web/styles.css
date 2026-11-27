@@ -24,6 +24,8 @@
   --knob: #ffffff;
   --pl: #e3127e;             /* Premier League: pink */
   --cl: #2343d9;             /* Champions League: blue */
+  --ll: #7b3fe4;             /* La Liga: purple */
+  --sa: #0e9f6e;             /* Serie A: green */
   --nba: #f0b400;            /* NBA: yellow */
   --gold: #d9a406;           /* the star after the name of the player of the week */
   --wnba: #f26a1b;           /* WNBA: orange */
@@ -49,6 +51,8 @@
   --knob: #111216;
   --pl: #ff4fa3;
   --cl: #6f8dff;
+  --ll: #b08cff;
+  --sa: #3fd1a0;
   --nba: #ffc933;
   --gold: #f2c230;
   --wnba: #ff8a3d;
@@ -134,12 +138,12 @@ body.public .tabs { display: none; }
 /* ---- competition labels: a dot of colour and the name */
 .comp { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; }
 .comp::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--ink)); }
-.comp.pl { --c: var(--pl); } .comp.cl { --c: var(--cl); } .comp.nba { --c: var(--nba); } .comp.wnba { --c: var(--wnba); }
+.comp.pl { --c: var(--pl); } .comp.cl { --c: var(--cl); } .comp.ll { --c: var(--ll); } .comp.sa { --c: var(--sa); } .comp.nba { --c: var(--nba); } .comp.wnba { --c: var(--wnba); }
 
 /* ---- the pick slip */
 .slip { position: relative; }
 .slip.edge { border-left: 4px solid var(--c, var(--ink)); }
-.slip.edge.cl { --c: var(--cl); } .slip.edge.pl { --c: var(--pl); } .slip.edge.nba { --c: var(--nba); } .slip.edge.wnba { --c: var(--wnba); }
+.slip.edge.cl { --c: var(--cl); } .slip.edge.pl { --c: var(--pl); } .slip.edge.ll { --c: var(--ll); } .slip.edge.sa { --c: var(--sa); } .slip.edge.nba { --c: var(--nba); } .slip.edge.wnba { --c: var(--wnba); }
 .slip .body { padding: 16px 18px; }
 .slip .stub { padding: 13px 18px 16px; border-top: 1.5px dashed var(--line); }
 .slip .teams { font-weight: 700; font-size: 21px; line-height: 1.15; margin-top: 6px; }

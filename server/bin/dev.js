@@ -36,6 +36,8 @@ if (process.argv.includes("--matches")) {
   const made = [
     ["pl", FOOTBALL, "Premier League", "Arsenal", "Chelsea", now + (minutes + 10) * 60],
     ["cl", FOOTBALL, "Champions League", "Real Madrid", "Bayern", now + 26 * 3600],
+    ["ll", FOOTBALL, "La Liga", "Barcelona", "Sevilla", now + 28 * 3600],
+    ["sa", FOOTBALL, "Serie A", "Inter", "Juventus", now + 50 * 3600],
     ["nba", BASKETBALL, "NBA", "Knicks", "Bucks", now + 30 * 3600],
     ["nba", BASKETBALL, "NBA", "Warriors", "Nuggets", now + 54 * 3600],
   ];

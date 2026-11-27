@@ -35,7 +35,7 @@ test("only Kickoff can start a brand's group, and it starts with nobody in it", 
   // The prize line and the competitions can be left out: no prize line, and every competition.
   const plain = await start(s, { name: "Derby Day", brand: "Blokyz" });
   assert.equal("prize" in plain, false);
-  assert.deepEqual(plain.plays, ["pl", "cl", "nba", "wnba"]);
+  assert.deepEqual(plain.plays, ["pl", "cl", "ll", "sa", "nba", "wnba"]);
   assert.equal("prize" in (await start(s, { name: "Derby Day", brand: "Blokyz", prize: "   " })), false);
 
   for (const bad of [{ ...ask, brand: "" }, { ...ask, brand: "x".repeat(31) }, { ...ask, name: "" }, { ...ask, prize: "x".repeat(81) }, { ...ask, plays: ["chess"] }, { brand: "OKX" }]) {

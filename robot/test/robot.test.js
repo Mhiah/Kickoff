@@ -47,7 +47,7 @@ function world(matches = week()) {
       return reply(answer.status, answer.body);
     }
     if (u.hostname === "api.football-data.org") {
-      const comp = u.pathname.includes("/PL/") ? "pl" : "cl";
+      const comp = { PL: "pl", CL: "cl", PD: "ll", SA: "sa" }[u.pathname.split("/")[3]];
       if (w.down.includes(comp)) return reply(500, { message: "down" });
       return reply(200, { competition: { code: comp.toUpperCase() }, matches: w.matches[comp] ?? [] });
     }
@@ -70,7 +70,7 @@ test("the first run puts the week's real matches on Kickoff's list", async () =>
   const w = world();
   const report = await w.run();
   assert.equal(report.ok, true);
-  assert.deepEqual(report.fetched, { pl: 2, cl: 1, nba: 0, wnba: 0 });
+  assert.deepEqual(report.fetched, { pl: 2, cl: 1, ll: 0, sa: 0, nba: 0, wnba: 0 });
   assert.deepEqual(report.added.sort(), ["Champions League: Real Madrid v Bayern", "Premier League: Arsenal v Chelsea", "Premier League: Man City v Liverpool"]);
   assert.deepEqual(await w.listed(), [
     "Champions League: Real Madrid v Bayern | scheduled",
@@ -186,7 +186,7 @@ test("one feed failing does not stop the others, and what it could not fetch is 
   assert.match(report.problems.join("\n"), /Premier League: could not be fetched/);
   assert.equal((await w.listed()).filter((l) => l.startsWith("Premier League")).length, 2, "the Premier League matches are still there, untouched");
   // With every feed down the run is marked as failed, and still nothing is removed.
-  w.down = ["pl", "cl", "basketball"];
+  w.down = ["pl", "cl", "ll", "sa", "basketball"];
   const none = await w.run();
   assert.equal(none.ok, false);
   assert.equal((await w.listed()).length, 4);
@@ -367,4 +367,25 @@ test("the report reads plainly", async () => {
   assert.match(words, /Premier League: 2 in the feed/);
   assert.match(words, /Added: 3\. Updated: 0\. Called off: 0\. Unchanged: 0\./);
   assert.match(words, /\+ Premier League: Arsenal v Chelsea/);
+});
+
+test("La Liga and Serie A come in like the rest of the football: three predictions a match, with their own names", async () => {
+  const w = world({
+    ...week(),
+    ll: [footballMatch(21, "2026-11-29T20:00:00Z", "TIMED", "Real Madrid", "Barça")],
+    sa: [footballMatch(22, "2026-11-28T19:45:00Z", "TIMED", "Inter", "Juventus")],
+  });
+  const report = await w.run();
+  assert.equal(report.ok, true);
+  assert.deepEqual(report.fetched, { pl: 2, cl: 1, ll: 1, sa: 1, nba: 0, wnba: 0 });
+  assert.ok(report.added.includes("La Liga: Real Madrid v Barça") && report.added.includes("Serie A: Inter v Juventus"));
+  const listed = await w.kickoff.fixtures();
+  for (const [comp, label] of [["ll", "La Liga: Real Madrid v Barça"], ["sa", "Serie A: Inter v Juventus"]]) {
+    const three = listed.filter((f) => f.label === label);
+    assert.deepEqual(three.map((f) => f.comp), [comp, comp, comp]);
+    assert.deepEqual(three.map((f) => f.sport).sort(), [RESULT, GOAL_GOAL, SCORE].sort());
+  }
+  // The feed is asked for them by its own codes.
+  assert.ok(w.asked.some((a) => a.url.includes("/competitions/PD/matches")) && w.asked.some((a) => a.url.includes("/competitions/SA/matches")));
+  assert.match(inWords(report), /La Liga: 1 in the feed\n\s*Serie A: 1 in the feed/);
 });

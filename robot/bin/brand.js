@@ -14,7 +14,7 @@ import { appendFileSync } from "node:fs";
 
 import { createServer } from "../src/server.js";
 
-const COMPETITIONS = { pl: "Premier League", cl: "Champions League", nba: "NBA", wnba: "WNBA" };
+const COMPETITIONS = { pl: "Premier League", cl: "Champions League", ll: "La Liga", sa: "Serie A", nba: "NBA", wnba: "WNBA" };
 
 const flags = process.argv.slice(2);
 const flag = (name) => (flags.includes(name) ? (flags[flags.indexOf(name) + 1] ?? "").trim() : "");

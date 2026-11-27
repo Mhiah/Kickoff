@@ -26,7 +26,7 @@ on:
         type: string
         default: ""
       plays:
-        description: "Which competitions, with commas between: pl, cl, nba, wnba. Leave empty for all four"
+        description: "Which competitions, with commas between: pl, cl, ll, sa, nba, wnba. Leave empty for all six"
         type: string
         default: ""
 

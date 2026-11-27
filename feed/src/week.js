@@ -4,7 +4,7 @@ import { basketballGames } from "./basketball.js";
 import { footballMatches } from "./football.js";
 import { COMPETITIONS } from "./shape.js";
 
-export const FOOTBALL = ["pl", "cl"];
+export const FOOTBALL = ["pl", "cl", "ll", "sa"];
 export const BASKETBALL = ["nba", "wnba"];
 
 /**
