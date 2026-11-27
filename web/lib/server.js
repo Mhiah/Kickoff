@@ -41,6 +41,8 @@ export function createClient({ base = "", device, fetch = (...args) => globalThi
   const code = (value) => encodeURIComponent(String(value).trim().toUpperCase());
 
   return {
+    /** Choose a name with no group, for solo predictions. Answers { name }. */
+    setName: ({ name }) => signed("/api/me/name", { name }),
     /** `brand` is { name, amount, winners, token, ends } for a group run by a brand, or left out for a group of friends. */
     startGroup: ({ name, playerName, plays, brand = null }) => signed("/api/groups", { name, playerName, plays, ...(brand ? { brand } : {}) }),
     /** Whoever started a brand's group says they paid a winner: the winner's place and the payment's transaction. */

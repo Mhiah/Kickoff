@@ -194,7 +194,12 @@ body.public .tabs { display: none; }
 .demo { margin: 26px 0 24px; transform: rotate(-1.4deg); }
 .demo .pick { font-size: 46px; font-weight: 700; line-height: 1; margin-top: 12px; }
 .demo .stamp { position: absolute; right: 10px; top: 10px; }
-.tagline { text-align: center; margin-top: 16px; font-style: italic; color: var(--muted); }
+.solo { text-align: center; margin: 14px 0 0; color: var(--muted); }
+.solo a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; font-weight: 700; }
+/* A solo prediction by someone with no name yet: the name is asked for beside the Seal button. */
+.solo-name { display: block; margin: 18px 0 14px; font-size: 14.5px; font-weight: 600; }
+.solo-name input { display: block; width: 100%; margin-top: 6px; padding: 12px 14px; font: 400 18px var(--serif); color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 12px; }
+.solo-name input:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 /* The three parts under the hero: what you predict, how a match goes, and how to check it. */
 .trio .glass, .trio .btn { margin-top: 14px; }
 @media (max-width: 899px) {
@@ -430,7 +435,7 @@ h1.under { margin-top: 6px; }
   .hero h1 { font-size: 60px; margin-top: 0; }
   .hero .cta { grid-template-columns: auto auto; justify-content: start; margin-top: 26px; }
   .hero .cta .btn { width: auto; padding: 14px 26px; }
-  .hero .tagline { text-align: left; }
+  .hero .solo { text-align: left; }
   /* Three columns, each under its own rule, so the eye lands on the three headings first. Then
      the sentence that says what the column is about, then its detail in the quieter grey. */
   .trio { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 56px; align-items: start; margin-top: 64px; }

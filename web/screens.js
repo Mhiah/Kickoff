@@ -63,7 +63,7 @@ export function home() {
       <a class="btn go" href="#/group/start">Start a group</a>
       <a class="btn quiet" href="#/group/join">Join with a code</a>
     </div>
-    <p class="tagline">Free to play. Predict with your friends.</p>
+    <p class="solo">Playing alone? <a href="#/league">Solo prediction</a></p>
   </div>
 </div>
 
@@ -446,7 +446,7 @@ function markets(id, ctx) {
     body = `
 <div class="glass picker" data-picker="markets">${group.map((g) => `<div class="market" data-market="${g.f.sport}">${marketControls(g.f.sport, f, g.entry)}</div>`).join("")}</div>
 <ul class="rules"><li>Make one, two or all three. Each is scored by itself.</li><li>It is the score after 90 minutes. Extra time and penalties do not count.</li></ul>
-<button type="button" class="btn go" data-seal="${id}">${mine.length ? "Seal my new predictions" : "Seal my predictions"}</button>
+${soloName(ctx)}<button type="button" class="btn go" data-seal="${id}">${mine.length ? "Seal my new predictions" : "Seal my predictions"}</button>
 <p class="after" data-note-out role="status">No other player can see them before kickoff. You can change them until predictions close.</p>`;
   } else if (mine.length) {
     // Where each one stands. They are sent and locked together, so one word usually covers all three.
@@ -501,7 +501,7 @@ export function pick(id, ctx) {
     body = `
 <div class="glass picker" data-picker="${football ? "football" : "basketball"}">${pickControls(f, entry)}</div>
 <ul class="rules">${rules.map((r) => `<li>${r}</li>`).join("")}</ul>
-<button type="button" class="btn go" data-seal="${id}">${entry ? "Seal my new prediction" : "Seal my prediction"}</button>
+${soloName(ctx)}<button type="button" class="btn go" data-seal="${id}">${entry ? "Seal my new prediction" : "Seal my prediction"}</button>
 <p class="after" data-note-out role="status">No other player can see it before ${start}. You can change it until predictions close.</p>`;
   } else if (entry) {
     body = `
@@ -920,6 +920,16 @@ function payLines(g) {
 <p class="sub">Send each winner their share on X Layer, from your own wallet. Then paste the payment's transaction here. Kickoff reads it on X Layer and shows everyone it was paid.</p>
 <div class="glass pay">${rows}</div>
 ${token}`;
+}
+
+/**
+ * A solo prediction: someone with real matches and no name yet is asked for one beside the Seal
+ * button, so the leaderboard has something to call them. Nothing for anyone who has a name.
+ */
+function soloName(ctx) {
+  if (!ctx.real || ctx.mine?.name) return "";
+  return `<label class="solo-name">Your name<input name="soloName" data-solo-name maxlength="24" autocomplete="nickname"></label>
+`;
 }
 
 /** A link back to the Group screen, in the words that fit whether this phone is in a group. */

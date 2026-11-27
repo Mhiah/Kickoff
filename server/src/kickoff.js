@@ -692,6 +692,17 @@ export function createKickoff({ store, league, random = (n) => Math.floor(Math.r
       return { refused: true };
     },
 
+    /**
+     * Choose a name without being in a group: for someone making solo predictions. It is the same
+     * one name they would have in any group, and nobody else can have it. Returns { name }.
+     */
+    async setName({ player, now, name }) {
+      const who = tidyName(name, MAX_PLAYER_NAME, "Your name");
+      await ensurePerson(player, now);
+      await named(player, who, now);
+      return { name: who };
+    },
+
     /** Join a group with its code. A player has one name everywhere: giving another one here changes it everywhere. */
     async joinGroup({ player, now, code, playerName }) {
       const group = await this.group({ code, player, now });

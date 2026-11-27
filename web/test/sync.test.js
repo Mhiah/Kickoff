@@ -107,6 +107,24 @@ test("until real matches are on Kickoff's list, the made-up ones are shown and s
   assert.match(await ada.screen("ars-che"), /Nothing here is live yet/);
 });
 
+test("a solo prediction: someone with no name is asked for one beside the Seal button, and only then", async () => {
+  const online = await kickoffOnline();
+  const solo = await phone(online);
+  await solo.carry();
+  const c = await solo.ctx();
+  const match = Object.keys(c.fixtures).find((id) => c.fixtures[id].lead);
+  // No group and no name: the screen asks for a name, right above the button.
+  const asks = pick(match, { ...c, mine: { ...c.mine, name: "" } }).html;
+  assert.match(asks, /<label class="solo-name">Your name<input name="soloName" data-solo-name maxlength="24" autocomplete="nickname"><\/label>\n<button type="button" class="btn go" data-seal=/);
+  // Someone who has a name, from a group or from an earlier solo prediction, is not asked again.
+  assert.ok(!pick(match, { ...c, mine: { ...c.mine, name: "Tolu" } }).html.includes("data-solo-name"));
+  // The made-up matches of a never-launched copy do not ask either: nothing there is sent.
+  const preview = await phone(await kickoffOnline({ withMatches: false }));
+  await preview.carry();
+  const p = await preview.ctx();
+  assert.ok(!pick("ars-che", { ...p, mine: { ...p.mine, name: "" } }).html.includes("data-solo-name"));
+});
+
 test("once real matches have been on the list, a week with none shows nothing made up", async () => {
   const online = await kickoffOnline();
   const ada = await phone(online);

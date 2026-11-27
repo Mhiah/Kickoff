@@ -76,7 +76,8 @@ async function draw({ keepPlace = false } = {}) {
   }
   // The frame's own words: which group this is, and who is playing.
   const where = document.querySelector("[data-where]");
-  where.textContent = ctx.mine.group?.name ?? (screen.public ? "See a sample group" : "Start a group");
+  // With real matches on the list, someone in no group is offered a solo prediction, not a sample.
+  where.textContent = ctx.mine.group?.name ?? (screen.public ? (ctx.real ? "Solo prediction" : "See a sample group") : "Start a group");
   where.setAttribute("href", ctx.mine.group || !screen.public ? "#/group" : "#/league");
   const me = document.querySelector("[data-me]");
   me.hidden = !ctx.mine.group;
@@ -152,6 +153,13 @@ document.addEventListener("click", async (event) => {
     const ctx = await context();
     const fixture = ctx.fixtures[target.dataset.seal];
     try {
+      // A solo prediction by someone with no name yet: the name comes first, and is theirs from now on.
+      const asked = view.querySelector("[data-solo-name]");
+      if (asked) {
+        const name = asked.value.trim();
+        if (!name) throw new Error("Type your name first.");
+        await groups.name(name);
+      }
       if (several) {
         // Each prediction is sealed by itself. One that has not changed is left exactly as it was.
         for (const id of fixture.group) {

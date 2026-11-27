@@ -76,6 +76,12 @@ export function createGroups({ store, client, device }) {
       rememberName(playerName);
       return group;
     },
+    /** Choose this player's name with no group, for solo predictions. Refused if somebody else has it. */
+    async name(name) {
+      const answer = await client.setName({ name });
+      store.write(NAME_KEY, answer.name);
+      return answer.name;
+    },
     /** Whoever started a brand's group says they paid a winner. Kickoff's robot reads the payment before it counts. */
     async paid({ code, place, tx }) {
       return put(await client.claimPaid({ code, place, tx }));

@@ -140,6 +140,7 @@ A device must sign these:
 | `POST /api/groups/<code>/join` | Join a group with a name |
 | `POST /api/groups/<code>/paid` | Whoever started a brand's group says they paid a winner, and gives the payment's transaction. It counts once the robot has read it on X Layer |
 | `POST /api/groups/<code>/plays` | Choose which competitions it plays. Only the person who started it can |
+| `POST /api/me/name` | Choose a name with no group, for solo predictions. Refused if somebody else has it |
 | `POST /api/me/groups` | The groups this device is in, and the wallet it has linked, if any |
 | `POST /api/me/table` | The League screen's numbers: the table of everyone, the table of a group, and this player's place and finished matches |
 | `POST /api/wallet` | Link a wallet: its address, the note's time, and its signature of the note |

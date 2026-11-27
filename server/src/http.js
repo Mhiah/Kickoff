@@ -12,6 +12,7 @@
 //     POST /api/groups                { name, playerName, plays } start a group
 //     POST /api/groups/<code>/join    { playerName }            join one
 //     POST /api/groups/<code>/plays   { plays }                 choose its competitions (its starter only)
+//     POST /api/me/name               { name }                  choose a name with no group, for solo predictions
 //     POST /api/me/groups             {}                        the groups this device is in, and its wallet if it linked one
 //     POST /api/me/table              { group }                 the League screen: both tables, and this player's place and matches
 //     POST /api/wallet                { wallet, linkAt, signature } link a wallet (engine/src/wallet.js)
@@ -96,6 +97,10 @@ export function createHandler({ kickoff, now, adminKey = null }) {
     ["POST", /^\/api\/groups\/([^/]+)\/plays$/, async (r, code) => {
       const s = await signed(r);
       return kickoff.setPlays({ player: s.player, code: decodeURIComponent(code), plays: s.plays });
+    }],
+    ["POST", /^\/api\/me\/name$/, async (r) => {
+      const s = await signed(r);
+      return kickoff.setName({ player: s.player, now: now(), name: s.name });
     }],
     ["POST", /^\/api\/me\/groups$/, async (r) => {
       const s = await signed(r);
